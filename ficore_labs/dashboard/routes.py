@@ -1,4 +1,18 @@
-from flask import jsonify, request
+from flask import Blueprint, render_template, flash, session, jsonify, request
+from flask_login import login_required, current_user
+from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
+from bson import ObjectId
+import logging
+from translations import trans
+import utils
+from utils import format_date
+from helpers import reminders
+
+logger = logging.getLogger(__name__)
+
+dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
+
 # API endpoint for weekly profit data (for dashboard chart)
 @dashboard_bp.route('/weekly_profit_data')
 @login_required
@@ -29,19 +43,6 @@ def weekly_profit_data():
             'profit': profit
         })
     return jsonify({'data': profit_per_day})
-from flask import Blueprint, render_template, flash, session
-from flask_login import login_required, current_user
-from translations import trans
-import utils
-from utils import format_date
-from bson import ObjectId
-from datetime import datetime, timezone
-from zoneinfo import ZoneInfo
-import logging
-
-logger = logging.getLogger(__name__)
-
-dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
 
 @dashboard_bp.route('/')
 @login_required
@@ -71,11 +72,10 @@ def index():
     can_interact = False
 
     try:
-    db = utils.get_mongo_db()
-    query = {'user_id': str(current_user.id)}
-    tax_prep_mode = request.args.get('tax_prep') == '1'
-        # Import reminders utility
-        from helpers import reminders
+        db = utils.get_mongo_db()
+        query = {'user_id': str(current_user.id)}
+        tax_prep_mode = request.args.get('tax_prep') == '1'
+        # Fetch reminders data
         show_daily_log_reminder = False
         user_streak = 0
         unpaid_debtors = []
