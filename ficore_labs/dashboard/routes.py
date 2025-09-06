@@ -29,7 +29,7 @@ def weekly_profit_data():
             'profit': profit
         })
     return jsonify({'data': profit_per_day})
-apply this fix at the top OF THE sidebar template, and then proceed to the Visual Progress/Charts feature?from flask import Blueprint, render_template, flash, session
+from flask import Blueprint, render_template, flash, session
 from flask_login import login_required, current_user
 from translations import trans
 import utils
