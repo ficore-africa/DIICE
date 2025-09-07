@@ -1,3 +1,7 @@
+INTERNAL USE ONLY:
+This codebase contains proprietary and confidential information belonging to FICORE LABS LIMITED.
+Unauthorized access, use, copying, or distribution of any part of this codebase is strictly prohibited.
+
 # Ficore Labs (DIICE) - Full Stack Business Management Platform
 
 ## Overview
@@ -79,3 +83,4 @@ Ficore Labs (DIICE) is a modern, modular, and habit-forming business management 
 
 ## License
 MIT (c) Ficore Labs, 2025
+
