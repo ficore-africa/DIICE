@@ -1,86 +1,271 @@
-INTERNAL USE ONLY:
-This codebase contains proprietary and confidential information belonging to FICORE LABS LIMITED.
-Unauthorized access, use, copying, or distribution of any part of this codebase is strictly prohibited.
-
 # Ficore Labs (DIICE) - Full Stack Business Management Platform
 
 ## Overview
-Ficore Labs (DIICE) is a modern, modular, and habit-forming business management platform designed for African entrepreneurs, traders, and startups. It provides daily-use incentives, actionable insights, and a robust set of tools to help users manage finances, inventory, compliance, and growth—all in a secure, mobile-friendly, and extensible environment.
 
----
+Ficore Labs (DIICE) is a comprehensive, modern business management platform designed specifically for African entrepreneurs and traders. It provides daily-use incentives, actionable insights, and a robust set of tools to help users manage finances, inventory, compliance, taxation, and business growth—all in a secure, mobile-friendly, and extensible environment.
 
-## Features
-- **Smart Reminders**: Daily log reminders, streak tracking, and engagement banners.
-- **Quick Log Buttons**: Fast entry for sales, expenses, and inventory.
-- **Visual Progress & Charts**: Dashboard with profit/loss, streaks, and financial health charts (Chart.js).
-- **Streaks & Gamification**: Track daily usage streaks and reward consistency.
-- **Profit Summary PDF**: Downloadable profit/loss reports (PDF via ReportLab).
-- **Debt Tracker**: Alerts for unpaid debts/credits, with quick links to manage.
-- **Tax Prep Mode**: Toggle to show only true profit for tax purposes.
-- **Inventory Loss Detector**: Alerts when inventory cost exceeds expected margins.
-- **Inventory Management**: Full CRUD for inventory items, with dedicated module and UI.
-- **Modular Blueprints**: Each business area (dashboard, creditors, debtors, inventory, etc.) is a Flask blueprint for maintainability.
-- **User Management**: Secure authentication, trial/subscription logic, and admin controls.
-- **Notifications**: In-app notifications for key events and reminders.
-- **Internationalization**: Multi-language support (English, Hausa).
-- **PWA Support**: Installable, offline-capable web app with manifest and service worker.
-- **Responsive UI**: Mobile-first, Bootstrap-based design.
+The platform features a streamlined user experience for entrepreneurs/traders with dedicated admin capabilities for system management, comprehensive tax calculation tools, and educational resources to help users understand Nigerian tax compliance.
 
----
+## Key Features
+
+### 🎯 Core Business Management
+- **Smart Reminders**: Daily log reminders with customizable debt aging alerts
+- **Quick Log Buttons**: Fast entry for sales, expenses, and inventory transactions
+- **Visual Progress & Charts**: Dashboard with profit/loss tracking, streaks, and financial health visualization (Chart.js)
+- **Streaks & Gamification**: Track daily usage streaks with rewards (up to 30% discount on 100-day streaks)
+- **Profit Summary PDF**: Downloadable profit/loss reports with detailed breakdowns (ReportLab)
+
+### 💰 Advanced Financial Management
+- **Expense Categorization System**: 8 comprehensive expense categories with tax deductibility tracking:
+  - Office & Admin (tax-deductible)
+  - Staff & Wages (tax-deductible)
+  - Business Travel & Transport (tax-deductible)
+  - Rent & Utilities (tax-deductible)
+  - Marketing & Sales (tax-deductible)
+  - Cost of Goods Sold - COGS (tax-deductible)
+  - Personal Expenses (non-deductible)
+  - Statutory & Legal Contributions (tax-deductible, special handling)
+
+- **Debt & Credit Tracking**: Comprehensive alerts for unpaid debts/credits with quick management links
+- **Tax Preparation Mode**: Toggle to show only true profit for accurate tax calculations
+- **Inventory Loss Detection**: Smart alerts when inventory costs exceed expected margins
+
+### 🧮 Tax Calculation Engine
+- **Dual Entity Type Support**: 
+  - Sole Proprietor (Personal Income Tax - PIT)
+  - Limited Liability Company (Companies Income Tax - CIT)
+- **Four-Step PIT Calculation**:
+  1. Net Business Profit calculation using 6 deductible categories
+  2. Statutory & Legal Contributions deduction
+  3. Rent Relief calculation (lesser of 20% rent or ₦500,000)
+  4. Progressive tax band application (NTA 2025 rates: 15%, 18%, 21%, 24%, 25%)
+- **CIT Calculation**: 0% for companies ≤₦50M revenue, 30% for >₦50M revenue
+- **Real-time Tax Calculator**: Interactive interface with detailed breakdown displays
+
+### 📚 Education & Compliance
+- **Tax Education System**: Personalized learning paths based on user type:
+  - Employee (PAYE focus)
+  - Entrepreneur Unregistered (formalization benefits)
+  - Sole Proprietor (PIT requirements)
+  - Company (CIT requirements)
+- **Interactive Learning Modules**: Understanding tax types, filing requirements, deductions & reliefs
+- **Compliance Tracking**: Tools to help users stay compliant with Nigerian tax regulations
+
+### 📊 Inventory & Operations
+- **Full Inventory Management**: Complete CRUD operations with dedicated module and UI
+- **Loss Detection**: Automated alerts for inventory cost anomalies
+- **Margin Tracking**: Monitor profitability across inventory items
+
+### 👥 User Management & Security
+- **Secure Authentication**: Flask-Login with session management
+- **Trial/Subscription Logic**: Flexible subscription system with trial periods
+- **Admin Dashboard**: Dedicated admin account for user monitoring, KYC management, and system oversight
+- **Role-based Access Control**: Separate interfaces for traders and administrators
+
+### 🌍 Internationalization & Accessibility
+- **Multi-language Support**: English and Hausa translations (Flask-Babel)
+- **PWA Support**: Installable, offline-capable web app with manifest and service worker
+- **Responsive Design**: Mobile-first, Bootstrap 5-based interface
+- **Accessibility Compliance**: ARIA labels, keyboard navigation, screen reader support
+
+### 🔔 Notifications & Engagement
+- **In-app Notifications**: Real-time alerts for key events and reminders
+- **Engagement Banners**: Contextual prompts to encourage platform usage
+- **Reward System**: Streak-based incentives and discount programs
+
+### 📋 Compliance & Documentation
+- **KYC Management**: Upload and manage compliance documents
+- **Audit Logging**: Comprehensive activity tracking for compliance
+- **Report Generation**: Detailed financial reports for tax and business purposes
 
 ## Tech Stack
-- **Backend**: Python 3, Flask, Flask-Login, Flask-Session, Flask-Babel, Flask-Limiter, Flask-CORS, Flask-WTF, Flask-Compress
-- **Database**: MongoDB (via PyMongo)
-- **Frontend**: Jinja2 templates, Bootstrap 5, Chart.js, custom CSS/JS
-- **PDF Generation**: ReportLab
-- **Internationalization**: Flask-Babel, translation files
-- **PWA**: Manifest.json, Service Worker (sw.js)
-- **Deployment**: WSGI (wsgi.py), Render.com/Heroku/Cloud
-- **Other**: dotenv for config, logging, CSRF protection, CORS, session management
 
----
+### Backend
+- **Python 3** with **Flask** framework
+- **Flask Extensions**: Login, Session, Babel, Limiter, CORS, WTF, Compress
+- **Database**: MongoDB with PyMongo driver
+- **Authentication**: Flask-Login with secure session management
+- **PDF Generation**: ReportLab for financial reports
 
-## Main App Sections
-- **Dashboard**: Central hub for reminders, charts, streaks, and alerts.
-- **Inventory**: Add, view, and manage inventory items. Loss detection and margin tracking.
-- **Debtors & Creditors**: Track who owes you and whom you owe. Alerts for unpaid items.
-- **Receipts & Payments**: Record and manage all cashflows.
-- **Reports**: Generate and download profit/loss summaries.
-- **Settings**: User profile, preferences, and language selection.
-- **Admin**: User management, system settings, and advanced reports.
-- **Notifications**: In-app alerts and reminders.
-- **KYC & Compliance**: Upload and manage compliance documents.
-- **Subscribe**: Manage trial, subscription, and plan upgrades.
+### Frontend
+- **Templates**: Jinja2 with Bootstrap 5
+- **Charts**: Chart.js for financial visualizations
+- **PWA**: Manifest.json and Service Worker (sw.js)
+- **Styling**: Custom CSS with responsive design
 
----
+### Infrastructure
+- **Deployment**: WSGI (wsgi.py) compatible with Render.com/Heroku/Cloud platforms
+- **Configuration**: Environment variables with dotenv
+- **Logging**: Comprehensive logging with session tracking
+- **Security**: CSRF protection, CORS handling, rate limiting
 
-## Directory Structure (Key Folders)
-- `ficore_labs/` - Main app package
-  - `app.py` - App factory, blueprint registration
-  - `models.py` - Data models and initialization
-  - `utils.py` - Utility functions (DB, logging, etc.)
-  - `helpers/` - Custom business logic (reminders, streaks, inventory loss, etc.)
-  - `templates/` - Jinja2 templates (modular by section)
-  - `static/` - CSS, JS, images, manifest, service worker
-  - `admin/`, `dashboard/`, `creditors/`, `debtors/`, `inventory/`, etc. - Blueprints for each business area
+## Application Modules
 
----
+### Core Modules
+- **Dashboard**: Central hub with reminders, charts, streaks, and financial alerts
+- **Payments & Receipts**: Record and manage all cashflows with expense categorization
+- **Inventory**: Add, view, and manage inventory items with loss detection
+- **Debtors & Creditors**: Track receivables and payables with aging alerts
+
+### Financial & Tax Modules
+- **Tax Calculator**: Interactive tax calculation with entity type support
+- **Reports**: Generate and download comprehensive profit/loss summaries
+- **Education**: Tax education system with personalized learning paths
+
+### Management Modules
+- **Admin**: User monitoring, KYC management, subscription oversight (admin only)
+- **Settings**: User profile, preferences, language selection, entity type management
+- **KYC & Compliance**: Document upload and compliance management
+- **Subscribe**: Trial and subscription plan management
+
+### Engagement Modules
+- **Notifications**: In-app alerts and reminder system
+- **Rewards**: Streak tracking and reward management
+
+## Directory Structure
+
+```
+ficore_labs/
+├── app.py                 # App factory and blueprint registration
+├── models.py              # Data models and database initialization
+├── utils.py               # Utility functions (DB, logging, expense categories)
+├── tax_calculation_engine.py  # Tax calculation logic for PIT and CIT
+├── wsgi.py               # WSGI entry point
+├── requirements.txt      # Python dependencies
+├── blueprints/           # Flask blueprints for modular architecture
+│   ├── admin/           # Admin management interface
+│   ├── business/        # Business logic and operations
+│   ├── creditors/       # Creditor management
+│   ├── dashboard/       # Main dashboard
+│   ├── debtors/         # Debtor management
+│   ├── education/       # Tax education system
+│   ├── general/         # General pages and landing
+│   ├── inventory/       # Inventory management
+│   ├── kyc/            # KYC and compliance
+│   ├── payments/        # Payment processing with categories
+│   ├── receipts/        # Receipt management
+│   ├── reports/         # Financial reporting
+│   ├── rewards/         # Reward and streak system
+│   ├── settings/        # User settings and preferences
+│   ├── subscribe/       # Subscription management
+│   ├── tax/            # Tax calculator interface
+│   └── users/          # User authentication and management
+├── helpers/             # Custom business logic
+├── templates/           # Jinja2 templates (modular by section)
+├── static/             # CSS, JS, images, manifest, service worker
+├── translations/        # Multi-language support files
+└── notifications/       # Notification system
+```
 
 ## Getting Started
-1. **Clone the repo**
-2. `pip install -r requirements.txt`
-3. Set up `.env` with `SECRET_KEY` and `MONGO_URI`
-4. Run with `python -m ficore_labs.app` or `flask run`
-5. Access at `http://localhost:5000`
 
----
+### Prerequisites
+- Python 3.8+
+- MongoDB database
+- Environment variables for configuration
+
+### Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd ficore_labs
+   ```
+
+2. **Install dependencies**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **Set up environment variables**
+   Create a `.env` file with:
+   ```
+   SECRET_KEY=your_secret_key_here
+   MONGO_URI=your_mongodb_connection_string
+   FLASK_ENV=development
+   ```
+
+4. **Run the application**
+   ```bash
+   python -m ficore_labs.app
+   # or
+   flask run
+   ```
+
+5. **Access the application**
+   Open http://localhost:5000 in your browser
+
+### Default Admin Account
+- **Username**: admin
+- **Password**: Admin123!
+
+This account is auto-created for system management, user monitoring, KYC oversight, and subscription management. All other users are entrepreneurs/traders by default.
+
+## Key Features in Detail
+
+### Expense Categorization System
+The platform includes a sophisticated 8-category expense system designed for Nigerian tax compliance:
+
+- **6 Tax-Deductible Categories**: Office & Admin, Staff & Wages, Business Travel, Rent & Utilities, Marketing & Sales, COGS
+- **1 Non-Deductible Category**: Personal Expenses
+- **1 Special Category**: Statutory & Legal Contributions (handled separately in tax calculations)
+
+### Tax Calculation Engine
+- **Automatic Entity Type Detection**: Routes calculations based on user's business structure
+- **PIT Four-Step Process**: Compliant with Nigeria Tax Act 2025
+- **CIT Revenue Threshold**: Automatic 0% vs 30% rate application
+- **Rent Relief Calculation**: Automatic application of rent relief benefits
+- **Progressive Tax Bands**: Accurate application of multiple tax rates
+
+### Education System
+- **Personalized Learning**: Content adapts based on user's business type
+- **Interactive Modules**: Step-by-step guidance through tax concepts
+- **Practical Examples**: Real-world scenarios relevant to Nigerian businesses
+- **Compliance Tracking**: Tools to help users stay compliant
 
 ## Contributing
-- PRs welcome! Please follow PEP8 and keep features modular.
-- For translations, update the relevant files in `translations/`.
+
+We welcome contributions! Please follow these guidelines:
+
+1. **Code Style**: Follow PEP8 standards
+2. **Modular Design**: Keep features modular using the blueprint system
+3. **Translations**: Update relevant files in `translations/` for new features
+4. **Testing**: Include tests for new functionality
+5. **Documentation**: Update README and inline documentation
+
+### Adding New Blueprints
+1. Create blueprint under `blueprints/<name>/`
+2. Import in `app.py`: `from blueprints.<name>.routes import <name>_bp`
+3. Register: `app.register_blueprint(<name>_bp, url_prefix='/<name>')`
+
+### Translation Updates
+- Update files in `translations/general_features/` and `translations/trader/`
+- Use translation keys in templates: `{{ trans('key_name', default='Default Text') }}`
+
+## Deployment
+
+The application is designed for easy deployment on cloud platforms:
+
+- **Render.com**: Use `wsgi.py` as entry point
+- **Heroku**: Compatible with Heroku's Python buildpack
+- **Cloud Platforms**: Standard WSGI deployment
+
+### Environment Configuration
+Ensure these environment variables are set in production:
+- `SECRET_KEY`: Strong secret key for session security
+- `MONGO_URI`: MongoDB connection string
+- `FLASK_ENV`: Set to 'production'
+- `SERVER_NAME`: Your domain name
+- `PREFERRED_URL_SCHEME`: 'https' for production
+
+## License
+
+This project is proprietary software developed by Ficore Labs for African entrepreneurs and traders.
+
+## Support
+
+For support, feature requests, or bug reports, please contact the development team or create an issue in the project repository.
 
 ---
 
-## License
-MIT (c) Ficore Labs, 2025
-
+**Ficore Labs** - Empowering African entrepreneurs with modern business management tools and tax compliance education.
