@@ -1,8 +1,8 @@
 CREDITORS_TRANSLATIONS = {
     'en': {
         'creditors_dashboard': 'Creditors',
-        'creditors_dashboard_desc': 'Keep track of money you owe to others.',
-        'creditors_tooltip': 'Manage your debts to creditors.',
+        'creditors_dashboard_desc': 'Monitor outstanding payments to suppliers and vendors to maintain healthy cash flow.',
+        'creditors_tooltip': 'Track payment obligations and manage supplier relationships effectively.',
         'creditors_list': 'Creditors List',
         'they_owe_title': 'They Owe',
         'creditors_recent_creditors': 'Recent Creditors',
@@ -115,7 +115,7 @@ CREDITORS_TRANSLATIONS = {
         'creditors_total_outstanding': 'Jimillar da Ya Rage',
         'creditors_overdue_payments': 'Biyan da Ya Wuce Lokaci',
         'they_owe_title': 'Suna Bashi',
-        'creditors_dashboard_desc': 'Kula da wadanda suke binku bashi.',
+        'creditors_dashboard_desc': 'Lura da biyan kuɗi ga masu sayar da kayayyaki da masu hidima don kula da kwararar kuɗi mai kyau.',
         'creditors_aging_report': 'Rahoton Tsufa',
         'creditors_create_what_you_owe': 'Ƙirƙiri Abin da ake Binka',
         'creditors_what_you_owe': 'Abin da ake Binka',
@@ -123,7 +123,7 @@ CREDITORS_TRANSLATIONS = {
         'creditors_no_recent_creditors': 'Babu Binka Bashi na Kwanan Nan',
         'creditors_insufficient_coins': 'Ba kiredit don ƙara masu binka bashi',
         'creditors_what_you_owe_subtext': 'Bi diddigin basusukan da ake binka',
-        'creditors_tooltip': 'Sarrafa bashinka ga Masu Binka Bashi.',
+        'creditors_tooltip': 'Bi diddigin wajibai na biya da sarrafa dangantakar masu sayar da kayayyaki yadda ya kamata.',
         'creditors_no_what_you_owe': 'Babu basusuka da aka rubuta',
         'creditors_create_success': 'An ƙirƙiri mai biyan bashi cikin nasara!',
         'creditors_amount_owed': 'Adadin Bashi',

@@ -4,8 +4,8 @@ EDUCATION_TRANSLATIONS = {
     'en': {
         # Navigation and General
         'tax_education': 'Tax Education',
-        'tax_education_desc': 'Learn about Nigerian tax laws and compliance',
-        'tax_education_tooltip': 'Access comprehensive tax education modules',
+        'tax_education_desc': 'Comprehensive guide to Nigerian tax laws, compliance requirements, and business formalization benefits',
+        'tax_education_tooltip': 'Interactive learning modules covering PIT, CIT, VAT, and tax planning strategies',
         'education_title': 'Tax Education Center',
         'education_center': 'Tax Education Center',
         'welcome_education': 'Welcome to Tax Education',

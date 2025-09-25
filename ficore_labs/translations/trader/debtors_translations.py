@@ -5,8 +5,8 @@ Debtors management translations for accounting tools
 DEBTORS_TRANSLATIONS = {
     'en': {
         'debtors_dashboard': 'Debtors',
-        'debtors_dashboard_desc': 'Manage money owed to you by others.',
-        'debtors_tooltip': 'Manage money owed to you by debtors.',
+        'debtors_dashboard_desc': 'Track outstanding receivables and manage customer payment schedules to optimize cash flow.',
+        'debtors_tooltip': 'Monitor customer debts and send payment reminders to maintain healthy accounts receivable.',
         'debtors_list': 'Debtors List',
         'debtors_add_debtor': 'Add Debtor',
         'debtors_recent_debtors': 'Recent Debtors',
@@ -178,12 +178,12 @@ DEBTORS_TRANSLATIONS = {
         'debtors_no_debtors': 'Ba a sami masu bin bashi ba',
         'debtors_search_debtors': 'Nemo masu bin bashi...',
         'debtors_create_what_they_owe_you': 'Ƙirƙiri Abinda Kake Bi',
-        'debtors_tooltip': 'Bincika da sarrafa masu bashi',
+        'debtors_tooltip': 'Lura da bashin abokan ciniki da aika tunatarwar biya don kula da lafiyar asusun da za a karɓa.',
         'debtors_insufficient_credits': 'Rashin Isassun Kuɗi',
         'debtors_what_they_owe_you': 'Abin da Kake Bi',
         'debtors_what_they_owe_you_subtext': 'Bi diddigin basusukan da aake bi',
         'debtors_no_what_they_owe_you': 'Babu basusuka da kake bi',
-        'debtors_dashboard_desc': 'Duba bayanan wadanda kake bi bashi.',
+        'debtors_dashboard_desc': 'Bi diddigin kuɗaɗen da za a karɓa da sarrafa jadawalin biyan abokan ciniki don inganta kwararar kuɗi.',
         # Debtors
         'debtors_amount_owed': 'Adadin Bashi',
         
