@@ -18,6 +18,7 @@ def get_db_connection():
     try:
         # Try different MongoDB connection strings
         possible_uris = [
+            'mongodb+srv://ficoreaiafrica:kA1ba9Ote6SsHV3w@records.9xeqmnn.mongodb.net/ficore_accounting?retryWrites=true&w=majority&tlsAllowInvalidCertificates=true',
             os.environ.get('MONGODB_URI'),
             'mongodb://localhost:27017/ficore_labs',
             'mongodb://127.0.0.1:27017/ficore_labs'
@@ -30,7 +31,9 @@ def get_db_connection():
                     client.admin.command('ping')
                     
                     # Extract database name
-                    if '/' in uri and uri.split('/')[-1]:
+                    if 'ficore_accounting' in uri:
+                        db_name = 'ficore_accounting'
+                    elif '/' in uri and uri.split('/')[-1]:
                         db_name = uri.split('/')[-1].split('?')[0]
                     else:
                         db_name = 'ficore_labs'
@@ -72,10 +75,9 @@ def clean_string_field(value):
     
     return cleaned
 
-def fix_user_data(user_id):
+def fix_user_data(db, user_id):
     """Fix cashflow data for a specific user."""
-    db = get_db_connection()
-    if not db:
+    if db is None:
         return False
     
     try:
@@ -137,17 +139,43 @@ def fix_user_data(user_id):
         logger.error(f"Error fixing data for user {user_id}: {str(e)}")
         return False
 
+def fix_all_users():
+    """Fix cashflow data for all users."""
+    db = get_db_connection()
+    if db is None:
+        return False
+    
+    try:
+        # Get all unique user IDs
+        user_ids = db.cashflows.distinct('user_id')
+        logger.info(f"Found {len(user_ids)} unique users")
+        
+        total_success = 0
+        for user_id in user_ids:
+            logger.info(f"Processing user: {user_id}")
+            if fix_user_data(db, user_id):
+                total_success += 1
+            else:
+                logger.error(f"Failed to fix data for user: {user_id}")
+        
+        logger.info(f"Successfully processed {total_success} out of {len(user_ids)} users")
+        return total_success == len(user_ids)
+        
+    except Exception as e:
+        logger.error(f"Error in fix_all_users: {str(e)}")
+        return False
+
 def main():
     """Main function."""
-    logger.info("Starting cashflow data cleanup")
+    logger.info("Starting cashflow data cleanup for all users")
     
-    # Fix data for user hassan specifically
-    success = fix_user_data('hassan')
+    # Fix data for all users
+    success = fix_all_users()
     
     if success:
-        logger.info("Cleanup completed successfully")
+        logger.info("Cleanup completed successfully for all users")
     else:
-        logger.error("Cleanup failed")
+        logger.error("Cleanup failed for some users")
 
 if __name__ == "__main__":
     main()

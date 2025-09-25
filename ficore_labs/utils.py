@@ -649,10 +649,17 @@ def clean_cashflow_record(record):
                     logger.info(f"Cleaned cashflow field '{field}': '{original_value}' -> '{cleaned_value}'", 
                                extra={'session_id': session.get('sid', 'no-session-id')})
         
-        # Ensure datetime fields are properly handled
-        if 'created_at' in cleaned_record and cleaned_record['created_at']:
-            if hasattr(cleaned_record['created_at'], 'tzinfo') and cleaned_record['created_at'].tzinfo is None:
-                cleaned_record['created_at'] = cleaned_record['created_at'].replace(tzinfo=ZoneInfo("UTC"))
+        # Ensure datetime fields are properly handled and JSON serializable
+        datetime_fields = ['created_at', 'updated_at']
+        for field in datetime_fields:
+            if field in cleaned_record and cleaned_record[field]:
+                if hasattr(cleaned_record[field], 'tzinfo') and cleaned_record[field].tzinfo is None:
+                    cleaned_record[field] = cleaned_record[field].replace(tzinfo=ZoneInfo("UTC"))
+                # Convert to ISO string for JSON serialization
+                if hasattr(cleaned_record[field], 'isoformat'):
+                    cleaned_record[field] = cleaned_record[field].isoformat()
+                else:
+                    cleaned_record[field] = str(cleaned_record[field])
         
         return cleaned_record
         
@@ -709,10 +716,17 @@ def aggressively_clean_record(record):
         if not cleaned_record.get('expense_category'):
             cleaned_record['expense_category'] = 'office_admin'
         
-        # Ensure datetime is properly formatted
-        if 'created_at' in cleaned_record and cleaned_record['created_at']:
-            if hasattr(cleaned_record['created_at'], 'tzinfo') and cleaned_record['created_at'].tzinfo is None:
-                cleaned_record['created_at'] = cleaned_record['created_at'].replace(tzinfo=ZoneInfo("UTC"))
+        # Ensure datetime is properly formatted and JSON serializable
+        datetime_fields = ['created_at', 'updated_at']
+        for field in datetime_fields:
+            if field in cleaned_record and cleaned_record[field]:
+                if hasattr(cleaned_record[field], 'tzinfo') and cleaned_record[field].tzinfo is None:
+                    cleaned_record[field] = cleaned_record[field].replace(tzinfo=ZoneInfo("UTC"))
+                # Convert to ISO string for JSON serialization
+                if hasattr(cleaned_record[field], 'isoformat'):
+                    cleaned_record[field] = cleaned_record[field].isoformat()
+                else:
+                    cleaned_record[field] = str(cleaned_record[field])
         
         return cleaned_record
         

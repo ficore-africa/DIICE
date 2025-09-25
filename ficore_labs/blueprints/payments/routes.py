@@ -59,19 +59,22 @@ def index():
                 if test_count > 0:
                     logger.warning(f"Found {test_count} payments for user {current_user.id} but safe_find returned empty", 
                                  extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-                    # Try to get at least some records with minimal processing
-                    raw_payments = list(db.cashflows.find(query).limit(50))
+                    # Try to get at least some records with aggressive cleaning
+                    raw_payments = list(db.cashflows.find(query).sort('created_at', -1).limit(50))
                     payments = []
                     for payment in raw_payments:
                         try:
-                            # Minimal cleaning for display
-                            if 'party_name' in payment and payment['party_name']:
-                                payment['party_name'] = str(payment['party_name']).replace('\\', '')[:100]
-                            if 'description' in payment and payment['description']:
-                                payment['description'] = str(payment['description']).replace('\\', '')[:200]
-                            payments.append(payment)
-                        except Exception:
+                            # Use the aggressive cleaning function from utils
+                            cleaned_payment = utils.aggressively_clean_record(payment)
+                            if cleaned_payment:
+                                # Ensure ObjectId is converted to string
+                                if '_id' in cleaned_payment:
+                                    cleaned_payment['_id'] = str(cleaned_payment['_id'])
+                                payments.append(cleaned_payment)
+                        except Exception as clean_error:
+                            logger.debug(f"Failed to clean payment record {payment.get('_id', 'unknown')}: {str(clean_error)}")
                             continue
+                    logger.info(f"Fallback cleaning recovered {len(payments)} payments for user {current_user.id}")
             except Exception as fallback_error:
                 logger.error(f"Fallback query also failed for user {current_user.id}: {str(fallback_error)}", 
                            extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
@@ -116,19 +119,22 @@ def manage():
                 if test_count > 0:
                     logger.warning(f"Found {test_count} payments for user {current_user.id} but safe_find returned empty in manage", 
                                  extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-                    # Try to get at least some records with minimal processing
-                    raw_payments = list(db.cashflows.find(query).limit(50))
+                    # Try to get at least some records with aggressive cleaning
+                    raw_payments = list(db.cashflows.find(query).sort('created_at', -1).limit(50))
                     payments = []
                     for payment in raw_payments:
                         try:
-                            # Minimal cleaning for display
-                            if 'party_name' in payment and payment['party_name']:
-                                payment['party_name'] = str(payment['party_name']).replace('\\', '')[:100]
-                            if 'description' in payment and payment['description']:
-                                payment['description'] = str(payment['description']).replace('\\', '')[:200]
-                            payments.append(payment)
-                        except Exception:
+                            # Use the aggressive cleaning function from utils
+                            cleaned_payment = utils.aggressively_clean_record(payment)
+                            if cleaned_payment:
+                                # Ensure ObjectId is converted to string
+                                if '_id' in cleaned_payment:
+                                    cleaned_payment['_id'] = str(cleaned_payment['_id'])
+                                payments.append(cleaned_payment)
+                        except Exception as clean_error:
+                            logger.debug(f"Failed to clean payment record {payment.get('_id', 'unknown')}: {str(clean_error)}")
                             continue
+                    logger.info(f"Fallback cleaning recovered {len(payments)} payments for user {current_user.id} in manage")
             except Exception as fallback_error:
                 logger.error(f"Fallback query also failed for user {current_user.id} in manage: {str(fallback_error)}", 
                            extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})

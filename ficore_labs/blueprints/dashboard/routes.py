@@ -336,9 +336,25 @@ def index():
                 item['name'] = utils.sanitize_input(item.get('name', ''), max_length=100)
                 item['description'] = utils.sanitize_input(item.get('description', 'No description provided'), max_length=500)
                 item['contact'] = utils.sanitize_input(item.get('contact', 'N/A'), max_length=50)
-                item['_id'] = str(item['_id'])
+                # Ensure ObjectId is converted to string to prevent JSON serialization errors
+                if '_id' in item:
+                    item['_id'] = str(item['_id'])
+                # Convert datetime objects to ISO strings for JSON serialization
+                if 'created_at' in item and item['created_at']:
+                    item['created_at'] = item['created_at'].isoformat() if hasattr(item['created_at'], 'isoformat') else str(item['created_at'])
+                if 'updated_at' in item and item['updated_at']:
+                    item['updated_at'] = item['updated_at'].isoformat() if hasattr(item['updated_at'], 'isoformat') else str(item['updated_at'])
+                if 'reminder_date' in item and item['reminder_date']:
+                    item['reminder_date'] = item['reminder_date'].isoformat() if hasattr(item['reminder_date'], 'isoformat') else str(item['reminder_date'])
             except Exception as e:
-                logger.warning(f"Error processing creditor/debtor item {item.get('_id')}: {str(e)}")
+                logger.warning(f"Error processing creditor/debtor item {item.get('_id', 'unknown')}: {str(e)}")
+                # Ensure _id is string even on error
+                if '_id' in item:
+                    item['_id'] = str(item['_id'])
+                # Ensure datetime fields are strings even on error
+                for date_field in ['created_at', 'updated_at', 'reminder_date']:
+                    if date_field in item and item[date_field]:
+                        item[date_field] = str(item[date_field])
                 continue
 
         # Process payments with enhanced field mapping
@@ -347,7 +363,14 @@ def index():
                 if item.get('created_at') and item['created_at'].tzinfo is None:
                     item['created_at'] = item['created_at'].replace(tzinfo=ZoneInfo("UTC"))
                 item['description'] = utils.sanitize_input(item.get('description', 'No description provided'), max_length=500)
-                item['_id'] = str(item['_id'])
+                # Ensure ObjectId is converted to string to prevent JSON serialization errors
+                if '_id' in item:
+                    item['_id'] = str(item['_id'])
+                # Convert datetime objects to ISO strings for JSON serialization
+                if 'created_at' in item and item['created_at']:
+                    item['created_at'] = item['created_at'].isoformat() if hasattr(item['created_at'], 'isoformat') else str(item['created_at'])
+                if 'updated_at' in item and item['updated_at']:
+                    item['updated_at'] = item['updated_at'].isoformat() if hasattr(item['updated_at'], 'isoformat') else str(item['updated_at'])
                 # Map party_name to recipient for payments
                 item['recipient'] = utils.sanitize_input(item.get('party_name', 'N/A'), max_length=100)
                 # Ensure amount is properly formatted
@@ -359,7 +382,14 @@ def index():
                 else:
                     item['category_display'] = 'No category'
             except Exception as e:
-                logger.warning(f"Error processing payment item {item.get('_id')}: {str(e)}")
+                logger.warning(f"Error processing payment item {item.get('_id', 'unknown')}: {str(e)}")
+                # Ensure _id is string even on error
+                if '_id' in item:
+                    item['_id'] = str(item['_id'])
+                # Ensure datetime fields are strings even on error
+                for date_field in ['created_at', 'updated_at']:
+                    if date_field in item and item[date_field]:
+                        item[date_field] = str(item[date_field])
                 continue
         
         # Process receipts with enhanced field mapping
@@ -368,7 +398,14 @@ def index():
                 if item.get('created_at') and item['created_at'].tzinfo is None:
                     item['created_at'] = item['created_at'].replace(tzinfo=ZoneInfo("UTC"))
                 item['description'] = utils.sanitize_input(item.get('description', 'No description provided'), max_length=500)
-                item['_id'] = str(item['_id'])
+                # Ensure ObjectId is converted to string to prevent JSON serialization errors
+                if '_id' in item:
+                    item['_id'] = str(item['_id'])
+                # Convert datetime objects to ISO strings for JSON serialization
+                if 'created_at' in item and item['created_at']:
+                    item['created_at'] = item['created_at'].isoformat() if hasattr(item['created_at'], 'isoformat') else str(item['created_at'])
+                if 'updated_at' in item and item['updated_at']:
+                    item['updated_at'] = item['updated_at'].isoformat() if hasattr(item['updated_at'], 'isoformat') else str(item['updated_at'])
                 # Map party_name to payer for receipts
                 item['payer'] = utils.sanitize_input(item.get('party_name', 'N/A'), max_length=100)
                 # Ensure amount is properly formatted
@@ -376,7 +413,14 @@ def index():
                 # Add category information for display
                 item['category_display'] = utils.sanitize_input(item.get('category', 'No category'), max_length=50)
             except Exception as e:
-                logger.warning(f"Error processing receipt item {item.get('_id')}: {str(e)}")
+                logger.warning(f"Error processing receipt item {item.get('_id', 'unknown')}: {str(e)}")
+                # Ensure _id is string even on error
+                if '_id' in item:
+                    item['_id'] = str(item['_id'])
+                # Ensure datetime fields are strings even on error
+                for date_field in ['created_at', 'updated_at']:
+                    if date_field in item and item[date_field]:
+                        item[date_field] = str(item[date_field])
                 continue
 
         for item in recent_funds:
@@ -385,9 +429,23 @@ def index():
                     item['created_at'] = item['created_at'].replace(tzinfo=ZoneInfo("UTC"))
                 item['name'] = utils.sanitize_input(item.get('source', ''), max_length=100)
                 item['description'] = utils.sanitize_input(item.get('description', 'No description provided'), max_length=500)
-                item['_id'] = str(item['_id'])
+                # Ensure ObjectId is converted to string to prevent JSON serialization errors
+                if '_id' in item:
+                    item['_id'] = str(item['_id'])
+                # Convert datetime objects to ISO strings for JSON serialization
+                if 'created_at' in item and item['created_at']:
+                    item['created_at'] = item['created_at'].isoformat() if hasattr(item['created_at'], 'isoformat') else str(item['created_at'])
+                if 'updated_at' in item and item['updated_at']:
+                    item['updated_at'] = item['updated_at'].isoformat() if hasattr(item['updated_at'], 'isoformat') else str(item['updated_at'])
             except Exception as e:
-                logger.warning(f"Error processing fund item {item.get('_id')}: {str(e)}")
+                logger.warning(f"Error processing fund item {item.get('_id', 'unknown')}: {str(e)}")
+                # Ensure _id is string even on error
+                if '_id' in item:
+                    item['_id'] = str(item['_id'])
+                # Ensure datetime fields are strings even on error
+                for date_field in ['created_at', 'updated_at']:
+                    if date_field in item and item[date_field]:
+                        item[date_field] = str(item[date_field])
                 continue
 
         for item in recent_inventory:
@@ -397,9 +455,23 @@ def index():
                 item['name'] = utils.sanitize_input(item.get('name', ''), max_length=100)
                 item['cost'] = float(item.get('cost', 0))
                 item['expected_margin'] = float(item.get('expected_margin', 0))
-                item['_id'] = str(item['_id'])
+                # Ensure ObjectId is converted to string to prevent JSON serialization errors
+                if '_id' in item:
+                    item['_id'] = str(item['_id'])
+                # Convert datetime objects to ISO strings for JSON serialization
+                if 'created_at' in item and item['created_at']:
+                    item['created_at'] = item['created_at'].isoformat() if hasattr(item['created_at'], 'isoformat') else str(item['created_at'])
+                if 'updated_at' in item and item['updated_at']:
+                    item['updated_at'] = item['updated_at'].isoformat() if hasattr(item['updated_at'], 'isoformat') else str(item['updated_at'])
             except Exception as e:
-                logger.warning(f"Error processing inventory item {item.get('_id')}: {str(e)}")
+                logger.warning(f"Error processing inventory item {item.get('_id', 'unknown')}: {str(e)}")
+                # Ensure _id is string even on error
+                if '_id' in item:
+                    item['_id'] = str(item['_id'])
+                # Ensure datetime fields are strings even on error
+                for date_field in ['created_at', 'updated_at']:
+                    if date_field in item and item[date_field]:
+                        item[date_field] = str(item[date_field])
                 continue
 
         # Calculate stats with enhanced error handling and fallbacks
