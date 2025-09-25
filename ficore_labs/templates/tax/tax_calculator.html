@@ -2,6 +2,69 @@
 
 {% block title %}{{ t('tax_calculator_title', default='Tax Calculator') | e }} - DIICE{% endblock %}
 
+{% block extra_head %}
+<style>
+    .category-totals .card {
+        transition: all 0.3s ease;
+    }
+    
+    .category-totals .card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    
+    .tax-modal-content .modal-step-card {
+        margin-bottom: 1rem;
+    }
+    
+    .tax-modal-content .card-header {
+        padding: 0.5rem 1rem;
+    }
+    
+    .tax-modal-content .card-body {
+        padding: 0.75rem 1rem;
+    }
+    
+    .final-summary-table .table td {
+        padding: 0.5rem;
+    }
+    
+    .four-step-modal-breakdown .card {
+        margin-bottom: 0.75rem;
+    }
+    
+    @media print {
+        .modal-header, .modal-footer {
+            display: none !important;
+        }
+        
+        .modal-dialog {
+            margin: 0;
+            max-width: 100%;
+        }
+        
+        .modal-content {
+            border: none;
+            box-shadow: none;
+        }
+    }
+    
+    /* Real-time update animations */
+    #deductibleTotal, #statutoryTotal, #personalTotal {
+        transition: color 0.3s ease;
+    }
+    
+    .updating {
+        color: #ffc107 !important;
+    }
+    
+    /* Sticky tax summary */
+    .sticky-top {
+        top: 20px;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid">
     <div class="row">
@@ -234,7 +297,7 @@
                                         <p class="small mb-3">{{ t('pit_explanation', default='For sole proprietors, tax is calculated using a four-step process according to NTA 2025:') | e }}</p>
                                         <ol class="small">
                                             <li><strong>{{ t('step1_help', default='Net Business Profit:') | e }}</strong> {{ t('step1_help_desc', default='Total income minus main business expenses (6 categories)') | e }}</li>
-                                            <li><strong>{{ t('step2_help', default='Statutory Deductions:') | e }}</strong> {{ t('step2_help_desc', default='Subtract statutory & legal contributions') | e }}</li>
+                                            <li><strong>{{ t('step2_help', default='Statutory Deductions:') | e }}</strong> {{ t('step2_help_desc', default='Subtract statutory & legal contributions separately') | e }}</li>
                                             <li><strong>{{ t('step3_help', default='Rent Relief:') | e }}</strong> {{ t('step3_help_desc', default='Apply rent relief (maximum ₦500,000 or 20% of rent)') | e }}</li>
                                             <li><strong>{{ t('step4_help', default='Progressive Tax:') | e }}</strong> {{ t('step4_help_desc', default='Apply progressive tax bands to final taxable income') | e }}</li>
                                         </ol>
@@ -256,6 +319,9 @@
                         <!-- Real-time Category Totals -->
                         <div class="category-totals mb-4" role="region" aria-labelledby="totals-heading" aria-live="polite">
                             <h5 class="mb-3" id="totals-heading">{{ t('expense_totals_title', default='Expense Totals') | e }}</h5>
+                            <p class="small text-muted mb-3">
+                                <i class="fas fa-info-circle"></i> {{ t('empty_fields_note', default='Empty fields are treated as zero - you don\'t need to fill in every category') | e }}
+                            </p>
                             <div class="row">
                                 <div class="col-md-4">
                                     <div class="card border-success" role="status" aria-labelledby="deductible-heading">
@@ -694,6 +760,31 @@
 </style>
 {% endblock %}
 
+<!-- Tax Summary Modal -->
+<div class="modal fade" id="taxSummaryModal" tabindex="-1" aria-labelledby="taxSummaryModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="taxSummaryModalLabel">
+                    <i class="fas fa-calculator"></i> {{ t('tax_calculation_summary', default='Tax Calculation Summary') | e }}
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ t('close', default='Close') | e }}"></button>
+            </div>
+            <div class="modal-body" id="taxSummaryModalBody">
+                <!-- Tax summary content will be populated by JavaScript -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times"></i> {{ t('close', default='Close') | e }}
+                </button>
+                <button type="button" class="btn btn-primary" onclick="window.print()">
+                    <i class="fas fa-print"></i> {{ t('print_summary', default='Print Summary') | e }}
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% block scripts %}
 <script>
     document.addEventListener('DOMContentLoaded', function () {
@@ -778,6 +869,207 @@
         // Initialize accessibility features
         setupAccessibilityFeatures();
 
+        // Real-time calculation variables
+        let currentCalculation = null;
+        let calculationTimeout = null;
+
+        // Real-time expense totals update
+        function updateExpenseTotals() {
+            const deductibleInputs = document.querySelectorAll('.expense-input[data-category-type="deductible"]');
+            const statutoryInputs = document.querySelectorAll('.expense-input[data-category-type="statutory"]');
+            const personalInputs = document.querySelectorAll('.expense-input[data-category-type="personal"]');
+
+            let deductibleTotal = 0;
+            let statutoryTotal = 0;
+            let personalTotal = 0;
+
+            // Handle empty fields gracefully - parseFloat(empty) || 0 ensures empty fields = 0
+            deductibleInputs.forEach(input => {
+                const value = parseFloat(input.value) || 0;
+                deductibleTotal += value;
+            });
+
+            statutoryInputs.forEach(input => {
+                const value = parseFloat(input.value) || 0;
+                statutoryTotal += value;
+            });
+
+            personalInputs.forEach(input => {
+                const value = parseFloat(input.value) || 0;
+                personalTotal += value;
+            });
+
+            // Add visual feedback during update
+            const deductibleElement = document.getElementById('deductibleTotal');
+            const statutoryElement = document.getElementById('statutoryTotal');
+            const personalElement = document.getElementById('personalTotal');
+
+            // Add updating class for visual feedback
+            [deductibleElement, statutoryElement, personalElement].forEach(el => {
+                el.classList.add('updating');
+            });
+
+            // Update the totals display with animation
+            setTimeout(() => {
+                deductibleElement.textContent = formatCurrency(deductibleTotal);
+                statutoryElement.textContent = formatCurrency(statutoryTotal);
+                personalElement.textContent = formatCurrency(personalTotal);
+
+                // Remove updating class
+                [deductibleElement, statutoryElement, personalElement].forEach(el => {
+                    el.classList.remove('updating');
+                });
+            }, 150);
+        }
+
+        // Real-time tax summary update
+        function updateRealTimeTaxSummary() {
+            // Clear existing timeout
+            if (calculationTimeout) {
+                clearTimeout(calculationTimeout);
+            }
+
+            // Set new timeout for debounced calculation
+            calculationTimeout = setTimeout(() => {
+                performRealTimeCalculation();
+            }, 500); // 500ms delay to avoid too frequent calculations
+        }
+
+        // Perform real-time tax calculation
+        function performRealTimeCalculation() {
+            const incomeValue = parseFloat(document.getElementById('total_income').value) || 0;
+            const rentValue = parseFloat(document.getElementById('annual_rent').value) || 0;
+
+            // Only calculate if there's income
+            if (incomeValue <= 0) {
+                showPlaceholderSummary();
+                return;
+            }
+
+            // Collect expenses - include all categories, even if zero
+            const expenses = {};
+            const expenseInputs = document.querySelectorAll('.expense-input');
+            expenseInputs.forEach(input => {
+                const categoryKey = input.name;
+                const amount = parseFloat(input.value) || 0;
+                // Include all categories to ensure proper calculation
+                expenses[categoryKey] = amount;
+            });
+
+            const data = {
+                total_income: incomeValue,
+                annual_rent: rentValue,
+                expenses: expenses
+            };
+
+            // Perform calculation
+            fetch('/tax/calculate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    currentCalculation = result.breakdown;
+                    updateTaxSummary(result.breakdown);
+                } else {
+                    showCalculationError();
+                }
+            })
+            .catch(error => {
+                console.error('Real-time calculation error:', error);
+                showCalculationError();
+            });
+        }
+
+        // Show placeholder when no income
+        function showPlaceholderSummary() {
+            summaryDiv.innerHTML = `
+                <div class="text-center text-muted py-4">
+                    <i class="fas fa-calculator fa-3x mb-3" aria-hidden="true"></i>
+                    <p>{{ t('tax_summary_placeholder', default='Enter your income and expenses to see your tax calculation') | e }}</p>
+                </div>
+            `;
+        }
+
+        // Show calculation error
+        function showCalculationError() {
+            summaryDiv.innerHTML = `
+                <div class="text-center text-muted py-4">
+                    <i class="fas fa-exclamation-triangle fa-3x mb-3 text-warning" aria-hidden="true"></i>
+                    <p>{{ t('calculation_error_placeholder', default='Unable to calculate tax. Please check your inputs.') | e }}</p>
+                </div>
+            `;
+        }
+
+        // Add event listeners for real-time updates
+        function setupRealTimeUpdates() {
+            // Income field
+            const incomeField = document.getElementById('total_income');
+            if (incomeField) {
+                incomeField.addEventListener('input', () => {
+                    updateRealTimeTaxSummary();
+                });
+            }
+
+            // Rent field
+            const rentField = document.getElementById('annual_rent');
+            if (rentField) {
+                rentField.addEventListener('input', () => {
+                    updateRealTimeTaxSummary();
+                });
+            }
+
+            // All expense inputs
+            document.querySelectorAll('.expense-input').forEach(input => {
+                input.addEventListener('input', () => {
+                    updateExpenseTotals();
+                    updateRealTimeTaxSummary();
+                });
+            });
+        }
+
+        // Initialize real-time updates
+        setupRealTimeUpdates();
+        updateExpenseTotals(); // Initial update
+
+        // Clear form functionality
+        const clearFormButton = document.getElementById('clearForm');
+        if (clearFormButton) {
+            clearFormButton.addEventListener('click', function() {
+                if (confirm('{{ t("confirm_clear_form", default="Are you sure you want to clear all form data?") | e }}')) {
+                    // Clear all form inputs
+                    form.reset();
+                    
+                    // Clear validation states
+                    form.querySelectorAll('.is-invalid, .is-valid').forEach(field => {
+                        field.classList.remove('is-invalid', 'is-valid');
+                    });
+                    
+                    // Remove validation error messages
+                    form.querySelectorAll('.validation-error').forEach(error => {
+                        error.remove();
+                    });
+                    
+                    // Clear current calculation
+                    currentCalculation = null;
+                    
+                    // Reset totals and summary
+                    updateExpenseTotals();
+                    showPlaceholderSummary();
+                    
+                    // Focus on income field
+                    const incomeField = document.getElementById('total_income');
+                    if (incomeField) {
+                        incomeField.focus();
+                    }
+                }
+            });
+        }
+
         // Tax calculation validation functions
         function validateIncome(value) {
             const errors = [];
@@ -813,6 +1105,7 @@
         
         function validateExpenseAmount(value, categoryName) {
             const errors = [];
+            // Only validate if there's actually a value (not empty/null/undefined)
             if (value && value.toString().trim() !== '') {
                 const amount = parseFloat(value);
                 if (isNaN(amount)) {
@@ -823,6 +1116,7 @@
                     errors.push(`{{ t("validation_expense_too_large", default="Expense amount is unreasonably large for") }} ${categoryName}`);
                 }
             }
+            // Empty fields are valid (treated as zero)
             return errors;
         }
         
@@ -987,8 +1281,6 @@
             }
 
             summaryDiv.innerHTML = html;
-            // Announce to screen readers
-            announceToScreenReader('Tax calculation results updated');
         }
 
         // Generate CIT summary display
@@ -1201,20 +1493,31 @@
             `;
         }
 
-        // Handle form submission
-        form.addEventListener('submit', async function (e) {
+        // Handle form submission - Show tax summary modal
+        form.addEventListener('submit', function (e) {
             e.preventDefault();
 
             // Validate form before submission
             const validation = validateForm();
             if (!validation.isValid) {
                 // Show validation errors
-                showAlert('danger', `
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'alert alert-danger alert-dismissible fade show mt-3';
+                alertDiv.innerHTML = `
                     <strong>{{ t("validation_form_errors", default="Please correct the following errors:") }}</strong>
                     <ul class="mb-0 mt-2">
                         ${validation.errors.map(error => `<li>${error}</li>`).join('')}
                     </ul>
-                `);
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                `;
+                
+                // Remove existing alert
+                const existingAlert = form.querySelector('.alert-danger');
+                if (existingAlert) {
+                    existingAlert.remove();
+                }
+                
+                form.insertBefore(alertDiv, form.firstChild);
                 
                 // Scroll to first error
                 const firstError = form.querySelector('.is-invalid');
@@ -1226,22 +1529,24 @@
                 return;
             }
 
-            // Show loading modal
-            loadingModal.show();
+            // Use current calculation if available, otherwise perform new calculation
+            if (currentCalculation) {
+                showTaxSummaryModal(currentCalculation);
+            } else {
+                // Show loading modal
+                loadingModal.show();
 
-            try {
                 // Collect form data
                 const formData = new FormData(form);
                 
-                // Collect categorized expenses
+                // Collect categorized expenses - include all categories, even if zero
                 const expenses = {};
                 const expenseInputs = form.querySelectorAll('.expense-input');
                 expenseInputs.forEach(input => {
                     const categoryKey = input.name;
                     const amount = parseFloat(input.value) || 0;
-                    if (amount > 0) {
-                        expenses[categoryKey] = amount;
-                    }
+                    // Include all categories to ensure proper calculation
+                    expenses[categoryKey] = amount;
                 });
                 
                 const data = {
@@ -1251,266 +1556,484 @@
                 };
 
                 // Send calculation request
-                const response = await fetch('/tax/calculate', {
+                fetch('/tax/calculate', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify(data)
-                });
+                })
+                    .then(response => response.json())
+                    .then(result => {
+                        loadingModal.hide();
 
-                const result = await response.json();
-                loadingModal.hide();
+                        if (result.success) {
+                            currentCalculation = result.breakdown;
+                            updateTaxSummary(result.breakdown);
+                            showTaxSummaryModal(result.breakdown);
 
-                if (result.success) {
-                    updateTaxSummary(result.breakdown);
-                    showAlert('success', '{{ t("tax_calculation_success", default="Tax calculation completed successfully!") | e }}');
-                    
-                    // Update annual rent in database if changed
-                    const currentRent = {{ user_annual_rent }};
-                    if (parseFloat(data.annual_rent) !== currentRent) {
-                        await updateAnnualRent(data.annual_rent);
-                    }
-                } else {
-                    showAlert('danger', '{{ t("tax_calculation_error", default="Error calculating tax:") | e }} ' + (result.user_message || result.message || result.error));
-                }
-            } catch (error) {
-                loadingModal.hide();
-                console.error('Error:', error);
-                showAlert('danger', '{{ t("tax_calculation_network_error", default="An error occurred while calculating tax. Please check your connection and try again.") | e }}');
+                            // Update annual rent in database if changed
+                            const currentRent = {{ user_annual_rent }};
+                            if (parseFloat(data.annual_rent) !== currentRent) {
+                                updateAnnualRent(data.annual_rent);
+                            }
+                        } else {
+                            showAlert('danger', '{{ t("tax_calculation_error", default="Error calculating tax:") | e }} ' + (result.message || result.error));
+                        }
+                    })
+                    .catch(error => {
+                        loadingModal.hide();
+                        console.error('Error:', error);
+                        showAlert('danger', '{{ t("tax_calculation_network_error", default="An error occurred while calculating tax. Please check your connection and try again.") | e }}');
+                    });
             }
         });
 
-        // Update annual rent in database
-        async function updateAnnualRent(annualRent) {
-            try {
-                const response = await fetch('/tax/update-rent', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ annual_rent: annualRent })
-                });
-                const result = await response.json();
-                if (!result.success) {
-                    console.error('Failed to update annual rent:', result.error);
-                    showAlert('warning', '{{ t("rent_update_error", default="Failed to update annual rent.") | e }}');
-                }
-            } catch (error) {
-                console.error('Error updating annual rent:', error);
-                showAlert('danger', '{{ t("rent_update_network_error", default="An error occurred while updating annual rent.") | e }}');
-            }
-        }
+        // Show tax summary modal
+        function showTaxSummaryModal(breakdown) {
+            const modalBody = document.getElementById('taxSummaryModalBody');
+            if (!modalBody) return;
 
-        // Handle entity type change
-        document.getElementById('saveEntityType').addEventListener('click', async function () {
-            const selectedEntityType = document.querySelector('input[name="entity_type"]:checked');
-            if (!selectedEntityType) {
-                showAlert('warning', '{{ t("entity_type_selection_error", default="Please select an entity type") | e }}');
-                return;
-            }
-
-            const entityType = selectedEntityType.value;
+            // Generate detailed modal content
+            let modalContent = '';
             
-            // Show loading
-            const saveButton = this;
-            const originalText = saveButton.textContent;
-            saveButton.disabled = true;
-            saveButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
-
-            try {
-                // Update entity type
-                const response = await fetch('/tax/update-entity-type', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ entity_type: entityType })
-                });
-
-                const result = await response.json();
-                saveButton.disabled = false;
-                saveButton.textContent = originalText;
-
-                if (result.success) {
-                    // Update UI with new entity type
-                    document.querySelector('.entity-type-name').textContent = result.entity_info.name;
-                    
-                    // Update tax information section
-                    updateTaxInformationSection(result.entity_info, entityType);
-                    
-                    // Close modal
-                    bootstrap.Modal.getInstance(document.getElementById('entityTypeModal')).hide();
-                    
-                    // Clear current calculation
-                    clearTaxSummary();
-                    
-                    // Show success message
-                    showAlert('success', '{{ t("entity_type_updated", default="Entity type updated successfully. Please recalculate your tax.") | e }}');
-                } else {
-                    showAlert('danger', '{{ t("entity_type_update_error", default="Error updating entity type:") | e }} ' + result.error);
-                }
-            } catch (error) {
-                saveButton.disabled = false;
-                saveButton.textContent = originalText;
-                console.error('Error:', error);
-                showAlert('danger', '{{ t("entity_type_update_network_error", default="An error occurred while updating entity type.") | e }}');
-            }
-        });
-
-        // Update tax information section based on entity type
-        function updateTaxInformationSection(entityInfo, entityType) {
-            const taxInfoContent = document.getElementById('taxInformationContent');
-            
-            if (entityType === 'limited_liability') {
-                // CIT Information
-                taxInfoContent.innerHTML = `
-                    <h5>{{ t('cit_rates_title', default='Companies Income Tax (CIT) Rates') | e }}</h5>
-                    <div class="alert alert-success">
-                        <h6 class="mb-2">{{ t('small_company_exemption', default='Small Company Exemption') | e }}</h6>
-                        <p class="mb-1"><strong>₦0 - ₦50,000,000:</strong> 0% {{ t('tax_rate', default='tax rate') | e }}</p>
-                        <small class="text-muted">{{ t('small_company_note', default='Companies with annual revenue of ₦50 million or less are exempt from CIT') | e }}</small>
-                    </div>
-                    <div class="alert alert-warning">
-                        <h6 class="mb-2">{{ t('large_company_rate', default='Large Company Rate') | e }}</h6>
-                        <p class="mb-1"><strong>Above ₦50,000,000:</strong> 30% {{ t('tax_rate', default='tax rate') | e }}</p>
-                        <small class="text-muted">{{ t('large_company_note', default='Companies with annual revenue above ₦50 million pay 30% tax on taxable income') | e }}</small>
-                    </div>
-                    
-                    <hr>
-                    
-                    <h6>{{ t('cit_deductions_title', default='CIT Deductions') | e }}</h6>
-                    <p class="small text-muted">
-                        {{ t('cit_deductions_description', default='For CIT purposes, all legitimate business expenses are generally deductible from revenue to determine taxable income.') | e }}
-                    </p>
-                `;
+            if (breakdown.calculation_type === 'CIT') {
+                modalContent = generateCITModalContent(breakdown);
             } else {
-                // PIT Information
-                taxInfoContent.innerHTML = `
-                    <h5>{{ t('progressive_tax_rates_title', default='Progressive Tax Rates (NTA 2025)') | e }}</h5>
-                    <ul class="list-unstyled">
-                        <li><strong>₦0 - ₦800,000:</strong> 0%</li>
-                        <li><strong>₦800,001 - ₦3,000,000:</strong> 15%</li>
-                        <li><strong>₦3,000,001 - ₦12,000,000:</strong> 18%</li>
-                        <li><strong>₦12,000,001 - ₦25,000,000:</strong> 21%</li>
-                        <li><strong>₦25,000,001 - ₦50,000,000:</strong> 23%</li>
-                        <li><strong>Above ₦50,000,000:</strong> 25%</li>
-                    </ul>
-
-                    <hr>
-
-                    <h6>{{ t('rent_relief_title', default='Rent Relief') | e }}</h6>
-                    <p class="small text-muted">
-                        {{ t('rent_relief_description', default='You can claim rent relief equal to the lower of
-                        ₦500,000 or 20% of your annual rent.') | e }}
-                    </p>
-                `;
+                modalContent = generatePITModalContent(breakdown);
             }
+
+            modalBody.innerHTML = modalContent;
+
+            // Show the modal
+            const taxSummaryModal = new bootstrap.Modal(document.getElementById('taxSummaryModal'));
+            taxSummaryModal.show();
         }
 
-        // Show alert message
+        // Generate CIT modal content
+        function generateCITModalContent(breakdown) {
+            return `
+                <div class="tax-modal-content">
+                    <div class="alert alert-info mb-4">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-building fa-2x me-3"></i>
+                            <div>
+                                <h5 class="mb-1">Companies Income Tax (CIT) Summary</h5>
+                                <small>{{ t('cit_modal_subtitle', default='Tax calculation for registered limited liability company') | e }}</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="card border-success">
+                                <div class="card-body text-center">
+                                    <h6 class="text-success">{{ t('total_revenue', default='Total Revenue') | e }}</h6>
+                                    <h3 class="text-success mb-0">${formatCurrency(breakdown.total_revenue || breakdown.total_income)}</h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card border-primary">
+                                <div class="card-body text-center">
+                                    <h6 class="text-primary">{{ t('tax_liability', default='Tax Liability') | e }}</h6>
+                                    <h3 class="text-primary mb-0">${formatCurrency(breakdown.tax_liability)}</h3>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    ${breakdown.exemption_applied ? `
+                        <div class="alert alert-success">
+                            <h6><i class="fas fa-check-circle"></i> Small Company Exemption Applied</h6>
+                            <p class="mb-0">Your company qualifies for the small company exemption (revenue ≤ ₦${formatCurrency(breakdown.revenue_threshold).replace('₦', '')}) and is exempt from CIT.</p>
+                        </div>
+                    ` : `
+                        <div class="calculation-details mb-4">
+                            <h6>{{ t('calculation_breakdown', default='Calculation Breakdown') | e }}</h6>
+                            <table class="table table-sm">
+                                <tr>
+                                    <td>{{ t('total_revenue', default='Total Revenue') | e }}</td>
+                                    <td class="text-end">${formatCurrency(breakdown.total_revenue || breakdown.total_income)}</td>
+                                </tr>
+                                <tr>
+                                    <td>{{ t('total_expenses', default='Total Expenses') | e }}</td>
+                                    <td class="text-end text-danger">-${formatCurrency(breakdown.total_expenses || 0)}</td>
+                                </tr>
+                                <tr class="table-active">
+                                    <td><strong>{{ t('taxable_income', default='Taxable Income') | e }}</strong></td>
+                                    <td class="text-end"><strong>${formatCurrency(breakdown.taxable_income)}</strong></td>
+                                </tr>
+                                <tr>
+                                    <td>{{ t('tax_rate', default='Tax Rate') | e }}</td>
+                                    <td class="text-end">${formatPercentage(breakdown.tax_rate * 100)}</td>
+                                </tr>
+                                <tr class="table-primary">
+                                    <td><strong>{{ t('tax_liability', default='Tax Liability') | e }}</strong></td>
+                                    <td class="text-end"><strong>${formatCurrency(breakdown.tax_liability)}</strong></td>
+                                </tr>
+                            </table>
+                        </div>
+                    `}
+
+                    <div class="text-center">
+                        <p class="text-muted small">{{ t('effective_tax_rate', default='Effective Tax Rate') | e }}: ${formatPercentage(breakdown.effective_tax_rate)}</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Generate PIT modal content
+        function generatePITModalContent(breakdown) {
+            const fourStepBreakdown = breakdown.four_step_breakdown || {};
+            const summary = breakdown.summary || {};
+            
+            return `
+                <div class="tax-modal-content">
+                    <div class="alert alert-info mb-4">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-user fa-2x me-3"></i>
+                            <div>
+                                <h5 class="mb-1">Personal Income Tax (PIT) Summary</h5>
+                                <small>{{ t('pit_modal_subtitle', default='Four-step tax calculation for sole proprietors') | e }}</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="card border-success">
+                                <div class="card-body text-center">
+                                    <h6 class="text-success">{{ t('total_income', default='Total Income') | e }}</h6>
+                                    <h3 class="text-success mb-0">${formatCurrency(summary.total_income || 0)}</h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card border-primary">
+                                <div class="card-body text-center">
+                                    <h6 class="text-primary">{{ t('tax_liability', default='Tax Liability') | e }}</h6>
+                                    <h3 class="text-primary mb-0">${formatCurrency(summary.tax_liability || 0)}</h3>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="four-step-modal-breakdown mb-4">
+                        <h6 class="mb-3">{{ t('four_step_calculation', default='Four-Step Calculation Process') | e }}</h6>
+                        
+                        ${generateModalStepCard(fourStepBreakdown.step1, 1, 'success', 'Net Business Profit')}
+                        ${generateModalStepCard(fourStepBreakdown.step2, 2, 'info', 'Statutory Deductions')}
+                        ${generateModalStepCard(fourStepBreakdown.step3, 3, 'warning', 'Rent Relief')}
+                        ${generateModalStepCard(fourStepBreakdown.step4, 4, 'primary', 'Progressive Tax')}
+                    </div>
+
+                    <div class="final-summary-table">
+                        <h6>{{ t('final_summary', default='Final Summary') | e }}</h6>
+                        <table class="table table-sm">
+                            <tr>
+                                <td>{{ t('total_income', default='Total Income') | e }}</td>
+                                <td class="text-end">${formatCurrency(summary.total_income || 0)}</td>
+                            </tr>
+                            <tr>
+                                <td>{{ t('total_deductions', default='Total Deductions') | e }}</td>
+                                <td class="text-end text-danger">-${formatCurrency((summary.total_deductible_expenses || 0) + (summary.statutory_expenses || 0) + (summary.rent_relief || 0))}</td>
+                            </tr>
+                            <tr class="table-active">
+                                <td><strong>{{ t('final_taxable_income', default='Final Taxable Income') | e }}</strong></td>
+                                <td class="text-end"><strong>${formatCurrency(summary.final_taxable_income || 0)}</strong></td>
+                            </tr>
+                            <tr class="table-primary">
+                                <td><strong>{{ t('tax_liability', default='Tax Liability') | e }}</strong></td>
+                                <td class="text-end"><strong>${formatCurrency(summary.tax_liability || 0)}</strong></td>
+                            </tr>
+                        </table>
+                        <div class="text-center mt-3">
+                            <p class="text-muted small">{{ t('effective_tax_rate', default='Effective Tax Rate') | e }}: ${formatPercentage(summary.effective_tax_rate || 0)}</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Generate modal step card
+        function generateModalStepCard(stepData, stepNumber, colorClass, stepTitle) {
+            if (!stepData) return '';
+            
+            return `
+                <div class="modal-step-card mb-3">
+                    <div class="card border-${colorClass}">
+                        <div class="card-header bg-${colorClass} text-white py-2">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span><i class="fas fa-calculator"></i> Step ${stepNumber}: ${stepTitle}</span>
+                                <span class="badge bg-light text-dark">${formatCurrency(getStepResult(stepData))}</span>
+                            </div>
+                        </div>
+                        <div class="card-body py-2">
+                            <div class="small">
+                                <code>${stepData.formula || ''}</code>
+                            </div>
+                            ${stepData.calculation_note ? `
+                                <small class="text-muted d-block mt-1">
+                                    <i class="fas fa-info-circle"></i> ${stepData.calculation_note}
+                                </small>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Get step result value
+        function getStepResult(stepData) {
+            if (!stepData) return 0;
+            
+            if (stepData.net_business_profit !== undefined) return stepData.net_business_profit;
+            if (stepData.adjusted_profit_after_statutory !== undefined) return stepData.adjusted_profit_after_statutory;
+            if (stepData.taxable_income_after_rent_relief !== undefined) return stepData.taxable_income_after_rent_relief;
+            if (stepData.tax_liability !== undefined) return stepData.tax_liability;
+            
+            return 0;
+        }
+
+        // Show alert function
         function showAlert(type, message) {
             const alertDiv = document.createElement('div');
-            alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+            alertDiv.className = `alert alert-${type} alert-dismissible fade show mt-3`;
             alertDiv.innerHTML = `
                 ${message}
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             `;
             
-            // Insert at top of page
-            const container = document.querySelector('.container-fluid');
-            container.insertBefore(alertDiv, container.firstChild);
+            // Remove existing alerts
+            const existingAlerts = form.querySelectorAll('.alert');
+            existingAlerts.forEach(alert => alert.remove());
+            
+            form.insertBefore(alertDiv, form.firstChild);
             
             // Auto-dismiss after 5 seconds
             setTimeout(() => {
                 if (alertDiv.parentNode) {
-                    alertDiv.classList.remove('show');
-                    setTimeout(() => {
-                        if (alertDiv.parentNode) {
-                            alertDiv.remove();
-                        }
-                    }, 150); // Wait for fade transition
+                    alertDiv.remove();
                 }
             }, 5000);
-
-            // Announce to screen readers
-            announceToScreenReader(`${type === 'success' ? 'Success' : 'Error'}: ${message.replace(/<[^>]+>/g, '')}`);
         }
 
-        // Clear tax summary
-        function clearTaxSummary() {
-            summaryDiv.innerHTML = `
-                <div class="text-center text-muted py-4">
-                    <i class="fas fa-calculator fa-3x mb-3"></i>
-                    <p>{{ t('tax_summary_placeholder', default='Enter your income and expenses to see your tax calculation') | e }}</p>
-                </div>
-            `;
-            announceToScreenReader('Tax summary cleared');
-        }
-
-        // Clear form
-        document.getElementById('clearForm').addEventListener('click', function () {
-            form.reset();
-            clearTaxSummary();
-            updateCategoryTotals();
-            // Clear validation states
-            document.querySelectorAll('.form-control').forEach(field => {
-                clearFieldError(field.id);
-            });
-            showAlert('info', '{{ t("form_cleared", default="Form has been cleared.") | e }}');
-        });
-
-        // Update category totals in real-time
-        function updateCategoryTotals() {
-            let deductibleTotal = 0;
-            let statutoryTotal = 0;
-            let personalTotal = 0;
-            
-            const expenseInputs = form.querySelectorAll('.expense-input');
-            expenseInputs.forEach(input => {
-                const amount = parseFloat(input.value) || 0;
-                const categoryType = input.getAttribute('data-category-type');
-                
-                switch(categoryType) {
-                    case 'deductible':
-                        deductibleTotal += amount;
-                        break;
-                    case 'statutory':
-                        statutoryTotal += amount;
-                        break;
-                    case 'personal':
-                        personalTotal += amount;
-                        break;
+    // Update annual rent in database
+    function updateAnnualRent(annualRent) {
+        fetch('/tax/update-rent', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ annual_rent: annualRent })
+        })
+            .then(response => response.json())
+            .then(result => {
+                if (!result.success) {
+                    console.error('Failed to update annual rent:', result.error);
                 }
+            })
+            .catch(error => {
+                console.error('Error updating annual rent:', error);
             });
-            
-            // Update display
-            document.getElementById('deductibleTotal').textContent = formatCurrency(deductibleTotal);
-            document.getElementById('statutoryTotal').textContent = formatCurrency(statutoryTotal);
-            document.getElementById('personalTotal').textContent = formatCurrency(personalTotal);
+    }
+
+    // Handle entity type change
+    document.getElementById('saveEntityType').addEventListener('click', function () {
+        const selectedEntityType = document.querySelector('input[name="entity_type"]:checked');
+        if (!selectedEntityType) {
+            alert('Please select an entity type');
+            return;
         }
 
-        // Auto-calculate on input change (debounced)
-        let calculateTimeout;
-        const inputs = form.querySelectorAll('input[type="number"]');
-        inputs.forEach(input => {
-            input.addEventListener('input', function () {
-                // Update category totals immediately
-                updateCategoryTotals();
-                
-                clearTimeout(calculateTimeout);
-                calculateTimeout = setTimeout(() => {
-                    // Only auto-calculate if total income is entered
-                    const totalIncome = document.getElementById('total_income').value;
-                    if (totalIncome && parseFloat(totalIncome) > 0) {
-                        form.dispatchEvent(new Event('submit'));
-                    }
-                }, 1000);
-            });
-        });
+        const entityType = selectedEntityType.value;
+        
+        // Show loading
+        const saveButton = this;
+        const originalText = saveButton.textContent;
+        saveButton.disabled = true;
+        saveButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
 
-        // Initialize category totals on page load
-        updateCategoryTotals();
+        // Update entity type
+        fetch('/tax/update-entity-type', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ entity_type: entityType })
+        })
+        .then(response => response.json())
+        .then(result => {
+            saveButton.disabled = false;
+            saveButton.textContent = originalText;
+
+            if (result.success) {
+                // Update UI with new entity type
+                document.querySelector('.entity-type-name').textContent = result.entity_info.name;
+                
+                // Update tax information section
+                updateTaxInformationSection(result.entity_info, entityType);
+                
+                // Close modal
+                bootstrap.Modal.getInstance(document.getElementById('entityTypeModal')).hide();
+                
+                // Clear current calculation
+                clearTaxSummary();
+                
+                // Show success message
+                showAlert('success', 'Entity type updated successfully. Please recalculate your tax.');
+            } else {
+                showAlert('danger', 'Error updating entity type: ' + result.error);
+            }
+        })
+        .catch(error => {
+            saveButton.disabled = false;
+            saveButton.textContent = originalText;
+            console.error('Error:', error);
+            showAlert('danger', 'An error occurred while updating entity type');
+        });
     });
+
+    // Update tax information section based on entity type
+    function updateTaxInformationSection(entityInfo, entityType) {
+        const taxInfoContent = document.getElementById('taxInformationContent');
+        
+        if (entityType === 'limited_liability') {
+            // CIT Information
+            taxInfoContent.innerHTML = `
+                <h5>{{ t('cit_rates_title', default='Companies Income Tax (CIT) Rates') | e }}</h5>
+                <div class="alert alert-success">
+                    <h6 class="mb-2">{{ t('small_company_exemption', default='Small Company Exemption') | e }}</h6>
+                    <p class="mb-1"><strong>₦0 - ₦50,000,000:</strong> 0% {{ t('tax_rate', default='tax rate') | e }}</p>
+                    <small class="text-muted">{{ t('small_company_note', default='Companies with annual revenue of ₦50 million or less are exempt from CIT') | e }}</small>
+                </div>
+                <div class="alert alert-warning">
+                    <h6 class="mb-2">{{ t('large_company_rate', default='Large Company Rate') | e }}</h6>
+                    <p class="mb-1"><strong>Above ₦50,000,000:</strong> 30% {{ t('tax_rate', default='tax rate') | e }}</p>
+                    <small class="text-muted">{{ t('large_company_note', default='Companies with annual revenue above ₦50 million pay 30% tax on taxable income') | e }}</small>
+                </div>
+                
+                <hr>
+                
+                <h6>{{ t('cit_deductions_title', default='CIT Deductions') | e }}</h6>
+                <p class="small text-muted">
+                    {{ t('cit_deductions_description', default='For CIT purposes, all legitimate business expenses are generally deductible from revenue to determine taxable income.') | e }}
+                </p>
+            `;
+        } else {
+            // PIT Information
+            taxInfoContent.innerHTML = `
+                <h5>{{ t('progressive_tax_rates_title', default='Progressive Tax Rates (NTA 2025)') | e }}</h5>
+                <ul class="list-unstyled">
+                    <li><strong>₦0 - ₦800,000:</strong> 0%</li>
+                    <li><strong>₦800,001 - ₦3,000,000:</strong> 15%</li>
+                    <li><strong>₦3,000,001 - ₦12,000,000:</strong> 18%</li>
+                    <li><strong>₦12,000,001 - ₦25,000,000:</strong> 21%</li>
+                    <li><strong>₦25,000,001 - ₦50,000,000:</strong> 23%</li>
+                    <li><strong>Above ₦50,000,000:</strong> 25%</li>
+                </ul>
+
+                <hr>
+
+                <h6>{{ t('rent_relief_title', default='Rent Relief') | e }}</h6>
+                <p class="small text-muted">
+                    {{ t('rent_relief_description', default='You can claim rent relief equal to the lower of
+                    ₦500,000 or 20% of your annual rent.') | e }}
+                </p>
+            `;
+        }
+    }
+
+    // Show alert message
+    function showAlert(type, message) {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        
+        // Insert at top of page
+        const container = document.querySelector('.container-fluid');
+        container.insertBefore(alertDiv, container.firstChild);
+        
+        // Auto-dismiss after 5 seconds
+        setTimeout(() => {
+            if (alertDiv.parentNode) {
+                alertDiv.remove();
+            }
+        }, 5000);
+    }
+
+    // Clear tax summary
+    function clearTaxSummary() {
+        summaryDiv.innerHTML = `
+            <div class="text-center text-muted py-4">
+                <i class="fas fa-calculator fa-3x mb-3"></i>
+                <p>{{ t('tax_summary_placeholder', default='Enter your income and expenses to see your tax calculation') | e }}</p>
+            </div>
+        `;
+    }
+
+    // Clear form
+    document.getElementById('clearForm').addEventListener('click', function () {
+        form.reset();
+        clearTaxSummary();
+    });
+
+    // Update category totals in real-time
+    function updateCategoryTotals() {
+        let deductibleTotal = 0;
+        let statutoryTotal = 0;
+        let personalTotal = 0;
+        
+        const expenseInputs = form.querySelectorAll('.expense-input');
+        expenseInputs.forEach(input => {
+            const amount = parseFloat(input.value) || 0;
+            const categoryType = input.getAttribute('data-category-type');
+            
+            switch(categoryType) {
+                case 'deductible':
+                    deductibleTotal += amount;
+                    break;
+                case 'statutory':
+                    statutoryTotal += amount;
+                    break;
+                case 'personal':
+                    personalTotal += amount;
+                    break;
+            }
+        });
+        
+        // Update display
+        document.getElementById('deductibleTotal').textContent = formatCurrency(deductibleTotal);
+        document.getElementById('statutoryTotal').textContent = formatCurrency(statutoryTotal);
+        document.getElementById('personalTotal').textContent = formatCurrency(personalTotal);
+    }
+
+    // Auto-calculate on input change (debounced)
+    let calculateTimeout;
+    const inputs = form.querySelectorAll('input[type="number"]');
+    inputs.forEach(input => {
+        input.addEventListener('input', function () {
+            // Update category totals immediately
+            updateCategoryTotals();
+            
+            clearTimeout(calculateTimeout);
+            calculateTimeout = setTimeout(() => {
+                // Only auto-calculate if total income is entered
+                const totalIncome = document.getElementById('total_income').value;
+                if (totalIncome && parseFloat(totalIncome) > 0) {
+                    form.dispatchEvent(new Event('submit'));
+                }
+            }, 1000);
+        });
+    });
+
+    // Initialize category totals on page load
+    updateCategoryTotals();
+});
 </script>
+
 {% endblock %}

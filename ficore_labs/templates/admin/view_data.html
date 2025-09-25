@@ -169,6 +169,28 @@
                 {% endfor %}
             </tbody>
         </table>
+        
+        <!-- Profit Summary -->
+        <div class="mt-4 p-3 bg-light rounded">
+            <h4>{{ t('profit_summary', default='Profit Summary') | e }}</h4>
+            <div class="row">
+                <div class="col-md-4">
+                    <strong>{{ t('total_income', default='Total Income') | e }}:</strong>
+                    {{ (cashflows | selectattr('type', 'equalto', 'receipt') | sum(attribute='amount')) | format_number }} ₦
+                </div>
+                <div class="col-md-4">
+                    <strong>{{ t('total_expenses', default='Total Expenses') | e }}:</strong>
+                    {{ (cashflows | selectattr('type', 'equalto', 'payment') | sum(attribute='amount')) | format_number }} ₦
+                </div>
+                <div class="col-md-4">
+                    <strong>{{ t('net_profit', default='Net Profit') | e }}:</strong>
+                    {% set profit = (cashflows | selectattr('type', 'equalto', 'receipt') | sum(attribute='amount')) - (cashflows | selectattr('type', 'equalto', 'payment') | sum(attribute='amount')) %}
+                    <span class="{% if profit >= 0 %}text-success{% else %}text-danger{% endif %}">
+                        {{ profit | format_number }} ₦
+                    </span>
+                </div>
+            </div>
+        </div>
         {% else %}
         <p class="text-muted">{{ t('view_data_no_cashflows', default='No cashflows found.') | e }}</p>
         {% endif %}
