@@ -4,18 +4,17 @@
 {{ trans('dashboard_title', default='Dashboard') | escape }}
 {% endblock %}
 
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-notifications.css') }}">
+<script src="{{ url_for('static', filename='js/dashboard-notifications.js') }}" defer></script>
+{% endblock %}
+
 {% block content %}
-<div class="container">
-    <!-- Inventory Loss Alert -->
-    {% if inventory_loss %}
-    <div class="alert alert-danger d-flex align-items-center mb-4" role="alert">
-        <i class="bi bi-exclamation-octagon me-2"></i>
-        <div>
-            <strong>{{ trans('inventory_loss_detected', default='Inventory Loss Detected!') | escape }}</strong>
-            {{ trans('inventory_loss_message', default='Your inventory cost exceeds expected margins. Please review your stock and pricing.') | escape }}
-        </div>
+<div class="container" data-user-id="{{ current_user.id if current_user.is_authenticated else '' }}">
+    <!-- Dismissable Notifications Container -->
+    <div id="dashboard-notifications-container" class="mb-4">
+        <!-- Notifications will be dynamically inserted here -->
     </div>
-    {% endif %}
 
     <!-- Tax Prep Mode Alert -->
     {% if tax_prep_mode and stats.profit_only is defined %}
@@ -65,24 +64,7 @@
     }
     </script>
 
-    <!-- Debt Tracker Alerts -->
-    {% if unpaid_debtors or unpaid_creditors %}
-    <div class="alert alert-warning d-flex align-items-center mb-4" role="alert">
-        <i class="bi bi-exclamation-triangle me-2"></i>
-        <div>
-            {% if unpaid_debtors %}
-                <strong>{{ trans('debtors_unpaid', default='Unpaid Debts:') | escape }}</strong>
-                {{ unpaid_debtors|length }} {{ trans('debtors_people_owe_you', default='people owe you money!') | escape }}
-                <a href="{{ url_for('debtors.index') }}" class="btn btn-sm btn-outline-primary ms-2">{{ trans('view_details', default='View Details') | escape }}</a><br>
-            {% endif %}
-            {% if unpaid_creditors %}
-                <strong>{{ trans('creditors_unpaid', default='Unpaid Credits:') | escape }}</strong>
-                {{ unpaid_creditors|length }} {{ trans('creditors_you_owe', default='people you owe!') | escape }}
-                <a href="{{ url_for('creditors.index') }}" class="btn btn-sm btn-outline-primary ms-2">{{ trans('view_details', default='View Details') | escape }}</a>
-            {% endif %}
-        </div>
-    </div>
-    {% endif %}
+    <!-- Legacy notifications are now handled by JavaScript -->
 
     <!-- User Streak Card -->
     {% if current_user.is_authenticated %}
@@ -764,6 +746,15 @@
         tooltipTriggerList.forEach(function (tooltipTriggerEl) {
             new bootstrap.Tooltip(tooltipTriggerEl);
         });
+        
+        // Pass dashboard data to notification system
+        window.dashboardData = {
+            inventoryLoss: {{ 'true' if inventory_loss else 'false' }},
+            debts: {
+                unpaidDebtors: {{ unpaid_debtors | tojson if unpaid_debtors else '[]' }},
+                unpaidCreditors: {{ unpaid_creditors | tojson if unpaid_creditors else '[]' }}
+            }
+        };
     });
 </script>
 {% endblock %}
