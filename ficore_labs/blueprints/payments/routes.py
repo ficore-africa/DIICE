@@ -49,10 +49,13 @@ def index():
         query = {'user_id': str(current_user.id), 'type': 'payment'}
         payments = list(db.cashflows.find(query).sort('created_at', -1))
         
-        # Convert naive datetimes to timezone-aware
+        # Convert naive datetimes to timezone-aware and sanitize string fields
         for payment in payments:
             if payment.get('created_at') and payment['created_at'].tzinfo is None:
                 payment['created_at'] = payment['created_at'].replace(tzinfo=ZoneInfo("UTC"))
+            payment['party_name'] = utils.sanitize_input(payment.get('party_name', ''), max_length=100)
+            payment['description'] = utils.sanitize_input(payment.get('description', ''), max_length=1000) if payment.get('description') else ''
+            payment['contact'] = utils.sanitize_input(payment.get('contact', ''), max_length=100) if payment.get('contact') else ''
         
         # Calculate category-based summary statistics
         category_stats = utils.calculate_payment_category_stats(payments)
@@ -84,10 +87,13 @@ def manage():
         query = {'user_id': str(current_user.id), 'type': 'payment'}
         payments = list(db.cashflows.find(query).sort('created_at', -1))
         
-        # Convert naive datetimes to timezone-aware
+        # Convert naive datetimes to timezone-aware and sanitize string fields
         for payment in payments:
             if payment.get('created_at') and payment['created_at'].tzinfo is None:
                 payment['created_at'] = payment['created_at'].replace(tzinfo=ZoneInfo("UTC"))
+            payment['party_name'] = utils.sanitize_input(payment.get('party_name', ''), max_length=100)
+            payment['description'] = utils.sanitize_input(payment.get('description', ''), max_length=1000) if payment.get('description') else ''
+            payment['contact'] = utils.sanitize_input(payment.get('contact', ''), max_length=100) if payment.get('contact') else ''
         
         # Calculate category-based summary statistics
         category_stats = utils.calculate_payment_category_stats(payments)
