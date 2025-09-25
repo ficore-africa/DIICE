@@ -73,7 +73,7 @@
                                 <small class="form-text text-muted" id="rent-help">
                                     <i class="fas fa-info-circle text-info" aria-hidden="true"></i>
                                     {{ t('rent_relief_info', default='Rent relief is calculated as the lower of ₦500,000 or 20% of your annual rent') | e }}
-                                    <a href="{{ url_for('education_bp.view_module', module_id='deductions_reliefs') }}#rent_relief" 
+                                    <a href="{{ url_for('education.view_module', module_id='deductions_reliefs') }}#rent_relief" 
                                        target="_blank" class="ml-2" 
                                        aria-label="{{ t('learn_more', default='Learn more') }} {{ t('general_opens_new_window', default='(opens in new window)') }}">
                                         <i class="fas fa-graduation-cap" aria-hidden="true"></i> {{ t('learn_more', default='Learn more') }}
@@ -1505,4 +1505,5 @@
     updateCategoryTotals();
 });
 </script>
+
 {% endblock %}
