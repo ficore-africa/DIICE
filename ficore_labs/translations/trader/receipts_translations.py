@@ -1,6 +1,6 @@
 RECEIPTS_TRANSLATIONS = {
     'en': {
-        'receipts_dashboard': 'Sales Income',
+        'receipts_dashboard': 'Sales',
         'receipts_list': 'Sales Income List',
         # Receipts
         'receipts_payer_name': 'Customer Name',
