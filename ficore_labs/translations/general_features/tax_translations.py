@@ -6,6 +6,11 @@ TAX_TRANSLATIONS = {
         'rent_label': 'Annual Rent Paid',
         'calculate_button': 'Calculate Tax',
         'tax_summary_title': 'Your Tax Estimate',
+        'tax_calculator_tooltip': 'Tooltip for the tax calculator feature',
+        'tax_calculator': 'Tax Calculator',
+        'tax_education_tooltip': 'Tooltip for tax education resources',
+        'tax_education': 'Tax Education',
+        'tax_calculator_desc': 'Description of the tax calculator functionality',
         'net_profit_label': 'Net Profit',
         'rent_relief_label': 'Rent Relief Deduction',
         'taxable_income_label': 'Taxable Income',
@@ -257,6 +262,11 @@ TAX_TRANSLATIONS = {
         'wren_expenses_title': 'Abubuwan Kashewa na Kasuwanci masu Bin WREN',
         'wren_expenses_description': 'Shigar da abubuwan kashewa da aka yi gaba daya, na musamman, mai hankali, kuma dole don kasuwancinka.',
         'amount_label': 'Adadi (₦)',
+        'tax_calculator_tooltip': 'Bayanan kula na fasalin kirgar haraji',
+        'tax_calculator': 'Kirgar Haraji',
+        'tax_education_tooltip': 'Bayanan kula na albarkatun ilimin haraji',
+        'tax_education': 'Ilimin Haraji',
+        'tax_calculator_desc': 'Bayani game da aikin kirgar haraji',
         'amount_placeholder': '0.00',
         'examples_label': 'Misalai:',
         'clear_form_button': 'Share Fom',
@@ -278,4 +288,5 @@ TAX_TRANSLATIONS = {
         'business_travel_desc': 'Man fetur, gyaran mota, da kudin tafiye-tafiye na kasuwanci',
         'rent_utilities_desc': 'Kudin haya na shago ko ofishin kasuwanci (daban da Cirewar Kudin Haya)',
     }
+
 }
