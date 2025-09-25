@@ -141,7 +141,7 @@ def tax_calculator():
     except Exception as e:
         logger.error(f"Error in tax_calculator route: {str(e)}")
         flash('Error loading tax calculator. Please try again.', 'error')
-        return redirect(url_for('dashboard_bp.dashboard'))
+        return redirect(url_for('dashboard.index'))
 
 @tax_bp.route('/calculate', methods=['POST'])
 @login_required
@@ -708,4 +708,5 @@ def update_entity_type():
         return jsonify({
             'success': False,
             'error': str(e)
+
         }), 400
