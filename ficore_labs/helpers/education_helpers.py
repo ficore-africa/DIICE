@@ -20,35 +20,35 @@ def get_education_prompt(context_type, **kwargs):
         'expense_logged': {
             'message': trans('education_prompt_expense', 
                            default='Did you know some of these expenses are tax-deductible?'),
-            'link': url_for('education_bp.view_module', module_id='deductions_reliefs'),
+            'link': url_for('education.view_module', module_id='deductions_reliefs'),
             'action_text': trans('learn_about_deductions', default='Learn About Deductions'),
             'icon': 'fas fa-percentage'
         },
         'receipt_added': {
             'message': trans('education_prompt_receipt', 
                            default='Keep digital records for tax compliance!'),
-            'link': url_for('education_bp.view_module', module_id='tracking_compliance'),
+            'link': url_for('education.view_module', module_id='tracking_compliance'),
             'action_text': trans('learn_record_keeping', default='Learn About Record Keeping'),
             'icon': 'fas fa-clipboard-check'
         },
         'annual_rent_updated': {
             'message': trans('education_prompt_rent', 
                            default='Rent relief can lower your tax! Learn more about available reliefs.'),
-            'link': url_for('education_bp.view_module', module_id='deductions_reliefs'),
+            'link': url_for('education.view_module', module_id='deductions_reliefs'),
             'action_text': trans('learn_rent_relief', default='Learn About Rent Relief'),
             'icon': 'fas fa-home'
         },
         'first_time_user': {
             'message': trans('education_prompt_welcome', 
                            default='New to tax compliance? Start with understanding your tax obligations.'),
-            'link': url_for('education_bp.education_home'),
+            'link': url_for('education.education_home'),
             'action_text': trans('start_tax_education', default='Start Tax Education'),
             'icon': 'fas fa-graduation-cap'
         },
         'tax_season_reminder': {
             'message': trans('education_prompt_filing', 
                            default='Filing season is approaching! Make sure you understand the requirements.'),
-            'link': url_for('education_bp.view_module', module_id='filing_vs_paying'),
+            'link': url_for('education.view_module', module_id='filing_vs_paying'),
             'action_text': trans('learn_filing_requirements', default='Learn Filing Requirements'),
             'icon': 'fas fa-calendar-alt'
         }
@@ -62,25 +62,25 @@ def get_random_education_tip():
         {
             'message': trans('tip_expense_categories', 
                            default='Properly categorizing expenses helps maximize your tax deductions'),
-            'link': url_for('education_bp.view_module', module_id='deductions_reliefs'),
+            'link': url_for('education.view_module', module_id='deductions_reliefs'),
             'action_text': trans('learn_deductions', default='Learn About Deductions')
         },
         {
             'message': trans('tip_tin_registration', 
                            default='TIN registration is free and mandatory for all taxpayers'),
-            'link': url_for('education_bp.view_module', module_id='next_steps'),
+            'link': url_for('education.view_module', module_id='next_steps'),
             'action_text': trans('learn_tin', default='Learn About TIN')
         },
         {
             'message': trans('tip_filing_deadline', 
                            default='Filing tax returns is required even if you owe no tax'),
-            'link': url_for('education_bp.view_module', module_id='filing_vs_paying'),
+            'link': url_for('education.view_module', module_id='filing_vs_paying'),
             'action_text': trans('learn_filing', default='Learn About Filing')
         },
         {
             'message': trans('tip_rent_relief', 
                            default='You can claim rent relief of up to ₦500,000 annually'),
-            'link': url_for('education_bp.view_module', module_id='deductions_reliefs'),
+            'link': url_for('education.view_module', module_id='deductions_reliefs'),
             'action_text': trans('learn_reliefs', default='Learn About Reliefs')
         }
     ]

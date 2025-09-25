@@ -16,7 +16,6 @@ TAX_TRANSLATIONS = {
         'taxable_income_label': 'Taxable Income',
         'estimated_tax_label': 'Estimated Tax Liability',
         'expense_categories_title': 'Expense Categories',
-        'tax_deductible': 'Tax Deductible',
         
         # Expense Category Names
         'office_admin_cat': 'Office & Admin',
@@ -141,6 +140,14 @@ TAX_TRANSLATIONS = {
         'total_expenses_summary': 'Total Expenses:',
         'tax_liability_summary': 'Tax Liability:',
         'effective_tax_rate_summary': 'Effective Tax Rate:',
+        
+        # Tax Benefits for Formalization
+        'tax_benefits_title': 'Tax Benefits of Formalization',
+        'tax_benefits_content': 'Formalizing your business provides significant tax advantages and opportunities.',
+        'tax_benefit_point1': 'Access to legitimate business expense deductions',
+        'tax_benefit_point2': 'Ability to claim depreciation on business assets',
+        'tax_benefit_point3': 'Eligibility for tax incentives and reliefs',
+        'tax_benefit_point4': 'Reduced risk of penalties and disputes with tax authorities',
     },
     'ha': {
         'tax_calculator_title': 'Mai kirga haraji mai wayo',
@@ -269,7 +276,6 @@ TAX_TRANSLATIONS = {
         'tax_education': 'Ilimin Haraji',
         'tax_calculator_desc': 'Bayani game da aikin kirgar haraji',
         'amount_placeholder': '0.00',
-        'tax_deductible': 'Wanda Ake Cire Haraji',
         'examples_label': 'Misalai:',
         'clear_form_button': 'Share Fom',
         'tax_summary_title': 'Takaicin Haraji',
@@ -289,7 +295,14 @@ TAX_TRANSLATIONS = {
         'statutory_contributions_desc': 'Kudin lissafi, shari\'a, da shawarwari da suka shafi kasuwanci',
         'business_travel_desc': 'Man fetur, gyaran mota, da kudin tafiye-tafiye na kasuwanci',
         'rent_utilities_desc': 'Kudin haya na shago ko ofishin kasuwanci (daban da Cirewar Kudin Haya)',
+        
+        # Tax Benefits for Formalization (Hausa)
+        'tax_benefits_title': 'Fa\'idodin Haraji na Daidaitawa',
+        'tax_benefits_content': 'Daidaita kasuwancinka yana ba da fa\'idodin haraji masu mahimmanci da dama.',
+        'tax_benefit_point1': 'Samun damar rage kashe kuɗin kasuwanci na gaskiya',
+        'tax_benefit_point2': 'Ikon neman rage darajar kayayyakin kasuwanci',
+        'tax_benefit_point3': 'Cancantar samun ƙarfafawa da taimako na haraji',
+        'tax_benefit_point4': 'Rage haɗarin hukunci da rigima da hukumomin haraji',
     }
 
 }
-
