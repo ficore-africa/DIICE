@@ -81,7 +81,7 @@
                                             </a>
                                         </div>
                                         <div class="col-md-6">
-                                            <a href="{{ url_for('education_bp.glossary') }}" class="btn btn-outline-info btn-block">
+                                            <a href="{{ url_for('education.glossary') }}" class="btn btn-outline-info btn-block">
                                                 <i class="fas fa-book mr-2"></i>{{ trans('view_glossary', default='View Glossary') }}
                                             </a>
                                         </div>
@@ -106,7 +106,7 @@
 
 <script>
 function markAsComplete() {
-    fetch('{{ url_for("education_bp.track_completion") }}', {
+    fetch('{{ url_for("education.track_completion") }}', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -143,4 +143,5 @@ function markAsComplete() {
     });
 }
 </script>
+
 {% endblock %}
