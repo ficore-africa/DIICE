@@ -583,8 +583,8 @@ def sanitize_input(input_string, max_length=None):
     if not input_string:
         return ''
     sanitized = str(input_string).strip()
-    sanitized = re.sub(r'[<>"\']', '', sanitized)
-    if re.search(r'[<>]', sanitized):
+    sanitized = re.sub(r'[<>"\'\\]', '', sanitized)  # Add backslash to regex
+    if re.search(r'[<>]', sanitized):  # Keep warning for potential XSS
         logger.warning(f"Potential malicious input detected: {sanitized}", extra={'session_id': session.get('sid', 'no-session-id')})
     if max_length and len(sanitized) > max_length:
         sanitized = sanitized[:max_length]
@@ -1475,19 +1475,51 @@ def get_optimized_tax_calculation_data(user_id, tax_year):
             }
 
 def calculate_payment_category_stats(payments):
-    """
-    Calculate category-based summary statistics for a list of payments.
-    
-    Args:
-        payments (list): List of payment records
-        
-    Returns:
-        dict: Dictionary with category statistics including totals by category,
-              tax deductible vs non-deductible amounts, and category counts
-    """
     try:
         stats = {
             'total_payments': len(payments),
+            'total_amount': 0.0,
+            'tax_deductible_amount': 0.0,
+            'non_deductible_amount': 0.0,
+            'category_totals': {},
+            'category_counts': {}
+        }
+        
+        # Initialize category totals and counts
+        expense_categories = get_all_expense_categories()  # Use the correct function
+        for category_key, category_data in expense_categories.items():
+            stats['category_totals'][category_key] = 0.0
+            stats['category_counts'][category_key] = 0
+        
+        # Process each payment
+        for payment in payments:
+            amount = float(payment.get('amount', 0))
+            category = payment.get('expense_category', 'office_admin')  # Default fallback
+            is_tax_deductible = payment.get('is_tax_deductible', True)
+            
+            # Update totals
+            stats['total_amount'] += amount
+            
+            if is_tax_deductible:
+                stats['tax_deductible_amount'] += amount
+            else:
+                stats['non_deductible_amount'] += amount
+            
+            # Update category-specific stats
+            if category in stats['category_totals']:
+                stats['category_totals'][category] += amount
+                stats['category_counts'][category] += 1
+        
+        logger.info(f"Calculated payment category stats: {stats['total_payments']} payments, "
+                   f"₦{stats['total_amount']:.2f} total", 
+                   extra={'session_id': session.get('sid', 'no-session-id') if has_request_context() else 'no-session-id'})
+        
+        return stats
+    except Exception as e:
+        logger.error(f"Error calculating payment category stats: {str(e)}", 
+                    extra={'session_id': session.get('sid', 'no-session-id') if has_request_context() else 'no-session-id'})
+        return {
+            'total_payments': 0,
             'total_amount': 0.0,
             'tax_deductible_amount': 0.0,
             'non_deductible_amount': 0.0,
@@ -1874,4 +1906,5 @@ def calculate_four_step_tax_liability(user_id, tax_year):
             'final_tax_liability': 0.0,
             'effective_tax_rate': 0.0
         }
+
 
