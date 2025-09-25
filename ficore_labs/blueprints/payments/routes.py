@@ -47,7 +47,34 @@ def index():
     try:
         db = utils.get_mongo_db()
         query = {'user_id': str(current_user.id), 'type': 'payment'}
+        
+        # Use the enhanced safe_find_cashflows function
         payments = utils.safe_find_cashflows(db, query, 'created_at', -1)
+        
+        # If we got no payments but expected some, try a fallback query
+        if not payments:
+            try:
+                # Try a simpler query to see if there are any records at all
+                test_count = db.cashflows.count_documents(query)
+                if test_count > 0:
+                    logger.warning(f"Found {test_count} payments for user {current_user.id} but safe_find returned empty", 
+                                 extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
+                    # Try to get at least some records with minimal processing
+                    raw_payments = list(db.cashflows.find(query).limit(50))
+                    payments = []
+                    for payment in raw_payments:
+                        try:
+                            # Minimal cleaning for display
+                            if 'party_name' in payment and payment['party_name']:
+                                payment['party_name'] = str(payment['party_name']).replace('\\', '')[:100]
+                            if 'description' in payment and payment['description']:
+                                payment['description'] = str(payment['description']).replace('\\', '')[:200]
+                            payments.append(payment)
+                        except Exception:
+                            continue
+            except Exception as fallback_error:
+                logger.error(f"Fallback query also failed for user {current_user.id}: {str(fallback_error)}", 
+                           extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
         
         # Calculate category-based summary statistics
         category_stats = utils.calculate_payment_category_stats(payments)
@@ -66,7 +93,7 @@ def index():
             f"Error fetching payments for user {current_user.id}: {str(e)}",
             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
         )
-        flash(trans('payments_fetch_error', default='An error occurred'), 'danger')
+        flash(trans('payments_fetch_error', default='An error occurred while loading your payments. Please try again.'), 'danger')
         return redirect(url_for('dashboard.index'))
 
 @payments_bp.route('/manage')
@@ -77,7 +104,34 @@ def manage():
     try:
         db = utils.get_mongo_db()
         query = {'user_id': str(current_user.id), 'type': 'payment'}
+        
+        # Use the enhanced safe_find_cashflows function
         payments = utils.safe_find_cashflows(db, query, 'created_at', -1)
+        
+        # If we got no payments but expected some, try a fallback query
+        if not payments:
+            try:
+                # Try a simpler query to see if there are any records at all
+                test_count = db.cashflows.count_documents(query)
+                if test_count > 0:
+                    logger.warning(f"Found {test_count} payments for user {current_user.id} but safe_find returned empty in manage", 
+                                 extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
+                    # Try to get at least some records with minimal processing
+                    raw_payments = list(db.cashflows.find(query).limit(50))
+                    payments = []
+                    for payment in raw_payments:
+                        try:
+                            # Minimal cleaning for display
+                            if 'party_name' in payment and payment['party_name']:
+                                payment['party_name'] = str(payment['party_name']).replace('\\', '')[:100]
+                            if 'description' in payment and payment['description']:
+                                payment['description'] = str(payment['description']).replace('\\', '')[:200]
+                            payments.append(payment)
+                        except Exception:
+                            continue
+            except Exception as fallback_error:
+                logger.error(f"Fallback query also failed for user {current_user.id} in manage: {str(fallback_error)}", 
+                           extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
         
         # Calculate category-based summary statistics
         category_stats = utils.calculate_payment_category_stats(payments)
@@ -96,7 +150,7 @@ def manage():
             f"Error fetching payments for manage page for user {current_user.id}: {str(e)}",
             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
         )
-        flash(trans('payments_fetch_error', default='An error occurred'), 'danger')
+        flash(trans('payments_fetch_error', default='An error occurred while loading your payments. Please try again.'), 'danger')
         return redirect(url_for('payments.index'))
 
 @payments_bp.route('/view/<id>')

@@ -148,6 +148,7 @@ TAX_TRANSLATIONS = {
         'tax_benefit_point2': 'Ability to claim depreciation on business assets',
         'tax_benefit_point3': 'Eligibility for tax incentives and reliefs',
         'tax_benefit_point4': 'Reduced risk of penalties and disputes with tax authorities',
+        'tax_deductible': 'Tax Deductible',
     },
     'ha': {
         'tax_calculator_title': 'Mai kirga haraji mai wayo',

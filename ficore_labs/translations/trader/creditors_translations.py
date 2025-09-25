@@ -71,6 +71,10 @@ CREDITORS_TRANSLATIONS = {
         'general_something_went_wrong': 'An error occurred',
         'general_error': 'Error',
         'general_note': 'Note',
+        
+        # Missing keys from logs
+        'creditors_unpaid': 'Unpaid Credits',
+        'creditors_you_owe': 'people you owe!',
     },
     'ha': {
         'creditors_dashboard': 'Masu Bina Bashi',
@@ -137,5 +141,9 @@ CREDITORS_TRANSLATIONS = {
         'credits_amount_required': 'Adadin Kuɗin Ficore yana da bukata',
         'general_error': 'Kuskure',
         'general_note': 'Bayanan kula',
+        
+        # Missing keys from logs
+        'creditors_unpaid': 'Basusukan da ba a biya ba',
+        'creditors_you_owe': 'mutane da kake bin su bashi!',
     }
 }

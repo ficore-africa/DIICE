@@ -13,6 +13,26 @@ logger = logging.getLogger(__name__)
 
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
 
+@dashboard_bp.route('/test-notifications')
+@login_required
+def test_notifications():
+    """Test route to verify notifications work - remove in production"""
+    return render_template('dashboard/index.html', 
+                         inventory_loss=True,
+                         unpaid_debtors=[{'name': 'Test Debtor', 'amount': 1000}],
+                         unpaid_creditors=[{'name': 'Test Creditor', 'amount': 500}],
+                         stats={}, 
+                         recent_creditors=[], 
+                         recent_debtors=[], 
+                         recent_payments=[], 
+                         recent_receipts=[], 
+                         recent_funds=[], 
+                         recent_inventory=[],
+                         can_interact=True,
+                         show_daily_log_reminder=False,
+                         streak=0,
+                         tax_prep_mode=False)
+
 # API endpoint for weekly profit data (for dashboard chart)
 @dashboard_bp.route('/weekly_profit_data')
 @login_required

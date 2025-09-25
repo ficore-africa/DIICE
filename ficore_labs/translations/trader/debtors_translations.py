@@ -92,6 +92,10 @@ DEBTORS_TRANSLATIONS = {
         'debtors_create_invoice': 'Create Invoice',
         'debtors_no_debtors': 'No debtors found',
         'debtors_search_debtors': 'Search debtors...',
+        
+        # Missing keys from logs
+        'debtors_unpaid': 'Unpaid Debts',
+        'debtors_people_owe_you': 'people owe you money!',
     },
     'ha': {
         'debtors_dashboard': 'Bashi',
@@ -182,5 +186,9 @@ DEBTORS_TRANSLATIONS = {
         'debtors_dashboard_desc': 'Duba bayanan wadanda kake bi bashi.',
         # Debtors
         'debtors_amount_owed': 'Adadin Bashi',
+        
+        # Missing keys from logs
+        'debtors_unpaid': 'Basusukan da ba a biya ba',
+        'debtors_people_owe_you': 'mutane suna bin ka bashi!',
     }
 }
