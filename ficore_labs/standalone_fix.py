@@ -18,7 +18,6 @@ def get_db_connection():
     try:
         # Try different MongoDB connection strings
         possible_uris = [
-            'mongodb+srv://ficoreaiafrica:kA1ba9Ote6SsHV3w@records.9xeqmnn.mongodb.net/ficore_accounting?retryWrites=true&w=majority&tlsAllowInvalidCertificates=true',
             os.environ.get('MONGODB_URI'),
             'mongodb://localhost:27017/ficore_labs',
             'mongodb://127.0.0.1:27017/ficore_labs'
@@ -178,4 +177,5 @@ def main():
         logger.error("Cleanup failed for some users")
 
 if __name__ == "__main__":
+
     main()
