@@ -6,7 +6,9 @@
 
 {% block extra_head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-notifications.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-realtime.css') }}">
 <script src="{{ url_for('static', filename='js/dashboard-notifications.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/dashboard-realtime.js') }}" defer></script>
 {% endblock %}
 
 {% block content %}
@@ -26,6 +28,34 @@
             <br>
             <small class="text-muted">{{ trans('profit_note', default='This is your actual profit after all expenses and inventory costs.') | escape }}</small>
         </div>
+    </div>
+    {% endif %}
+
+    <!-- Real-time Refresh Controls -->
+    {% if current_user.is_authenticated %}
+    <div class="refresh-controls">
+        <button id="dashboard-refresh-btn" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-arrow-clockwise"></i> {{ trans('general_refresh', default='Refresh') | escape }}
+        </button>
+        
+        <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="auto-refresh-toggle" checked>
+            <label class="form-check-label" for="auto-refresh-toggle">
+                {{ trans('auto_refresh', default='Auto-refresh') | escape }}
+            </label>
+        </div>
+        
+        <select id="refresh-rate-select" class="form-select form-select-sm">
+            <option value="30" selected>{{ trans('refresh_30s', default='30 seconds') | escape }}</option>
+            <option value="60">{{ trans('refresh_1m', default='1 minute') | escape }}</option>
+            <option value="300">{{ trans('refresh_5m', default='5 minutes') | escape }}</option>
+        </select>
+        
+        <span id="refresh-indicator" class="text-primary">
+            <i class="bi bi-arrow-clockwise spin"></i> {{ trans('refreshing', default='Refreshing...') | escape }}
+        </span>
+        
+        <small id="last-refresh-time" class="last-refresh-time"></small>
     </div>
     {% endif %}
 
@@ -101,99 +131,99 @@
     <div class="row g-3 mb-4">
         <!-- Profit Summary Card -->
         <div class="col-md-3">
-            <div class="card border-0 shadow-sm h-100 {% if not tax_prep_mode %}border-success{% endif %}">
+            <div class="card border-0 shadow-sm h-100 dashboard-stat-card profit-summary-card {% if (stats.total_receipts_amount - stats.total_payments_amount) < 0 %}negative{% endif %}">
                 <div class="card-body text-center">
-                    <div class="{% if tax_prep_mode %}text-success{% else %}text-info{% endif %} mb-2">
+                    <div class="text-white mb-2">
                         <i class="bi bi-graph-up-arrow fa-2x"></i>
                     </div>
-                    <h6 class="card-title">{{ trans('profit_summary', default='Profit Summary') | escape }}</h6>
+                    <h6 class="card-title text-white">{{ trans('profit_summary', default='Profit Summary') | escape }}</h6>
                     <p class="card-text">
                         {% if tax_prep_mode and stats.profit_only is defined %}
-                            <span class="h5 text-success">{{ stats.profit_only | format_currency }}</span><br>
-                            <small class="text-muted">{{ trans('true_profit', default='True Profit') | escape }}</small>
+                            <span id="true-profit" class="h5 text-white profit-summary-value">{{ stats.profit_only | format_currency }}</span><br>
+                            <small class="text-white-50">{{ trans('true_profit', default='True Profit') | escape }}</small>
                         {% else %}
-                            <span class="h5 text-info">{{ (stats.total_receipts_amount - stats.total_payments_amount) | format_currency }}</span><br>
-                            <small class="text-muted">{{ trans('gross_profit', default='Gross Profit') | escape }}</small>
+                            <span id="gross-profit" class="h5 text-white profit-summary-value">{{ (stats.total_receipts_amount - stats.total_payments_amount) | format_currency }}</span><br>
+                            <small class="text-white-50">{{ trans('gross_profit', default='Gross Profit') | escape }}</small>
                         {% endif %}
                     </p>
-                    <button class="btn btn-outline-{% if tax_prep_mode %}success{% else %}info{% endif %} btn-sm" onclick="toggleTaxPrepMode()">
+                    <button class="btn btn-outline-light btn-sm" onclick="toggleTaxPrepMode()">
                         {{ trans('toggle_view', default='Toggle View') | escape }}
                     </button>
                 </div>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card border-0 shadow-sm h-100">
+            <div class="card border-0 shadow-sm h-100 dashboard-stat-card">
                 <div class="card-body text-center">
                     <div class="text-primary mb-2">
                         <i class="bi bi-box-seam fa-2x"></i>
                     </div>
                     <h6 class="card-title">{{ trans('inventory_nav_label', default='Inventory') | escape }}</h6>
                     <p class="card-text">
-                        <span class="h5 text-primary">{{ stats.total_inventory | default('?') }}</span><br>
-                        <small class="text-muted">{{ stats.total_inventory_cost | format_currency }}</small>
+                        <span id="inventory-count" class="h5 text-primary">{{ stats.total_inventory | default('0') }}</span><br>
+                        <small class="text-muted"><span id="inventory-cost">{{ stats.total_inventory_cost | format_currency }}</span></small>
                     </p>
                     <a href="{{ url_for('inventory.index') }}" class="btn btn-outline-primary btn-sm">{{ trans('general_view', default='View') | escape }}</a>
                 </div>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card border-0 shadow-sm h-100">
+            <div class="card border-0 shadow-sm h-100 dashboard-stat-card">
                 <div class="card-body text-center">
                     <div class="text-primary mb-2">
                         <i class="bi bi-person-plus-fill fa-2x"></i>
                     </div>
                     <h6 class="card-title">{{ trans('general_debtors', default='Debtors') | escape }}</h6>
                     <p class="card-text">
-                        <span class="h5 text-primary">{{ stats.total_debtors }}</span><br>
-                        <small class="text-muted">{{ stats.total_debtors_amount | format_currency }}</small>
+                        <span id="debtors-count" class="h5 text-primary">{{ stats.total_debtors }}</span><br>
+                        <small class="text-muted"><span id="debtors-amount">{{ stats.total_debtors_amount | format_currency }}</span></small>
                     </p>
                     <a href="{{ url_for('debtors.index') }}" class="btn btn-outline-primary btn-sm">{{ trans('general_view', default='View') | escape }}</a>
                 </div>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card border-0 shadow-sm h-100">
+            <div class="card border-0 shadow-sm h-100 dashboard-stat-card">
                 <div class="card-body text-center">
                     <div class="text-primary mb-2">
                         <i class="bi bi-person-dash-fill fa-2x"></i>
                     </div>
                     <h6 class="card-title">{{ trans('general_creditors', default='Creditors') | escape }}</h6>
                     <p class="card-text">
-                        <span class="h5 text-primary">{{ stats.total_creditors }}</span><br>
-                        <small class="text-muted">{{ stats.total_creditors_amount | format_currency }}</small>
+                        <span id="creditors-count" class="h5 text-primary">{{ stats.total_creditors }}</span><br>
+                        <small class="text-muted"><span id="creditors-amount">{{ stats.total_creditors_amount | format_currency }}</span></small>
                     </p>
                     <a href="{{ url_for('creditors.index') }}" class="btn btn-outline-primary btn-sm">{{ trans('general_view', default='View') | escape }}</a>
                 </div>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card border-0 shadow-sm h-100">
+            <div class="card border-0 shadow-sm h-100 dashboard-stat-card">
                 <div class="card-body text-center">
-                    <div class="text-primary mb-2">
+                    <div class="text-success mb-2">
                         <i class="bi bi-cash-stack fa-2x"></i>
                     </div>
                     <h6 class="card-title">{{ trans('receipts_money_in', default='Income') | escape }}</h6>
                     <p class="card-text">
-                        <span class="h5 text-primary">{{ stats.total_receipts }}</span><br>
-                        <small class="text-muted">{{ stats.total_receipts_amount | format_currency }}</small>
+                        <span id="receipts-count" class="h5 text-success">{{ stats.total_receipts }}</span><br>
+                        <small class="text-muted"><span id="receipts-amount">{{ stats.total_receipts_amount | format_currency }}</span></small>
                     </p>
-                    <a href="{{ url_for('receipts.index') }}" class="btn btn-outline-primary btn-sm">{{ trans('general_view', default='View') | escape }}</a>
+                    <a href="{{ url_for('receipts.index') }}" class="btn btn-outline-success btn-sm">{{ trans('general_view', default='View') | escape }}</a>
                 </div>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card border-0 shadow-sm h-100">
+            <div class="card border-0 shadow-sm h-100 dashboard-stat-card">
                 <div class="card-body text-center">
-                    <div class="text-primary mb-2">
+                    <div class="text-danger mb-2">
                         <i class="bi bi-wallet2 fa-2x"></i>
                     </div>
                     <h6 class="card-title">{{ trans('payments_money_out', default='Expenses') | escape }}</h6>
                     <p class="card-text">
-                        <span class="h5 text-primary">{{ stats.total_payments }}</span><br>
-                        <small class="text-muted">{{ stats.total_payments_amount | format_currency }}</small>
+                        <span id="payments-count" class="h5 text-danger">{{ stats.total_payments }}</span><br>
+                        <small class="text-muted"><span id="payments-amount">{{ stats.total_payments_amount | format_currency }}</span></small>
                     </p>
-                    <a href="{{ url_for('payments.index') }}" class="btn btn-outline-primary btn-sm">{{ trans('general_view', default='View') | escape }}</a>
+                    <a href="{{ url_for('payments.index') }}" class="btn btn-outline-danger btn-sm">{{ trans('general_view', default='View') | escape }}</a>
                 </div>
             </div>
         </div>
