@@ -16,6 +16,7 @@ TAX_TRANSLATIONS = {
         'taxable_income_label': 'Taxable Income',
         'estimated_tax_label': 'Estimated Tax Liability',
         'expense_categories_title': 'Expense Categories',
+        'tax_deductible': 'Tax Deductible',
         
         # Expense Category Names
         'office_admin_cat': 'Office & Admin',
@@ -268,6 +269,7 @@ TAX_TRANSLATIONS = {
         'tax_education': 'Ilimin Haraji',
         'tax_calculator_desc': 'Bayani game da aikin kirgar haraji',
         'amount_placeholder': '0.00',
+        'tax_deductible': 'Wanda Ake Cire Haraji',
         'examples_label': 'Misalai:',
         'clear_form_button': 'Share Fom',
         'tax_summary_title': 'Takaicin Haraji',
@@ -290,3 +292,4 @@ TAX_TRANSLATIONS = {
     }
 
 }
+
