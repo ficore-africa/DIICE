@@ -45,12 +45,7 @@ def index():
     try:
         db = utils.get_mongo_db()
         query = {'user_id': str(current_user.id), 'type': 'receipt'}
-        receipts = list(db.cashflows.find(query).sort('created_at', -1))
-        
-        # Convert naive datetimes to timezone-aware
-        for receipt in receipts:
-            if receipt.get('created_at') and receipt['created_at'].tzinfo is None:
-                receipt['created_at'] = receipt['created_at'].replace(tzinfo=ZoneInfo("UTC"))
+        receipts = utils.safe_find_cashflows(db, query, 'created_at', -1)
         
         logger.info(
             f"Fetched receipts for user {current_user.id}",
@@ -80,12 +75,7 @@ def manage():
     try:
         db = utils.get_mongo_db()
         query = {'user_id': str(current_user.id), 'type': 'receipt'}
-        receipts = list(db.cashflows.find(query).sort('created_at', -1))
-        
-        # Convert naive datetimes to timezone-aware
-        for receipt in receipts:
-            if receipt.get('created_at') and receipt['created_at'].tzinfo is None:
-                receipt['created_at'] = receipt['created_at'].replace(tzinfo=ZoneInfo("UTC"))
+        receipts = utils.safe_find_cashflows(db, query, 'created_at', -1)
         
         logger.info(
             f"Fetched receipts for manage page for user {current_user.id}",

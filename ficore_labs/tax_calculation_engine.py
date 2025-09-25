@@ -345,7 +345,8 @@ def get_total_income(user_id, tax_year, db):
             'tax_year': tax_year
         }
         
-        income_records = db.cashflows.find(income_query)
+        from utils import safe_find_cashflows
+        income_records = safe_find_cashflows(db, income_query)
         total_income = sum(record.get('amount', 0) for record in income_records)
         
         logger.info(f"Retrieved total income for user {user_id} in {tax_year}: {total_income}")
@@ -415,7 +416,7 @@ def get_expenses_by_categories(user_id, tax_year, category_list, db):
                 'expense_category': {'$in': category_list}
             }
             
-            expense_records = db.cashflows.find(expense_query)
+            expense_records = safe_find_cashflows(db, expense_query)
             category_totals = {category: 0.0 for category in category_list}
             
             for record in expense_records:

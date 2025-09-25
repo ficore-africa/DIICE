@@ -1,10 +1,18 @@
-# Ficore Labs (DIICE) - Full Stack Business Management Platform
+# Ficore Labs Business Management Platform
 
 ## Overview
 
-Ficore Labs (DIICE) is a comprehensive, modern business management platform designed specifically for African entrepreneurs and traders. It provides daily-use incentives, actionable insights, and a robust set of tools to help users manage finances, inventory, compliance, taxation, and business growth—all in a secure, mobile-friendly, and extensible environment.
+Ficore Labs is a comprehensive, modern business management platform designed specifically for African entrepreneurs and traders. It provides real-time profit tracking, daily-use incentives, actionable insights, and a robust set of tools to help users manage finances, inventory, compliance, taxation, and business growth—all in a secure, mobile-friendly, and extensible environment.
 
-The platform features a streamlined user experience for entrepreneurs/traders with dedicated admin capabilities for system management, comprehensive tax calculation tools, and educational resources to help users understand Nigerian tax compliance.
+The platform features a streamlined user experience for entrepreneurs/traders with dedicated admin capabilities for system management, comprehensive tax calculation tools, real-time profit display functionality, and educational resources to help users understand Nigerian tax compliance.
+
+## Key Highlights
+
+- **Real-time Profit Display**: Toggle between gross profit and true profit (tax prep mode) with one click
+- **Smart Dashboard**: Interactive profit summaries with visual indicators and real-time calculations
+- **Tax Preparation Mode**: Instantly calculate true profit by subtracting all expenses and inventory costs from income
+- **Comprehensive Financial Tracking**: Complete cashflow management with expense categorization
+- **Mobile-First Design**: Responsive interface optimized for African entrepreneurs on-the-go
 
 ## Key Features
 
@@ -16,6 +24,12 @@ The platform features a streamlined user experience for entrepreneurs/traders wi
 - **Profit Summary PDF**: Downloadable profit/loss reports with detailed breakdowns (ReportLab)
 
 ### 💰 Advanced Financial Management
+- **Real-time Profit Tracking**: 
+  - Instant profit calculations with visual indicators
+  - Toggle between gross profit and true profit views
+  - Tax preparation mode for accurate profit assessment
+  - Interactive profit summary cards on dashboard
+
 - **Expense Categorization System**: 8 comprehensive expense categories with tax deductibility tracking:
   - Office & Admin (tax-deductible)
   - Staff & Wages (tax-deductible)
@@ -26,9 +40,11 @@ The platform features a streamlined user experience for entrepreneurs/traders wi
   - Personal Expenses (non-deductible)
   - Statutory & Legal Contributions (tax-deductible, special handling)
 
-- **Debt & Credit Tracking**: Comprehensive alerts for unpaid debts/credits with quick management links
-- **Tax Preparation Mode**: Toggle to show only true profit for accurate tax calculations
-- **Inventory Loss Detection**: Smart alerts when inventory costs exceed expected margins
+- **Smart Financial Insights**:
+  - Debt & Credit Tracking with comprehensive alerts
+  - Inventory Loss Detection with smart alerts
+  - Real-time cashflow summaries
+  - Automated profit/loss calculations
 
 ### 🧮 Tax Calculation Engine
 - **Dual Entity Type Support**: 
@@ -203,6 +219,16 @@ This account is auto-created for system management, user monitoring, KYC oversig
 
 ## Key Features in Detail
 
+### Real-time Profit Display System
+The platform features an advanced profit tracking system with multiple viewing modes:
+
+- **Gross Profit Mode**: Shows simple Income - Expenses calculation
+- **Tax Prep Mode**: Calculates true profit by subtracting all expenses AND inventory costs from income
+- **Interactive Toggle**: One-click switching between profit views
+- **Visual Indicators**: Color-coded profit displays (green for positive, red for negative)
+- **Dashboard Integration**: Prominent profit summary cards with real-time updates
+- **PDF Export**: Downloadable profit/loss summaries for tax preparation
+
 ### Expense Categorization System
 The platform includes a sophisticated 8-category expense system designed for Nigerian tax compliance:
 
@@ -244,11 +270,17 @@ We welcome contributions! Please follow these guidelines:
 
 ## Deployment
 
-The application is designed for easy deployment on cloud platforms:
+The application is designed for easy deployment on cloud platforms with idempotent migrations:
 
-- **Render.com**: Use `wsgi.py` as entry point
+- **Render.com**: Use `wsgi.py` as entry point (recommended)
 - **Heroku**: Compatible with Heroku's Python buildpack
 - **Cloud Platforms**: Standard WSGI deployment
+
+### Render.com Deployment Features
+- **Idempotent Migrations**: All database migrations are designed to run safely on every deployment
+- **Automatic Restarts**: Render handles app restarts without data loss
+- **Environment Variables**: Secure configuration management
+- **Zero-Downtime Deployments**: Seamless updates without service interruption
 
 ### Environment Configuration
 Ensure these environment variables are set in production:
@@ -257,6 +289,13 @@ Ensure these environment variables are set in production:
 - `FLASK_ENV`: Set to 'production'
 - `SERVER_NAME`: Your domain name
 - `PREFERRED_URL_SCHEME`: 'https' for production
+
+### Migration Safety
+All migrations in this application are idempotent and safe to run multiple times:
+- Database initialization checks for existing data
+- Migration flags prevent duplicate operations
+- Graceful handling of missing collections
+- No data loss on redeployments
 
 ## License
 

@@ -389,6 +389,7 @@ def create_app():
     from blueprints.rewards.routes import rewards_bp
     from blueprints.tax import tax_bp
     from blueprints.education import education_bp
+    from blueprints.api.routes import api_bp
 
     app.register_blueprint(users_bp, url_prefix='/users')
     app.register_blueprint(debtors_bp, url_prefix='/debtors')
@@ -408,7 +409,8 @@ def create_app():
     app.register_blueprint(rewards_bp, url_prefix='/rewards')
     app.register_blueprint(tax_bp, url_prefix='/tax')
     app.register_blueprint(education_bp, url_prefix='/education')
-    logger.info('Registered all blueprints including KYC, Settings, Rewards, Tax Calculator, and Education', extra={'session_id': 'none', 'user_role': 'none', 'ip_address': 'none'})
+    app.register_blueprint(api_bp, url_prefix='/api')
+    logger.info('Registered all blueprints including KYC, Settings, Rewards, Tax Calculator, Education, and API', extra={'session_id': 'none', 'user_role': 'none', 'ip_address': 'none'})
 
     # Define format_currency filter
     def format_currency(value):
@@ -636,7 +638,7 @@ def create_app():
         try:
             db = get_mongo_db()
             records = db.records.find({'user_id': current_user.id})
-            cashflows = db.cashflows.find({'user_id': current_user.id})
+            cashflows = utils.safe_find_cashflows(db, {'user_id': current_user.id})
             return render_template('view_data.html',
                                  records=list(records),
                                  cashflows=list(cashflows),

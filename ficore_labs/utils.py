@@ -580,15 +580,152 @@ def format_date(date_obj, lang=None, format_type='short'):
         return str(date_obj) if date_obj else ''
 
 def sanitize_input(input_string, max_length=None):
+    """
+    Sanitize input string by removing potentially dangerous characters.
+    Enhanced to handle backslashes and other problematic characters that can cause parsing errors.
+    """
     if not input_string:
         return ''
-    sanitized = str(input_string).strip()
-    sanitized = re.sub(r'[<>"\'\\]', '', sanitized)  # Add backslash to regex
-    if re.search(r'[<>]', sanitized):  # Keep warning for potential XSS
-        logger.warning(f"Potential malicious input detected: {sanitized}", extra={'session_id': session.get('sid', 'no-session-id')})
-    if max_length and len(sanitized) > max_length:
-        sanitized = sanitized[:max_length]
-    return sanitized
+    
+    try:
+        # Convert to string and strip whitespace
+        sanitized = str(input_string).strip()
+        
+        # Remove dangerous characters including backslashes that can cause parsing errors
+        # This regex removes: < > " ' \ and other control characters
+        sanitized = re.sub(r'[<>"\'\\\\]', '', sanitized)
+        
+        # Remove any remaining control characters and non-printable characters
+        sanitized = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', sanitized)
+        
+        # Remove any remaining backslashes that might have been missed
+        sanitized = sanitized.replace('\\', '')
+        
+        # Check for potential XSS patterns
+        if re.search(r'[<>]', sanitized):
+            logger.warning(f"Potential malicious input detected: {sanitized}", extra={'session_id': session.get('sid', 'no-session-id')})
+        
+        # Truncate if max_length is specified
+        if max_length and len(sanitized) > max_length:
+            sanitized = sanitized[:max_length]
+            
+        return sanitized
+        
+    except Exception as e:
+        logger.error(f"Error sanitizing input '{input_string}': {str(e)}", extra={'session_id': session.get('sid', 'no-session-id')})
+        return ''
+
+def clean_cashflow_record(record):
+    """
+    Clean and sanitize a cashflow record to prevent parsing errors.
+    This function handles problematic characters in existing database records.
+    """
+    if not record or not isinstance(record, dict):
+        return record
+    
+    try:
+        # Create a copy to avoid modifying the original
+        cleaned_record = record.copy()
+        
+        # Clean string fields that might contain problematic characters
+        string_fields = ['party_name', 'description', 'contact', 'method', 'expense_category']
+        
+        for field in string_fields:
+            if field in cleaned_record and cleaned_record[field] is not None:
+                original_value = cleaned_record[field]
+                cleaned_value = sanitize_input(original_value, max_length=1000 if field == 'description' else 100)
+                cleaned_record[field] = cleaned_value
+                
+                # Log if we cleaned something significant
+                if original_value != cleaned_value and len(str(original_value)) > 0:
+                    logger.info(f"Cleaned cashflow field '{field}': '{original_value}' -> '{cleaned_value}'", 
+                               extra={'session_id': session.get('sid', 'no-session-id')})
+        
+        # Ensure datetime fields are properly handled
+        if 'created_at' in cleaned_record and cleaned_record['created_at']:
+            if hasattr(cleaned_record['created_at'], 'tzinfo') and cleaned_record['created_at'].tzinfo is None:
+                cleaned_record['created_at'] = cleaned_record['created_at'].replace(tzinfo=ZoneInfo("UTC"))
+        
+        return cleaned_record
+        
+    except Exception as e:
+        logger.error(f"Error cleaning cashflow record: {str(e)}", extra={'session_id': session.get('sid', 'no-session-id')})
+        return record
+
+def safe_find_cashflows(db, query, sort_field='created_at', sort_direction=-1):
+    """
+    Safely find cashflows with error handling and data cleaning.
+    This prevents the "unexpected char" error by cleaning problematic data.
+    """
+    try:
+        # Execute the query with error handling
+        cursor = db.cashflows.find(query).sort(sort_field, sort_direction)
+        cashflows = []
+        
+        for record in cursor:
+            try:
+                # Clean each record to prevent parsing errors
+                cleaned_record = clean_cashflow_record(record)
+                cashflows.append(cleaned_record)
+            except Exception as record_error:
+                logger.error(f"Error processing cashflow record {record.get('_id', 'unknown')}: {str(record_error)}", 
+                           extra={'session_id': session.get('sid', 'no-session-id')})
+                # Skip problematic records rather than failing entirely
+                continue
+        
+        return cashflows
+        
+    except Exception as e:
+        logger.error(f"Error in safe_find_cashflows: {str(e)}", extra={'session_id': session.get('sid', 'no-session-id')})
+        # Return empty list rather than crashing
+        return []
+
+def bulk_clean_cashflow_data(db, user_id=None):
+    """
+    Bulk clean cashflow data for a specific user or all users.
+    This function can be called to proactively clean data.
+    """
+    try:
+        query = {}
+        if user_id:
+            query['user_id'] = str(user_id)
+        
+        # Get count for progress tracking
+        total_count = db.cashflows.count_documents(query)
+        logger.info(f"Starting bulk cleanup of {total_count} cashflow records for user {user_id or 'all users'}", 
+                   extra={'session_id': session.get('sid', 'no-session-id') if has_request_context() else 'no-session-id'})
+        
+        cleaned_count = 0
+        cursor = db.cashflows.find(query)
+        
+        for record in cursor:
+            try:
+                original_record = record.copy()
+                cleaned_record = clean_cashflow_record(record)
+                
+                # Check if any cleaning was done
+                if cleaned_record != original_record:
+                    # Update the record in database
+                    db.cashflows.update_one(
+                        {'_id': record['_id']},
+                        {'$set': cleaned_record}
+                    )
+                    cleaned_count += 1
+                    
+            except Exception as record_error:
+                logger.error(f"Error cleaning cashflow record {record.get('_id', 'unknown')}: {str(record_error)}", 
+                           extra={'session_id': session.get('sid', 'no-session-id') if has_request_context() else 'no-session-id'})
+                continue
+        
+        logger.info(f"Bulk cleanup completed: cleaned {cleaned_count} out of {total_count} records for user {user_id or 'all users'}", 
+                   extra={'session_id': session.get('sid', 'no-session-id') if has_request_context() else 'no-session-id'})
+        
+        return cleaned_count
+        
+    except Exception as e:
+        logger.error(f"Error in bulk_clean_cashflow_data: {str(e)}", 
+                   extra={'session_id': session.get('sid', 'no-session-id') if has_request_context() else 'no-session-id'})
+        return 0
 
 def generate_unique_id(prefix=''):
     return f"{prefix}_{str(uuid.uuid4())}" if prefix else str(uuid.uuid4())
@@ -1224,7 +1361,7 @@ def get_total_income(user_id, tax_year):
             'tax_year': tax_year
         }
         
-        income_records = db.cashflows.find(income_query)
+        income_records = safe_find_cashflows(db, income_query)
         total_income = sum(record.get('amount', 0) for record in income_records)
         
         logger.info(f"Retrieved total income for user {user_id} in {tax_year}: {total_income}", 
@@ -1300,7 +1437,7 @@ def get_expenses_by_categories(user_id, tax_year, category_list):
                 'expense_category': {'$in': category_list}
             }
             
-            expense_records = db.cashflows.find(expense_query)
+            expense_records = safe_find_cashflows(db, expense_query)
             category_totals = {category: 0.0 for category in category_list}
             
             for record in expense_records:

@@ -666,6 +666,63 @@ def update_annual_rent():
             'error': str(e)
         }), 400
 
+@tax_bp.route('/calculate-realtime', methods=['POST'])
+@login_required
+def calculate_tax_realtime():
+    """Real-time tax calculation endpoint for live updates"""
+    try:
+        db = get_mongo_db()
+        data = request.get_json()
+        
+        # Validate input data
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': 'No data provided'
+            }), 400
+        
+        # Get user's entity type
+        user_entity_type = get_user_entity_type(current_user.id, db)
+        entity_info = get_entity_type_info(user_entity_type)
+        
+        # Extract data
+        total_income = float(data.get('total_income', 0))
+        annual_rent = float(data.get('annual_rent', current_user.annual_rent or 0))
+        
+        # Clean expense data
+        expenses = data.get('expenses', {})
+        cleaned_expenses = {}
+        for category, amount in expenses.items():
+            amount_float = float(amount) if amount else 0
+            cleaned_expenses[category] = amount_float
+        
+        try:
+            # Perform calculation based on entity type
+            if user_entity_type == 'limited_liability':
+                result = simulate_cit_calculation(total_income, cleaned_expenses, entity_info)
+            else:
+                result = simulate_pit_four_step_calculation(total_income, cleaned_expenses, annual_rent, entity_info)
+            
+            return jsonify({
+                'success': True,
+                'breakdown': result
+            })
+            
+        except Exception as calc_error:
+            logger.error(f"Real-time calculation error for user {current_user.id}: {str(calc_error)}")
+            return jsonify({
+                'success': False,
+                'error': 'Calculation error',
+                'message': 'Unable to complete tax calculation'
+            }), 400
+        
+    except Exception as e:
+        logger.error(f"Real-time calculation endpoint error for user {current_user.id}: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error'
+        }), 500
+
 @tax_bp.route('/update-entity-type', methods=['POST'])
 @login_required
 def update_entity_type():

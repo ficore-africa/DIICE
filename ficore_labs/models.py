@@ -263,70 +263,6 @@ def assign_default_category_for_historical_data(party_name, amount, existing_cat
                     exc_info=True, extra={'session_id': 'no-session-id'})
         return 'office_admin'  # Safe fallback
 
-def migrate_cashflows_sanitize_party_name():
-    """
-    One-time migration script to sanitize party_name fields in cashflow records.
-    Removes or escapes problematic characters like backslashes to prevent JSON serialization errors.
-    """
-    try:
-        db = get_db()
-        migration_flag = db.system_config.find_one({'_id': 'party_name_sanitization_completed'})
-        if migration_flag and migration_flag.get('value'):
-            logger.info("Party name sanitization migration already completed, skipping.", extra={'session_id': 'no-session-id'})
-            return
-
-        # Check if cashflows collection exists
-        if 'cashflows' not in db.list_collection_names():
-            logger.info("Cashflows collection does not exist, skipping migration.", extra={'session_id': 'no-session-id'})
-            return
-
-        collection = db.cashflows
-
-        # Find cashflow records with party_name containing problematic characters
-        # Using regex to match backslashes or other problematic characters
-        query = {
-            'party_name': {'$regex': r'[\\/]', '$options': 'i'}  # Matches backslash or forward slash
-        }
-        
-        documents = collection.find(query)
-        updated_count = 0
-        
-        for doc in documents:
-            original_party_name = doc.get('party_name', '')
-            if original_party_name:
-                # Replace backslashes and forward slashes with underscores
-                sanitized_party_name = original_party_name.replace('\\', '_').replace('/', '_')
-                
-                # Update the document if the party_name changed
-                if sanitized_party_name != original_party_name:
-                    result = collection.update_one(
-                        {'_id': doc['_id']},
-                        {'$set': {'party_name': sanitized_party_name}}
-                    )
-                    if result.modified_count > 0:
-                        updated_count += 1
-                        logger.info(
-                            f"Sanitized party_name in cashflow record {doc['_id']}: '{original_party_name}' -> '{sanitized_party_name}'",
-                            extra={'session_id': 'no-session-id'}
-                        )
-
-        logger.info(
-            f"Completed party name sanitization migration for cashflows: {updated_count} documents updated",
-            extra={'session_id': 'no-session-id'}
-        )
-
-        # Mark migration as complete
-        db.system_config.update_one(
-            {'_id': 'party_name_sanitization_completed'},
-            {'$set': {'value': True}},
-            upsert=True
-        )
-        logger.info("Marked party name sanitization migration as completed in system_config", extra={'session_id': 'no-session-id'})
-
-    except Exception as e:
-        logger.error(f"Failed to sanitize party_name in cashflows: {str(e)}", exc_info=True, extra={'session_id': 'no-session-id'})
-        raise
-
 def migrate_cashflows_expense_categories():
     """
     One-time migration script to add expense category fields to existing cashflow records.
@@ -666,7 +602,7 @@ def initialize_app_data(app):
                             'properties': {
                                 'user_id': {'bsonType': 'string'},
                                 'type': {'enum': ['receipt', 'payment']},
-                                'party_name': {'bsonType': 'string', 'pattern': r'^[^\\\/]*$'},
+                                'party_name': {'bsonType': 'string'},
                                 'amount': {'bsonType': 'number', 'minimum': 0},
                                 'method': {'bsonType': ['string', 'null']},
                                 'category': {'bsonType': ['string', 'null']},
@@ -1159,20 +1095,12 @@ def initialize_app_data(app):
                 logger.error(f"Failed to run expense categories migration: {str(e)}", 
                             exc_info=True, extra={'session_id': 'no-session-id'})
                 raise
-            
-            # Run party name sanitization migration
-            try:
-                migrate_cashflows_sanitize_party_name()
-            except Exception as e:
-                logger.error(f"Failed to run party name sanitization migration: {str(e)}", 
-                            exc_info=True, extra={'session_id': 'no-session-id'})
-                raise
                 
         except Exception as e:
             logger.error(f"{trans('general_database_initialization_failed', default='Failed to initialize database')}: {str(e)}", 
                         exc_info=True, extra={'session_id': 'no-session-id'})
             raise
-            
+
 class User:
     def __init__(self, id, email, display_name=None, role='trader', is_admin=False, setup_complete=False, language='en', 
                  is_trial=True, trial_start=None, trial_end=None, is_subscribed=False, 
@@ -1534,7 +1462,8 @@ def get_cashflows(db, filter_kwargs):
         list: List of cashflow records
     """
     try:
-        return list(db.cashflows.find(filter_kwargs).sort('created_at', DESCENDING))
+        from utils import safe_find_cashflows
+        return safe_find_cashflows(db, filter_kwargs, 'created_at', -1)
     except Exception as e:
         logger.error(f"{trans('general_cashflows_fetch_error', default='Error getting cashflows')}: {str(e)}", 
                     exc_info=True, extra={'session_id': 'no-session-id'})

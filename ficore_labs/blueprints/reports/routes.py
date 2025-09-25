@@ -241,7 +241,7 @@ def profit_loss():
             if form.end_date.data:
                 end_datetime = datetime.combine(form.end_date.data, datetime.max.time(), tzinfo=ZoneInfo("UTC"))
                 query['created_at'] = query.get('created_at', {}) | {'$lte': end_datetime}
-            cashflows = [to_dict_cashflow(cf) for cf in db.cashflows.find(query).sort('created_at', -1)]
+            cashflows = [to_dict_cashflow(cf) for cf in utils.safe_find_cashflows(db, query, 'created_at', -1)]
             output_format = form.format.data
             logger.info(
                 f"Generating profit/loss report for user {current_user.id}, format: {output_format}",
@@ -266,7 +266,7 @@ def profit_loss():
     else:
         try:
             db = utils.get_mongo_db()
-            cashflows = [to_dict_cashflow(cf) for cf in db.cashflows.find(query).sort('created_at', -1)]
+            cashflows = [to_dict_cashflow(cf) for cf in utils.safe_find_cashflows(db, query, 'created_at', -1)]
         except pymongo.errors.PyMongoError as e:
             logger.error(
                 f"MongoDB error fetching cashflows for user {current_user.id}: {str(e)}",

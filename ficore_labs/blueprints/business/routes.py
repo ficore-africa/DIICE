@@ -102,10 +102,7 @@ def view_data():
                 record['created_at'] = record['created_at'].replace(tzinfo=ZoneInfo("UTC"))
 
         # Fetch cashflow records
-        cashflows = list(db.cashflows.find({'user_id': user_id}).sort('created_at', -1).limit(50))
-        for cashflow in cashflows:
-            if 'created_at' in cashflow and cashflow['created_at'].tzinfo is None:
-                cashflow['created_at'] = cashflow['created_at'].replace(tzinfo=ZoneInfo("UTC"))
+        cashflows = utils.safe_find_cashflows(db, {'user_id': user_id}, 'created_at', -1)[:50]
 
         logger.info(
             f"Rendered view_data for user {user_id}, debt_records={len(debt_records)}, cashflows={len(cashflows)}",
@@ -262,7 +259,7 @@ def recent_activity():
             })
 
         # Fetch recent cashflows
-        cashflows = db.cashflows.find({'user_id': user_id}).sort('created_at', -1).limit(3)
+        cashflows = utils.safe_find_cashflows(db, {'user_id': user_id}, 'created_at', -1)[:3]
         for cashflow in cashflows:
             created_at = (
                 cashflow['created_at'].replace(tzinfo=ZoneInfo("UTC"))

@@ -331,7 +331,7 @@ def user_type_modules(user_type):
     """Display modules for selected user type"""
     if user_type not in USER_TYPES:
         flash(trans('invalid_user_type', default='Invalid user type selected'), 'error')
-        return redirect(url_for('education_bp.education_home'))
+        return redirect(url_for('education.education_home'))
     
     user_config = USER_TYPES[user_type]
     modules = []
@@ -354,7 +354,7 @@ def view_module(module_id):
     """Display specific education module"""
     if module_id not in EDUCATION_MODULES:
         flash(trans('module_not_found', default='Module not found'), 'error')
-        return redirect(url_for('education_bp.education_home'))
+        return redirect(url_for('education.education_home'))
     
     module = EDUCATION_MODULES[module_id]
     
@@ -463,7 +463,7 @@ def user_progress():
     except Exception as e:
         logger.error(f"Error fetching progress for user {current_user.id}: {str(e)}")
         flash(trans('error_loading_progress', default='Error loading progress'), 'error')
-        return redirect(url_for('education_bp.education_home'))
+        return redirect(url_for('education.education_home'))
 
 @education_bp.route('/search')
 @login_required
@@ -490,7 +490,7 @@ def search():
                 'id': module_id,
                 'title': module['title'],
                 'description': module['description'],
-                'url': url_for('education_bp.view_module', module_id=module_id)
+                'url': url_for('education.view_module', module_id=module_id)
             })
     
     return render_template('education/search.html',

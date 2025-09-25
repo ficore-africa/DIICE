@@ -128,8 +128,8 @@ def index():
                 stats['total_receipts_amount'] = stats['total_payments_amount'] = stats['total_funds_amount'] = 0
             recent_creditors = list(db.records.find({**query, 'type': 'creditor'}).sort('created_at', -1).limit(5))
             recent_debtors = list(db.records.find({**query, 'type': 'debtor'}).sort('created_at', -1).limit(5))
-            recent_payments = list(db.cashflows.find({**query, 'type': 'payment'}).sort('created_at', -1).limit(5))
-            recent_receipts = list(db.cashflows.find({**query, 'type': 'receipt'}).sort('created_at', -1).limit(5))
+            recent_payments = utils.safe_find_cashflows(db, {**query, 'type': 'payment'}, 'created_at', -1)[:5]
+            recent_receipts = utils.safe_find_cashflows(db, {**query, 'type': 'receipt'}, 'created_at', -1)[:5]
             recent_funds = list(db.records.find({**query, 'type': 'fund'}).sort('created_at', -1).limit(5))
             recent_inventory = list(db.records.find({**query, 'type': 'inventory'}).sort('created_at', -1).limit(5))
         except Exception as e:
@@ -197,8 +197,8 @@ def index():
                 'total_funds': db.records.count_documents({**query, 'type': 'fund'}),
                 'total_debtors_amount': sum(doc.get('amount_owed', 0) for doc in db.records.find({**query, 'type': 'debtor'})),
                 'total_creditors_amount': sum(doc.get('amount_owed', 0) for doc in db.records.find({**query, 'type': 'creditor'})),
-                'total_payments_amount': sum(doc.get('amount', 0) for doc in db.cashflows.find({**query, 'type': 'payment'})),
-                'total_receipts_amount': sum(doc.get('amount', 0) for doc in db.cashflows.find({**query, 'type': 'receipt'})),
+                'total_payments_amount': sum(doc.get('amount', 0) for doc in utils.safe_find_cashflows(db, {**query, 'type': 'payment'})),
+                'total_receipts_amount': sum(doc.get('amount', 0) for doc in utils.safe_find_cashflows(db, {**query, 'type': 'receipt'})),
                 'total_funds_amount': sum(doc.get('amount', 0) for doc in db.records.find({**query, 'type': 'fund'})),
                 'total_forecasts': db.records.count_documents({**query, 'type': 'forecast'}),
                 'total_forecasts_amount': sum(doc.get('projected_revenue', 0) for doc in db.records.find({**query, 'type': 'forecast'})),
