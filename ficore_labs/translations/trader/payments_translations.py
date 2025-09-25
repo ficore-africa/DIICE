@@ -6,6 +6,7 @@ PAYMENTS_TRANSLATIONS = {
         'payment_location_address': 'Address',
         'payment_location_city': 'City',
         'payment_location_country': 'Country',
+        'payments_back_to_list': 'Back to Payments List',
         'payment_location_name_placeholder': 'Enter location name',
         'payment_location_address_placeholder': 'Enter address',
         'payments_title': 'Expenses',
@@ -177,6 +178,7 @@ PAYMENTS_TRANSLATIONS = {
         'payment_location_address_placeholder': 'Shigar da adireshi',
         'payment_location_city_placeholder': 'Shigar da gari',
         'payment_location_country_placeholder': 'Shigar da ƙasa',
+        'payments_back_to_list': 'Koma zuwa Jerin Biyayya',
         'confirm_delete_payment_location': 'Kuna da tabbacin cewa kuna so ku goge wannan wurin kashe kuɗi?',
         
         # Expense Category Selection (Hausa)
