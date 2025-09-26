@@ -1727,6 +1727,43 @@ def get_kyc_record(db, filter_kwargs):
         logger.error(f"{trans('general_kyc_fetch_error', default='Error getting KYC records')}: {str(e)}", 
                     exc_info=True, extra={'session_id': 'no-session-id'})
         raise
+def update_kyc_record(db, filter_kwargs, update_data):
+    """
+    Updates a KYC record in the database.
+    
+    Args:
+        db (MongoDB): The database instance.
+        filter_kwargs (dict): MongoDB filter criteria (e.g., {'user_id': '123'}).
+        update_data (dict): The fields and values to update (e.g., {'status': 'approved'}).
+        
+    Returns:
+        dict: The MongoDB update result, or raises an Exception on failure.
+    """
+    
+    # 1. Prepare the update operation for MongoDB
+    update_operation = {'$set': update_data}
+    
+    # 2. Add an 'updated_at' timestamp (a common best practice)
+    update_operation['$set']['updated_at'] = datetime.utcnow()
+    
+    try:
+        # 3. Execute the update command
+        result = db.kyc_records.update_one(filter_kwargs, update_operation)
+        
+        # 4. Error handling for when the record isn't found
+        if result.matched_count == 0:
+            # Raise a specific error if no record matched the filter
+            raise Exception("No KYC record found matching the criteria for update.")
+            
+        return result
+        
+    except Exception as e:
+        # Log the error and re-raise a custom exception for the application
+        error_msg = f"Error updating KYC record: {e}"
+        raise Exception(error_msg, extra={'filter': filter_kwargs, 'data': update_data})
+
+from datetime import datetime
+# NOTE: The 'datetime' import would need to be added at the top of models.py
 
 def to_dict_kyc_record(record):
     """
