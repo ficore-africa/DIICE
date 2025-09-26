@@ -25,20 +25,10 @@ def get_expense_categories():
             name_key = f"{category_key}_cat"
             desc_key = f"{category_key}_desc"
             
-            # Sanitize string fields to prevent JSON parsing errors
-            name = trans(name_key, default=category_data.get('name', category_key))
-            description = trans(desc_key, default=category_data.get('description', ''))
-            examples = category_data.get('examples', [])
-            
-            # Use json.dumps to ensure proper escaping, then remove quotes
-            safe_name = json.dumps(str(name))[1:-1] if name else ''
-            safe_description = json.dumps(str(description))[1:-1] if description else ''
-            safe_examples = [json.dumps(str(ex))[1:-1] for ex in examples if ex]
-            
             translated_categories[category_key] = {
-                'name': safe_name,
-                'description': safe_description,
-                'examples': safe_examples,
+                'name': trans(name_key, default=category_data.get('name', category_key)),
+                'description': trans(desc_key, default=category_data.get('description', '')),
+                'examples': category_data.get('examples', []),
                 'tax_deductible': category_data.get('tax_deductible', False),
                 'is_personal': category_data.get('is_personal', False),
                 'is_statutory': category_data.get('is_statutory', False)
@@ -139,23 +129,6 @@ def tax_calculator():
             'non_deductible_categories': [key for key, data in expense_categories.items() 
                                         if not data.get('tax_deductible', False)]
         }
-        
-        # Add debug logging for template variables
-        logger.debug(f"Tax calculator template variables for user {current_user.id}: "
-                    f"entity_type={user_entity_type}, categories_count={len(expense_categories)}, "
-                    f"annual_rent={current_user.annual_rent or 0}")
-        
-        # Test JSON serialization of template variables to catch issues early
-        try:
-            json.dumps({
-                'expense_categories': expense_categories,
-                'user_entity_type': user_entity_type,
-                'entity_info': entity_info,
-                'calculation_context': calculation_context
-            })
-        except (TypeError, ValueError) as json_error:
-            logger.error(f"JSON serialization check failed for user {current_user.id}: {str(json_error)}")
-            # Continue with rendering but log the issue
         
         return render_template('tax/tax_calculator.html', 
                              expense_categories=expense_categories,
@@ -576,7 +549,7 @@ def simulate_pit_four_step_calculation(total_income, expenses, annual_rent, enti
         # Include non-deductible expenses for reference
         personal_expenses = validated_expenses.get('personal_expenses', 0)
         
-        result = {
+        return {
             'calculation_type': 'PIT',
             'entity_type': 'sole_proprietor',
             'entity_info': entity_info,
@@ -693,100 +666,6 @@ def update_annual_rent():
             'error': str(e)
         }), 400
 
-@tax_bp.route('/log-client-error', methods=['POST'])
-@login_required
-def log_client_error():
-    """Log client-side JavaScript errors for debugging"""
-    try:
-        data = request.get_json()
-        error_message = data.get('error', 'Unknown client error')
-        error_details = data.get('details', {})
-        error_stack = data.get('stack', '')
-        page_url = data.get('url', '')
-        user_agent = data.get('userAgent', '')
-        
-        # Log the client-side error with user context
-        logger.error(
-            f"Client-side error for user {current_user.id}: {error_message}",
-            extra={
-                'session_id': session.get('sid', 'no-session-id'),
-                'user_id': current_user.id,
-                'error_details': error_details,
-                'error_stack': error_stack,
-                'page_url': page_url,
-                'user_agent': user_agent
-            }
-        )
-        
-        return jsonify({
-            'success': True,
-            'message': 'Error logged successfully'
-        })
-        
-    except Exception as e:
-        logger.error(f"Error logging client-side error: {str(e)}")
-        return jsonify({
-            'success': False,
-            'error': 'Failed to log error'
-        }), 500
-
-@tax_bp.route('/calculate-realtime', methods=['POST'])
-@login_required
-def calculate_tax_realtime():
-    """Real-time tax calculation endpoint for live updates"""
-    try:
-        db = get_mongo_db()
-        data = request.get_json()
-        
-        # Validate input data
-        if not data:
-            return jsonify({
-                'success': False,
-                'error': 'No data provided'
-            }), 400
-        
-        # Get user's entity type
-        user_entity_type = get_user_entity_type(current_user.id, db)
-        entity_info = get_entity_type_info(user_entity_type)
-        
-        # Extract data
-        total_income = float(data.get('total_income', 0))
-        annual_rent = float(data.get('annual_rent', current_user.annual_rent or 0))
-        
-        # Clean expense data
-        expenses = data.get('expenses', {})
-        cleaned_expenses = {}
-        for category, amount in expenses.items():
-            amount_float = float(amount) if amount else 0
-            cleaned_expenses[category] = amount_float
-        
-        try:
-            # Perform calculation based on entity type
-            if user_entity_type == 'limited_liability':
-                result = simulate_cit_calculation(total_income, cleaned_expenses, entity_info)
-            else:
-                result = simulate_pit_four_step_calculation(total_income, cleaned_expenses, annual_rent, entity_info)
-            
-            return jsonify({
-                'success': True,
-                'breakdown': result
-            })
-            
-        except Exception as calc_error:
-            logger.error(f"Real-time calculation error for user {current_user.id}: {str(calc_error)}")
-            return jsonify({
-                'success': False,
-                'error': 'Calculation error',
-                'message': 'Unable to complete tax calculation'
-            }), 400
-        
-    except Exception as e:
-        logger.error(f"Real-time calculation endpoint error for user {current_user.id}: {str(e)}")
-        return jsonify({
-            'success': False,
-            'error': 'Internal server error'
-        }), 500
-
 @tax_bp.route('/update-entity-type', methods=['POST'])
 @login_required
 def update_entity_type():
@@ -829,4 +708,5 @@ def update_entity_type():
         return jsonify({
             'success': False,
             'error': str(e)
+
         }), 400
