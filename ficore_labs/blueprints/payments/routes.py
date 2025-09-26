@@ -53,10 +53,10 @@ class PaymentForm(FlaskForm):
 
 payments_bp = Blueprint('payments', __name__, url_prefix='/payments')
 
-def fetch_payments_with_fallback(db, query, sort_key='created_at', sort_direction=-1, limit=50):
+def fetch_payments_with_fallback(db, query, sort_field='created_at', sort_direction=-1, limit=50):
     """Fetch payments with fallback logic for robustness."""
-    # Adjusted call to safe_find_cashflows to match expected signature (db, query, sort_key, sort_direction)
-    payments = utils.safe_find_cashflows(db, query, sort_key=sort_key, sort_direction=sort_direction)
+    # Use sort_field to align with safe_find_cashflows signature
+    payments = utils.safe_find_cashflows(db, query, sort_field=sort_field, sort_direction=sort_direction)
     if not payments:
         try:
             test_count = db.cashflows.count_documents(query, hint=[('user_id', 1), ('type', 1)])
@@ -66,14 +66,13 @@ def fetch_payments_with_fallback(db, query, sort_key='created_at', sort_directio
                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
                 )
                 # Apply limit in the fallback query
-                raw_payments = list(db.cashflows.find(query, hint=[('user_id', 1), ('type', 1)]).sort(sort_key, sort_direction).limit(limit))
+                raw_payments = list(db.cashflows.find(query, hint=[('user_id', 1), ('type', 1)]).sort(sort_field, sort_direction).limit(limit))
                 payments = []
                 for payment in raw_payments:
                     try:
-                        cleaned_payment = utils.aggressively_clean_record(payment)
+                        from models import to_dict_cashflow
+                        cleaned_payment = to_dict_cashflow(payment)
                         if cleaned_payment:
-                            if '_id' in cleaned_payment:
-                                cleaned_payment['_id'] = str(cleaned_payment['_id'])
                             payments.append(cleaned_payment)
                     except Exception as clean_error:
                         logger.debug(f"Failed to clean payment record {payment.get('_id', 'unknown')}: {str(clean_error)}")
@@ -84,7 +83,7 @@ def fetch_payments_with_fallback(db, query, sort_key='created_at', sort_directio
                 f"Fallback query failed for user {current_user.id}: {str(fallback_error)}",
                 extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
             )
-    return bulk_clean_documents_for_json(payments)
+    return payments
 
 @payments_bp.route('/')
 @login_required
@@ -93,6 +92,7 @@ def index():
     """List all payment cashflows for the current user."""
     try:
         db = utils.get_mongo_db()
+        utils.audit_datetime_fields(db, 'cashflows')  # Run audit
         query = {'user_id': str(current_user.id), 'type': 'payment'}
         
         payments = fetch_payments_with_fallback(db, query)
@@ -177,7 +177,8 @@ def view(id):
         payment.setdefault('contact', '')
         payment.setdefault('description', '')
         
-        payment = clean_document_for_json(payment)
+        from models import to_dict_cashflow
+        payment = to_dict_cashflow(payment)  # Use to_dict_cashflow for consistent serialization
         return safe_json_response(payment)
     except ValueError:
         logger.error(
@@ -213,9 +214,8 @@ def generate_pdf(id):
             flash(trans('payments_record_not_found', default='Record not found'), 'danger')
             return redirect(url_for('payments.index'))
         
-        # Convert naive datetimes to timezone-aware
-        if payment.get('created_at') and payment['created_at'].tzinfo is None:
-            payment['created_at'] = payment['created_at'].replace(tzinfo=ZoneInfo("UTC"))
+        from models import to_dict_cashflow
+        payment = to_dict_cashflow(payment)  # Use to_dict_cashflow for consistent serialization
         
         # Sanitize inputs for PDF generation
         payment['party_name'] = utils.sanitize_input(payment['party_name'], max_length=100)
@@ -243,8 +243,8 @@ def generate_pdf(id):
             (trans('payments_amount', default='Amount Paid'), utils.format_currency(payment['amount'])),
             (trans('general_payment_method', default='Payment Method'), payment.get('method', 'N/A')),
             (trans('general_category', default='Category'), payment['category_display']),
-            (trans('general_date', default='Date'), utils.format_date(payment['created_at'])),
-            (trans('payments_id', default='Payment ID'), str(payment['_id']))
+            (trans('general_date', default='Date'), payment['created_at']),  # ISO string from to_dict_cashflow
+            (trans('payments_id', default='Payment ID'), payment['id'])
         ]
         for label, value in fields:
             p.drawString(inch, y_position, f"{label}:")
@@ -277,7 +277,7 @@ def generate_pdf(id):
             buffer.getvalue(),
             mimetype='application/pdf',
             headers={
-                'Content-Disposition': f'attachment; filename=payment_{utils.sanitize_input(payment["party_name"], max_length=50)}_{str(payment["_id"])}.pdf'
+                'Content-Disposition': f'attachment; filename=payment_{utils.sanitize_input(payment["party_name"], max_length=50)}_{payment["id"]}.pdf'
             }
         )
     except ValueError:
@@ -309,6 +309,7 @@ def add():
         form = PaymentForm()
         if form.validate_on_submit():
             try:
+                from models import create_cashflow
                 form_data = {
                     'party_name': form.party_name.data,
                     'date': form.date.data,
@@ -334,7 +335,7 @@ def add():
                     )
                 
                 db = utils.get_mongo_db()
-                payment_date = datetime.combine(form.date.data, datetime.min.time(), tzinfo=ZoneInfo("UTC"))
+                payment_date = datetime.fromisoformat(utils.normalize_datetime(form.date.data))
                 category_metadata = utils.get_category_metadata(form.expense_category.data)
                 
                 cashflow = {
@@ -354,9 +355,9 @@ def add():
                     'contact': utils.sanitize_input(form.contact.data, max_length=100) if form.contact.data else None,
                     'description': utils.sanitize_input(form.description.data, max_length=1000) if form.description.data else None,
                     'created_at': payment_date,
-                    'updated_at': datetime.now(timezone.utc)
+                    'updated_at': datetime.fromisoformat(utils.normalize_datetime(datetime.now()))
                 }
-                db.cashflows.insert_one(cashflow)
+                create_cashflow(db, cashflow)  # Use models.create_cashflow
                 logger.info(
                     f"Payment added for user {current_user.id}",
                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
@@ -405,10 +406,6 @@ def edit(id):
             flash(trans('payments_record_not_found', default='Cashflow not found'), 'danger')
             return redirect(url_for('payments.index'))
         
-        # Convert naive datetimes to timezone-aware
-        if payment.get('created_at') and payment['created_at'].tzinfo is None:
-            payment['created_at'] = payment['created_at'].replace(tzinfo=ZoneInfo("UTC"))
-        
         form = PaymentForm(data={
             'party_name': payment['party_name'],
             'date': payment['created_at'].date(),
@@ -420,6 +417,7 @@ def edit(id):
         })
         if form.validate_on_submit():
             try:
+                from models import update_cashflow
                 form_data = {
                     'party_name': form.party_name.data,
                     'date': form.date.data,
@@ -445,7 +443,7 @@ def edit(id):
                         can_interact=utils.can_user_interact(current_user)
                     )
                 
-                payment_date = datetime.combine(form.date.data, datetime.min.time(), tzinfo=ZoneInfo("UTC"))
+                payment_date = datetime.fromisoformat(utils.normalize_datetime(form.date.data))
                 category_metadata = utils.get_category_metadata(form.expense_category.data)
                 
                 updated_cashflow = {
@@ -462,10 +460,9 @@ def edit(id):
                     },
                     'contact': utils.sanitize_input(form.contact.data, max_length=100) if form.contact.data else None,
                     'description': utils.sanitize_input(form.description.data, max_length=1000) if form.description.data else None,
-                    'created_at': payment_date,
-                    'updated_at': datetime.now(timezone.utc)
+                    'created_at': payment_date
                 }
-                db.cashflows.update_one({'_id': ObjectId(id)}, {'$set': updated_cashflow}, hint=[('_id', 1)])
+                update_cashflow(db, id, updated_cashflow)  # Use models.update_cashflow
                 logger.info(
                     f"Payment {id} updated for user {current_user.id}",
                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}

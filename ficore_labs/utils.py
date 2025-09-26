@@ -358,6 +358,30 @@ def create_anonymous_session():
         session['is_anonymous'] = True
         session.modified = True
 
+def normalize_datetime(dt):
+    """
+    Centralized datetime normalization function to ensure all datetimes are UTC-aware ISO strings.
+    
+    Args:
+        dt: datetime object, string, or None
+    
+    Returns:
+        str: ISO formatted UTC datetime string
+    """
+    if not dt:
+        return datetime.now(ZoneInfo("UTC")).isoformat()
+    
+    if isinstance(dt, str):
+        try:
+            dt = datetime.fromisoformat(dt.replace('Z', '+00:00'))
+        except ValueError:
+            return datetime.now(ZoneInfo("UTC")).isoformat()
+    
+    if isinstance(dt, datetime) and dt.tzinfo is None:
+        dt = dt.replace(tzinfo=ZoneInfo("UTC"))
+    
+    return dt.isoformat() if hasattr(dt, 'isoformat') else str(dt)
+
 def clean_currency(value, max_value=10000000000):
     try:
         if value is None or (isinstance(value, str) and value.strip() == ''):
@@ -646,13 +670,7 @@ def clean_cashflow_record(record):
         datetime_fields = ['created_at', 'updated_at']
         for field in datetime_fields:
             if field in cleaned_record and cleaned_record[field]:
-                if hasattr(cleaned_record[field], 'tzinfo') and cleaned_record[field].tzinfo is None:
-                    cleaned_record[field] = cleaned_record[field].replace(tzinfo=ZoneInfo("UTC"))
-                # Convert to ISO string for JSON serialization
-                if hasattr(cleaned_record[field], 'isoformat'):
-                    cleaned_record[field] = cleaned_record[field].isoformat()
-                else:
-                    cleaned_record[field] = str(cleaned_record[field])
+                cleaned_record[field] = normalize_datetime(cleaned_record[field])
         
         return cleaned_record
         
@@ -864,21 +882,41 @@ def aggressively_clean_record(record):
     """
     Aggressively clean a record that failed normal cleaning.
     This is a last resort to salvage corrupted data.
+    Handles both cashflow and record documents.
     """
     if not record or not isinstance(record, dict):
         return None
     
     try:
-        # Initialize a new cleaned record dictionary
-        cleaned_record = {
-            'type': record.get('type', 'payment'),  # Fixed the incomplete line
-            'amount': record.get('amount', 0.0),
-            'created_at': record.get('created_at', datetime.now(ZoneInfo("UTC")))
-        }
+        # Determine if this is a cashflow or record based on available fields
+        is_cashflow = 'party_name' in record or 'amount' in record
+        
+        # Initialize a new cleaned record dictionary with appropriate defaults
+        if is_cashflow:
+            cleaned_record = {
+                'type': record.get('type', 'payment'),
+                'party_name': record.get('party_name', 'Unknown'),
+                'amount': record.get('amount', 0.0),
+                'created_at': record.get('created_at', datetime.now(ZoneInfo("UTC")))
+            }
+            string_fields = ['party_name', 'description', 'contact', 'method', 'expense_category']
+        else:
+            cleaned_record = {
+                'type': record.get('type', 'debtor'),
+                'name': record.get('name', 'Unknown'),
+                'created_at': record.get('created_at', datetime.now(ZoneInfo("UTC")))
+            }
+            string_fields = ['name', 'description', 'contact']
+        
+        # Copy over the _id if it exists
+        if '_id' in record:
+            cleaned_record['_id'] = record['_id']
+        
+        # Copy over user_id if it exists
+        if 'user_id' in record:
+            cleaned_record['user_id'] = record['user_id']
         
         # Try to salvage string fields with extreme cleaning
-        string_fields = ['party_name', 'description', 'contact', 'method', 'expense_category']
-        
         for field in string_fields:
             if field in record and record[field] is not None:
                 try:
@@ -898,26 +936,27 @@ def aggressively_clean_record(record):
                     # If we can't clean it, use a default
                     if field == 'party_name':
                         cleaned_record[field] = 'Unknown'
+                    elif field == 'name':
+                        cleaned_record[field] = 'Unknown'
                     elif field == 'expense_category':
                         cleaned_record[field] = 'office_admin'
         
-        # Ensure we have required fields
-        if not cleaned_record.get('party_name'):
-            cleaned_record['party_name'] = 'Unknown'
-        if not cleaned_record.get('expense_category'):
-            cleaned_record['expense_category'] = 'office_admin'
+        # Ensure we have required fields for cashflows
+        if is_cashflow:
+            if not cleaned_record.get('party_name'):
+                cleaned_record['party_name'] = 'Unknown'
+            if not cleaned_record.get('expense_category') and cleaned_record.get('type') == 'payment':
+                cleaned_record['expense_category'] = 'office_admin'
+        else:
+            # Ensure we have required fields for records
+            if not cleaned_record.get('name'):
+                cleaned_record['name'] = 'Unknown'
         
         # Ensure datetime fields are properly handled and JSON serializable
         datetime_fields = ['created_at', 'updated_at']
         for field in datetime_fields:
             if field in cleaned_record and cleaned_record[field]:
-                if hasattr(cleaned_record[field], 'tzinfo') and cleaned_record[field].tzinfo is None:
-                    cleaned_record[field] = cleaned_record[field].replace(tzinfo=ZoneInfo("UTC"))
-                # Convert to ISO string for JSON serialization
-                if hasattr(cleaned_record[field], 'isoformat'):
-                    cleaned_record[field] = cleaned_record[field].isoformat()
-                else:
-                    cleaned_record[field] = str(cleaned_record[field])
+                cleaned_record[field] = normalize_datetime(cleaned_record[field])
         
         return cleaned_record
         
@@ -989,6 +1028,133 @@ def safe_find_cashflows(db, query, sort_field='created_at', sort_direction=-1):
                        extra={'session_id': session.get('sid', 'no-session-id')})
             # Return empty list rather than crashing
             return []
+
+def clean_record(record):
+    """
+    Clean and sanitize a record to prevent parsing errors.
+    This function handles problematic characters in existing database records.
+    """
+    if not record or not isinstance(record, dict):
+        return record
+    
+    try:
+        # Create a copy to avoid modifying the original
+        cleaned_record = record.copy()
+        
+        # Clean string fields that might contain problematic characters
+        string_fields = ['name', 'description', 'contact', 'notes']
+        
+        for field in string_fields:
+            if field in cleaned_record and cleaned_record[field] is not None:
+                original_value = cleaned_record[field]
+                cleaned_value = sanitize_input(original_value, max_length=1000 if field == 'description' else 100)
+                cleaned_record[field] = cleaned_value
+                
+                # Log if we cleaned something significant
+                if original_value != cleaned_value and len(str(original_value)) > 0:
+                    logger.info(f"Cleaned record field '{field}': '{original_value}' -> '{cleaned_value}'", 
+                               extra={'session_id': session.get('sid', 'no-session-id')})
+        
+        # Ensure datetime fields are properly handled and JSON serializable
+        datetime_fields = ['created_at', 'updated_at']
+        for field in datetime_fields:
+            if field in cleaned_record and cleaned_record[field]:
+                cleaned_record[field] = normalize_datetime(cleaned_record[field])
+        
+        return cleaned_record
+        
+    except Exception as e:
+        logger.error(f"Error cleaning record: {str(e)}", extra={'session_id': session.get('sid', 'no-session-id')})
+        return record
+
+def safe_find_records(db, query, sort_field='created_at', sort_direction=-1):
+    """
+    Safely find records with error handling and data cleaning.
+    This prevents parsing errors by cleaning problematic data and mirrors safe_find_cashflows.
+    """
+    try:
+        # First attempt: Try normal query with cleaning
+        cursor = db.records.find(query).sort(sort_field, sort_direction)
+        records = []
+        
+        for record in cursor:
+            try:
+                # Clean each record to prevent parsing errors
+                cleaned_record = clean_record(record)
+                if cleaned_record:
+                    records.append(cleaned_record)
+            except Exception as record_error:
+                logger.warning(f"Error cleaning record {record.get('_id')}: {str(record_error)}", 
+                             extra={'session_id': session.get('sid', 'no-session-id')})
+                continue
+        
+        return records
+        
+    except Exception as e:
+        logger.warning(f"Initial query failed: {str(e)}", extra={'session_id': session.get('sid', 'no-session-id')})
+        
+        # Fallback strategy: Try to get records without sorting
+        try:
+            cursor = db.records.find(query)
+            records = []
+            
+            for record in cursor:
+                try:
+                    cleaned_record = aggressively_clean_record(record)
+                    if cleaned_record:
+                        records.append(cleaned_record)
+                except Exception:
+                    continue
+            
+            # Sort in Python if we got results
+            if records and sort_field in records[0]:
+                records.sort(key=lambda x: x.get(sort_field, datetime.min), reverse=(sort_direction == -1))
+            
+            return records
+            
+        except Exception as e:
+            logger.error(f"Fallback query failed: {str(e)}", extra={'session_id': session.get('sid', 'no-session-id')})
+            raise
+
+def audit_datetime_fields(db, collection_name='cashflows'):
+    """
+    Audit datetime fields in a collection to identify inconsistent created_at values.
+    This function proactively identifies and logs issues for manual or automated correction.
+    
+    Args:
+        db: MongoDB database instance
+        collection_name: Name of the collection to audit
+    
+    Returns:
+        list: List of issues found
+    """
+    try:
+        collection = db[collection_name]
+        datetime_fields = ['created_at', 'updated_at']
+        
+        # Find documents with datetime fields
+        query = {'$or': [{field: {'$exists': True}} for field in datetime_fields]}
+        issues = []
+        
+        for doc in collection.find(query):
+            for field in datetime_fields:
+                if field in doc:
+                    value = doc[field]
+                    if not isinstance(value, datetime):
+                        issues.append(f"Non-datetime {field} in {collection_name} ID {doc['_id']}: {type(value)}")
+                    elif value.tzinfo is None:
+                        issues.append(f"Naive datetime {field} in {collection_name} ID {doc['_id']}")
+        
+        if issues:
+            logger.warning(f"Found {len(issues)} datetime issues in {collection_name}: {issues[:10]}", 
+                         extra={'session_id': session.get('sid', 'no-session-id')})
+        
+        return issues
+        
+    except Exception as e:
+        logger.error(f"Failed to audit datetime fields in {collection_name}: {str(e)}", 
+                    exc_info=True, extra={'session_id': session.get('sid', 'no-session-id')})
+        raise
 
 def bulk_clean_cashflow_data(db, user_id=None):
     """

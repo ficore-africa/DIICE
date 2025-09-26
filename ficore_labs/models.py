@@ -7,7 +7,7 @@ from werkzeug.security import generate_password_hash
 from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError, DuplicateKeyError, OperationFailure
 from functools import lru_cache
 from translations import trans
-from utils import get_mongo_db, logger
+from utils import get_mongo_db, logger, normalize_datetime
 import time
 from zoneinfo import ZoneInfo
 
@@ -94,6 +94,65 @@ def manage_index(collection, keys, options=None, name=None):
             logger.error(f"Failed to create index on {collection.name}: {str(e)}", 
                         exc_info=True, extra={'session_id': 'no-session-id'})
             raise
+
+def to_dict_record(record):
+    """
+    Convert a record document to a standardized dictionary with normalized datetime fields.
+    
+    Args:
+        record: MongoDB record document
+    
+    Returns:
+        dict: Standardized record dictionary
+    """
+    if not record:
+        return {'type': None}
+    
+    result = {
+        'id': str(record.get('_id', '')),
+        'user_id': record.get('user_id', ''),
+        'type': record.get('type', ''),
+        'name': record.get('name', ''),
+        'contact': record.get('contact', ''),
+        'amount_owed': record.get('amount_owed', 0),
+        'description': record.get('description', ''),
+        'reminder_count': record.get('reminder_count', 0),
+        'cost': record.get('cost', 0),
+        'expected_margin': record.get('expected_margin', 0),
+        'created_at': normalize_datetime(record.get('created_at')),
+        'updated_at': normalize_datetime(record.get('updated_at')) if record.get('updated_at') else None
+    }
+    
+    return result
+
+def to_dict_cashflow(record):
+    """
+    Convert a cashflow document to a standardized dictionary with normalized datetime fields.
+    
+    Args:
+        record: MongoDB cashflow document
+    
+    Returns:
+        dict: Standardized cashflow dictionary
+    """
+    if not record:
+        return {'party_name': None, 'amount': None}
+    
+    return {
+        'id': str(record.get('_id', '')),
+        'user_id': record.get('user_id', ''),
+        'type': record.get('type', ''),
+        'party_name': record.get('party_name', ''),
+        'amount': record.get('amount', 0),
+        'method': record.get('method', ''),
+        'category': record.get('category', ''),
+        'expense_category': record.get('expense_category', ''),
+        'is_tax_deductible': record.get('is_tax_deductible'),
+        'tax_year': record.get('tax_year'),
+        'category_metadata': record.get('category_metadata'),
+        'created_at': normalize_datetime(record.get('created_at')),
+        'updated_at': normalize_datetime(record.get('updated_at')) if record.get('updated_at') else None
+    }
 
 def get_db():
     """
@@ -186,6 +245,46 @@ def migrate_naive_datetimes():
 
     except Exception as e:
         logger.error(f"Failed to migrate naive datetimes: {str(e)}", exc_info=True, extra={'session_id': 'no-session-id'})
+        raise
+
+def check_and_migrate_naive_datetimes(db, collection_name='cashflows'):
+    """
+    Periodic check to re-run migration for new records with naive datetimes.
+    This handles records that may have been inserted with naive datetimes after the initial migration.
+    
+    Args:
+        db: MongoDB database instance
+        collection_name: Name of the collection to check ('cashflows' or 'records')
+    """
+    try:
+        collection = db[collection_name]
+        datetime_fields = ['created_at', 'updated_at']
+        
+        # Find documents with naive datetimes
+        query = {'$or': [{field: {'$type': 'date', '$not': {'$type': 'timestamp'}}} for field in datetime_fields]}
+        documents = collection.find(query)
+        
+        updated_count = 0
+        for doc in documents:
+            updates = {}
+            for field in datetime_fields:
+                if field in doc and isinstance(doc[field], datetime) and doc[field].tzinfo is None:
+                    updates[field] = doc[field].replace(tzinfo=timezone.utc)
+            
+            if updates:
+                result = collection.update_one({'_id': doc['_id']}, {'$set': updates})
+                if result.modified_count > 0:
+                    updated_count += 1
+        
+        if updated_count > 0:
+            logger.info(f"Migrated {updated_count} naive datetimes in {collection_name}", 
+                       extra={'session_id': 'no-session-id'})
+        
+        return updated_count
+        
+    except Exception as e:
+        logger.error(f"Failed to check and migrate naive datetimes in {collection_name}: {str(e)}", 
+                    exc_info=True, extra={'session_id': 'no-session-id'})
         raise
 
 def assign_default_category_for_historical_data(party_name, amount, existing_category=None):
@@ -582,7 +681,8 @@ def initialize_app_data(app):
                     },
                     'indexes': [
                         {'key': [('user_id', ASCENDING), ('type', ASCENDING)]},
-                        {'key': [('created_at', DESCENDING)]}
+                        {'key': [('created_at', DESCENDING)]},
+                        {'key': [('user_id', ASCENDING), ('created_at', DESCENDING)]}  # New compound index
                     ]
                 },
                 'cashflows': {
@@ -623,6 +723,10 @@ def initialize_app_data(app):
                         {'key': [('user_id', ASCENDING), ('expense_category', ASCENDING)]},
                         {'key': [('user_id', ASCENDING), ('tax_year', ASCENDING)]},
                         {'key': [('user_id', ASCENDING), ('is_tax_deductible', ASCENDING)]},
+                        
+                        # New compound indexes for improved query performance
+                        {'key': [('user_id', ASCENDING), ('created_at', DESCENDING)]},
+                        {'key': [('user_id', ASCENDING), ('type', ASCENDING), ('created_at', DESCENDING)]},
                         
                         # Enhanced compound indexes for category-based operations
                         {'key': [('user_id', ASCENDING), ('expense_category', ASCENDING), ('tax_year', ASCENDING)]},
@@ -1066,6 +1170,25 @@ def initialize_app_data(app):
                 logger.error(f"Failed to run expense categories migration: {str(e)}", 
                             exc_info=True, extra={'session_id': 'no-session-id'})
                 raise
+            
+            # Check and migrate any new naive datetimes
+            try:
+                check_and_migrate_naive_datetimes(db_instance, 'cashflows')
+                check_and_migrate_naive_datetimes(db_instance, 'records')
+            except Exception as e:
+                logger.error(f"Failed to check and migrate new naive datetimes: {str(e)}", 
+                            exc_info=True, extra={'session_id': 'no-session-id'})
+                # Don't raise here as this is not critical for app startup
+            
+            # Audit datetime fields to identify any remaining issues
+            try:
+                from utils import audit_datetime_fields
+                audit_datetime_fields(db_instance, 'cashflows')
+                audit_datetime_fields(db_instance, 'records')
+            except Exception as e:
+                logger.error(f"Failed to audit datetime fields: {str(e)}", 
+                            exc_info=True, extra={'session_id': 'no-session-id'})
+                # Don't raise here as this is not critical for app startup
                 
         except Exception as e:
             logger.error(f"{trans('general_database_initialization_failed', default='Failed to initialize database')}: {str(e)}", 
@@ -1352,16 +1475,19 @@ def update_user(db, user_id, update_data):
 def get_records(db, filter_kwargs):
     """
     Retrieve records (debtors, creditors, inventory, etc.) based on filter criteria.
+    Uses safe_find_records for consistent datetime normalization and error handling.
     
     Args:
         db: MongoDB database instance
         filter_kwargs: Dictionary of filter criteria
     
     Returns:
-        list: List of records
+        list: List of standardized records with normalized datetime fields
     """
     try:
-        return list(db.records.find(filter_kwargs).sort('created_at', DESCENDING))
+        from utils import safe_find_records
+        records = safe_find_records(db, filter_kwargs, 'created_at', -1)
+        return [to_dict_record(record) for record in records]
     except Exception as e:
         logger.error(f"{trans('general_records_fetch_error', default='Error getting records')}: {str(e)}", 
                     exc_info=True, extra={'session_id': 'no-session-id'})
@@ -1370,6 +1496,7 @@ def get_records(db, filter_kwargs):
 def create_record(db, record_data):
     """
     Create a new record in the records collection.
+    Ensures created_at is UTC-aware at insertion.
     
     Args:
         db: MongoDB database instance
@@ -1382,6 +1509,11 @@ def create_record(db, record_data):
         required_fields = ['user_id', 'type', 'created_at']
         if not all(field in record_data for field in required_fields):
             raise ValueError(trans('general_missing_record_fields', default='Missing required record fields'))
+        
+        # Normalize created_at to ensure UTC-aware datetime
+        if isinstance(record_data['created_at'], datetime) and record_data['created_at'].tzinfo is None:
+            record_data['created_at'] = record_data['created_at'].replace(tzinfo=ZoneInfo("UTC"))
+        
         result = db.records.insert_one(record_data)
         logger.info(f"{trans('general_record_created', default='Created record with ID')}: {result.inserted_id}", 
                    extra={'session_id': record_data.get('session_id', 'no-session-id')})
@@ -1424,17 +1556,19 @@ def update_record(db, record_id, update_data):
 def get_cashflows(db, filter_kwargs):
     """
     Retrieve cashflow records (receipts, payments) based on filter criteria.
+    Uses safe_find_cashflows for consistent datetime normalization and error handling.
     
     Args:
         db: MongoDB database instance
         filter_kwargs: Dictionary of filter criteria
     
     Returns:
-        list: List of cashflow records
+        list: List of standardized cashflow records with normalized datetime fields
     """
     try:
         from utils import safe_find_cashflows
-        return safe_find_cashflows(db, filter_kwargs, 'created_at', -1)
+        cashflows = safe_find_cashflows(db, filter_kwargs, 'created_at', -1)
+        return [to_dict_cashflow(cashflow) for cashflow in cashflows]
     except Exception as e:
         logger.error(f"{trans('general_cashflows_fetch_error', default='Error getting cashflows')}: {str(e)}", 
                     exc_info=True, extra={'session_id': 'no-session-id'})
@@ -1443,6 +1577,7 @@ def get_cashflows(db, filter_kwargs):
 def create_cashflow(db, cashflow_data):
     """
     Create a new cashflow record in the cashflows collection.
+    Ensures created_at is UTC-aware at insertion.
     
     Args:
         db: MongoDB database instance
@@ -1455,6 +1590,11 @@ def create_cashflow(db, cashflow_data):
         required_fields = ['user_id', 'type', 'party_name', 'amount', 'created_at']
         if not all(field in cashflow_data for field in required_fields):
             raise ValueError(trans('general_missing_cashflow_fields', default='Missing required cashflow fields'))
+        
+        # Normalize created_at to ensure UTC-aware datetime
+        if isinstance(cashflow_data['created_at'], datetime) and cashflow_data['created_at'].tzinfo is None:
+            cashflow_data['created_at'] = cashflow_data['created_at'].replace(tzinfo=ZoneInfo("UTC"))
+        
         result = db.cashflows.insert_one(cashflow_data)
         logger.info(f"{trans('general_cashflow_created', default='Created cashflow record with ID')}: {result.inserted_id}", 
                    extra={'session_id': cashflow_data.get('session_id', 'no-session-id')})
