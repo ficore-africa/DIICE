@@ -1,0 +1,172 @@
+/* Dashboard Notifications Styles */
+
+.dashboard-notification {
+    border-left: 4px solid;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.dashboard-notification::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+    animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+.dashboard-notification.alert-danger {
+    border-left-color: #dc3545;
+    background: linear-gradient(135deg, #fff5f5 0%, #ffffff 100%);
+}
+
+.dashboard-notification.alert-warning {
+    border-left-color: #ffc107;
+    background: linear-gradient(135deg, #fffbf0 0%, #ffffff 100%);
+}
+
+.dashboard-notification.alert-info {
+    border-left-color: #0dcaf0;
+    background: linear-gradient(135deg, #f0fcff 0%, #ffffff 100%);
+}
+
+.dashboard-notification.alert-success {
+    border-left-color: #198754;
+    background: linear-gradient(135deg, #f0fff4 0%, #ffffff 100%);
+}
+
+.notification-dismiss {
+    opacity: 0.6;
+    transition: all 0.2s ease;
+    border: none;
+    background: none;
+    font-size: 1.1rem;
+    padding: 0.25rem;
+    border-radius: 50%;
+    width: 2rem;
+    height: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.notification-dismiss:hover {
+    opacity: 1;
+    background: rgba(0,0,0,0.1);
+    transform: scale(1.1);
+}
+
+.notification-dismiss:focus {
+    outline: 2px solid #0d6efd;
+    outline-offset: 2px;
+}
+
+#dashboard-notifications-container {
+    position: relative;
+    z-index: 1000;
+}
+
+.dashboard-notification .btn {
+    transition: all 0.2s ease;
+}
+
+.dashboard-notification .btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+/* Animation classes */
+.notification-enter {
+    opacity: 0;
+    transform: translateX(-100%);
+}
+
+.notification-enter-active {
+    opacity: 1;
+    transform: translateX(0);
+    transition: all 0.3s ease-in;
+}
+
+.notification-exit {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.notification-exit-active {
+    opacity: 0;
+    transform: translateX(100%);
+    transition: all 0.3s ease-out;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .dashboard-notification {
+        margin-left: -15px;
+        margin-right: -15px;
+        border-radius: 0;
+        border-left-width: 6px;
+    }
+    
+    .dashboard-notification .btn {
+        font-size: 0.875rem;
+        padding: 0.25rem 0.5rem;
+    }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    .dashboard-notification.alert-danger {
+        background: linear-gradient(135deg, #2d1b1b 0%, #1a1a1a 100%);
+        color: #f8d7da;
+    }
+    
+    .dashboard-notification.alert-warning {
+        background: linear-gradient(135deg, #2d2a1b 0%, #1a1a1a 100%);
+        color: #fff3cd;
+    }
+    
+    .dashboard-notification.alert-info {
+        background: linear-gradient(135deg, #1b2a2d 0%, #1a1a1a 100%);
+        color: #d1ecf1;
+    }
+    
+    .dashboard-notification.alert-success {
+        background: linear-gradient(135deg, #1b2d20 0%, #1a1a1a 100%);
+        color: #d4edda;
+    }
+}
+
+/* Accessibility improvements */
+.dashboard-notification:focus-within {
+    outline: 2px solid #0d6efd;
+    outline-offset: 2px;
+}
+
+.dashboard-notification[role="alert"] {
+    /* Ensure screen readers announce the notification */
+    position: relative;
+}
+
+/* Print styles */
+@media print {
+    .dashboard-notification {
+        break-inside: avoid;
+        border: 1px solid #000;
+        background: white !important;
+    }
+    
+    .notification-dismiss {
+        display: none;
+    }
+}
