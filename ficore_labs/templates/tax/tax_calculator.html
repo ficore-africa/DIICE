@@ -938,6 +938,60 @@
 {% block scripts %}
 <!-- Tax calculator functionality is now handled by external JavaScript file -->
 <script>
+    // Client-side error logging function
+    function logClientError(error, details = {}) {
+        try {
+            fetch('/tax/log-client-error', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    error: error.toString(),
+                    details: {
+                        ...details,
+                        userAgent: navigator.userAgent,
+                        url: window.location.href,
+                        timestamp: new Date().toISOString()
+                    }
+                })
+            }).catch(logError => {
+                console.error('Failed to log client error:', logError);
+            });
+        } catch (logError) {
+            console.error('Error in logClientError:', logError);
+        }
+    }
+
+    // Global error handler for unhandled errors
+    window.addEventListener('error', function(event) {
+        logClientError(event.error || event.message, {
+            filename: event.filename,
+            lineno: event.lineno,
+            colno: event.colno
+        });
+    });
+
+    // Validate template variables to catch JSON issues early
+    try {
+        // Test if template variables can be safely used
+        const templateVars = {
+            userEntityType: '{{ user_entity_type | e }}',
+            userAnnualRent: {{ user_annual_rent | default(0) }},
+            entityName: '{{ entity_info.name | e }}',
+            entityTaxType: '{{ entity_info.tax_type | e }}'
+        };
+        
+        // Log successful template variable parsing
+        console.log('Template variables loaded successfully:', templateVars);
+    } catch (templateError) {
+        console.error('Template variable parsing error:', templateError);
+        logClientError('Template variable parsing failed', {
+            error: templateError.toString(),
+            context: 'template_variables'
+        });
+    }
+
     // Legacy support for entity type changes and other functionality
     document.addEventListener('DOMContentLoaded', function () {
 
