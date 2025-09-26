@@ -6,7 +6,7 @@ from bson import ObjectId
 import logging
 from translations import trans
 import utils
-from utils import format_date, serialize_for_json, safe_json_response, clean_document_for_json, bulk_clean_documents_for_json, create_dashboard_safe_response
+from utils import format_date, serialize_for_json, safe_json_response, clean_document_for_json, bulk_clean_documents_for_json, create_dashboard_safe_response, safe_parse_datetime
 from helpers import reminders
 from models import get_records
 
@@ -17,16 +17,7 @@ dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
 def normalize_datetime(doc):
     """Convert created_at to timezone-aware datetime if it's a string or naive datetime."""
     if 'created_at' in doc:
-        if isinstance(doc['created_at'], str):
-            try:
-                # Parse string to datetime and make it timezone-aware
-                doc['created_at'] = datetime.fromisoformat(doc['created_at']).replace(tzinfo=ZoneInfo("UTC"))
-            except ValueError:
-                logger.warning(f"Invalid created_at format in document {doc.get('_id', 'unknown')}: {doc['created_at']}")
-                doc['created_at'] = datetime.now(timezone.utc)  # Fallback to current time
-        elif isinstance(doc['created_at'], datetime) and doc['created_at'].tzinfo is None:
-            # Make naive datetime timezone-aware
-            doc['created_at'] = doc['created_at'].replace(tzinfo=ZoneInfo("UTC"))
+        doc['created_at'] = safe_parse_datetime(doc['created_at'])
     return doc
 
 @dashboard_bp.route('/test-notifications')
@@ -52,13 +43,13 @@ def weekly_profit_data():
     try:
         db = utils.get_mongo_db()
         user_id = str(current_user.id)
-        today = datetime.now(timezone.utc)
+        today = safe_parse_datetime(datetime.now(timezone.utc))
         # Get last 7 days
         days = [(today - timedelta(days=i)).date() for i in range(6, -1, -1)]
         profit_per_day = []
 
         for day in days:
-            start = datetime(day.year, day.month, day.day, tzinfo=timezone.utc)
+            start = safe_parse_datetime(datetime(day.year, day.month, day.day, tzinfo=timezone.utc))
             end = start + timedelta(days=1)
             try:
                 # Sum receipts (income) for the day
@@ -183,7 +174,7 @@ def refresh_dashboard_data():
         return safe_json_response({
             'stats': formatted_stats,
             'success': True,
-            'timestamp': datetime.now(timezone.utc).isoformat(),
+            'timestamp': safe_parse_datetime(datetime.now(timezone.utc)).isoformat(),
             'validation': {'is_valid': is_valid, 'warnings': warnings}
         })
 
