@@ -549,7 +549,7 @@ def simulate_pit_four_step_calculation(total_income, expenses, annual_rent, enti
         # Include non-deductible expenses for reference
         personal_expenses = validated_expenses.get('personal_expenses', 0)
         
-        return {
+        result = {
             'calculation_type': 'PIT',
             'entity_type': 'sole_proprietor',
             'entity_info': entity_info,
