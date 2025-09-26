@@ -12,7 +12,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="container" data-user-id="{{ current_user.id if current_user.is_authenticated else '' }}">
+<div class="container" data-user-id="{{ current_user.id if current_user.is_authenticated else '' | escape }}">
     <!-- Dismissable Notifications Container -->
     <div id="dashboard-notifications-container" class="mb-4">
         <!-- Notifications will be dynamically inserted here -->
@@ -33,29 +33,29 @@
 
     <!-- Real-time Refresh Controls -->
     {% if current_user.is_authenticated %}
-    <div class="refresh-controls">
+    <div class="refresh-controls mb-4">
         <button id="dashboard-refresh-btn" class="btn btn-outline-primary btn-sm">
             <i class="bi bi-arrow-clockwise"></i> {{ trans('general_refresh', default='Refresh') | escape }}
         </button>
         
-        <div class="form-check form-switch">
+        <div class="form-check form-switch ms-3">
             <input class="form-check-input" type="checkbox" id="auto-refresh-toggle" checked>
             <label class="form-check-label" for="auto-refresh-toggle">
                 {{ trans('auto_refresh', default='Auto-refresh') | escape }}
             </label>
         </div>
         
-        <select id="refresh-rate-select" class="form-select form-select-sm">
+        <select id="refresh-rate-select" class="form-select form-select-sm ms-3">
             <option value="30" selected>{{ trans('refresh_30s', default='30 seconds') | escape }}</option>
             <option value="60">{{ trans('refresh_1m', default='1 minute') | escape }}</option>
             <option value="300">{{ trans('refresh_5m', default='5 minutes') | escape }}</option>
         </select>
         
-        <span id="refresh-indicator" class="text-primary">
+        <span id="refresh-indicator" class="text-primary ms-3">
             <i class="bi bi-arrow-clockwise spin"></i> {{ trans('refreshing', default='Refreshing...') | escape }}
         </span>
         
-        <small id="last-refresh-time" class="last-refresh-time"></small>
+        <small id="last-refresh-time" class="last-refresh-time ms-3"></small>
     </div>
     {% endif %}
 
@@ -93,8 +93,6 @@
         window.location.href = currentUrl.toString();
     }
     </script>
-
-    <!-- Legacy notifications are now handled by JavaScript -->
 
     <!-- Download Profit Summary Button -->
     <div class="mb-4">
@@ -153,7 +151,7 @@
                     </div>
                     <h6 class="card-title">{{ trans('general_debtors', default='Debtors') | escape }}</h6>
                     <p class="card-text">
-                        <span id="debtors-count" class="h5 text-primary">{{ stats.total_debtors }}</span><br>
+                        <span id="debtors-count" class="h5 text-primary">{{ stats.total_debtors | default('0') }}</span><br>
                         <small class="text-muted"><span id="debtors-amount">{{ stats.total_debtors_amount | format_currency }}</span></small>
                     </p>
                     <a href="{{ url_for('debtors.index') }}" class="btn btn-outline-primary btn-sm">{{ trans('general_view', default='View') | escape }}</a>
@@ -168,7 +166,7 @@
                     </div>
                     <h6 class="card-title">{{ trans('general_creditors', default='Creditors') | escape }}</h6>
                     <p class="card-text">
-                        <span id="creditors-count" class="h5 text-primary">{{ stats.total_creditors }}</span><br>
+                        <span id="creditors-count" class="h5 text-primary">{{ stats.total_creditors | default('0') }}</span><br>
                         <small class="text-muted"><span id="creditors-amount">{{ stats.total_creditors_amount | format_currency }}</span></small>
                     </p>
                     <a href="{{ url_for('creditors.index') }}" class="btn btn-outline-primary btn-sm">{{ trans('general_view', default='View') | escape }}</a>
@@ -183,7 +181,7 @@
                     </div>
                     <h6 class="card-title">{{ trans('receipts_money_in', default='Income') | escape }}</h6>
                     <p class="card-text">
-                        <span id="receipts-count" class="h5 text-success">{{ stats.total_receipts }}</span><br>
+                        <span id="receipts-count" class="h5 text-success">{{ stats.total_receipts | default('0') }}</span><br>
                         <small class="text-muted"><span id="receipts-amount">{{ stats.total_receipts_amount | format_currency }}</span></small>
                     </p>
                     <a href="{{ url_for('receipts.index') }}" class="btn btn-outline-success btn-sm">{{ trans('general_view', default='View') | escape }}</a>
@@ -198,7 +196,7 @@
                     </div>
                     <h6 class="card-title">{{ trans('payments_money_out', default='Expenses') | escape }}</h6>
                     <p class="card-text">
-                        <span id="payments-count" class="h5 text-danger">{{ stats.total_payments }}</span><br>
+                        <span id="payments-count" class="h5 text-danger">{{ stats.total_payments | default('0') }}</span><br>
                         <small class="text-muted"><span id="payments-amount">{{ stats.total_payments_amount | format_currency }}</span></small>
                     </p>
                     <a href="{{ url_for('payments.index') }}" class="btn btn-outline-danger btn-sm">{{ trans('general_view', default='View') | escape }}</a>
@@ -206,6 +204,170 @@
             </div>
         </div>
     </div>
+
+    <!-- Recent Activity Sections -->
+    {% if current_user.is_authenticated %}
+    <div class="mb-4">
+        <h3>{{ trans('recent_activity', default='Recent Activity') | escape }}</h3>
+        <div class="row g-3">
+            <!-- Recent Debtors -->
+            <div class="col-md-6">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ trans('general_debtors', default='Debtors') | escape }}</h5>
+                        {% if recent_debtors %}
+                        <table class="table table-sm table-hover">
+                            <thead>
+                                <tr>
+                                    <th>{{ trans('general_date', default='Date') | escape }}</th>
+                                    <th>{{ trans('general_name', default='Name') | escape }}</th>
+                                    <th>{{ trans('general_amount_owed', default='Amount Owed') | escape }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for debtor in recent_debtors %}
+                                <tr>
+                                    <td>{{ debtor.created_at | format_date | escape }}</td>
+                                    <td>{{ debtor.name | escape }}</td>
+                                    <td>{{ debtor.amount_owed | format_currency }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        {% else %}
+                        <p class="text-muted">{{ trans('no_recent_debtors', default='No recent debtors found.') | escape }}</p>
+                        {% endif %}
+                        <a href="{{ url_for('debtors.index') }}" class="btn btn-outline-primary btn-sm">{{ trans('general_view_all', default='View All') | escape }}</a>
+                    </div>
+                </div>
+            </div>
+            <!-- Recent Creditors -->
+            <div class="col-md-6">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ trans('general_creditors', default='Creditors') | escape }}</h5>
+                        {% if recent_creditors %}
+                        <table class="table table-sm table-hover">
+                            <thead>
+                                <tr>
+                                    <th>{{ trans('general_date', default='Date') | escape }}</th>
+                                    <th>{{ trans('general_name', default='Name') | escape }}</th>
+                                    <th>{{ trans('general_amount_owed', default='Amount Owed') | escape }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for creditor in recent_creditors %}
+                                <tr>
+                                    <td>{{ creditor.created_at | format_date | escape }}</td>
+                                    <td>{{ creditor.name | escape }}</td>
+                                    <td>{{ creditor.amount_owed | format_currency }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        {% else %}
+                        <p class="text-muted">{{ trans('no_recent_creditors', default='No recent creditors found.') | escape }}</p>
+                        {% endif %}
+                        <a href="{{ url_for('creditors.index') }}" class="btn btn-outline-primary btn-sm">{{ trans('general_view_all', default='View All') | escape }}</a>
+                    </div>
+                </div>
+            </div>
+            <!-- Recent Receipts -->
+            <div class="col-md-6">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ trans('receipts_money_in', default='Income') | escape }}</h5>
+                        {% if recent_receipts %}
+                        <table class="table table-sm table-hover">
+                            <thead>
+                                <tr>
+                                    <th>{{ trans('general_date', default='Date') | escape }}</th>
+                                    <th>{{ trans('general_party_name', default='Party Name') | escape }}</th>
+                                    <th>{{ trans('general_amount', default='Amount') | escape }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for receipt in recent_receipts %}
+                                <tr>
+                                    <td>{{ receipt.created_at | format_date | escape }}</td>
+                                    <td>{{ receipt.party_name | escape }}</td>
+                                    <td>{{ receipt.amount | format_currency }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        {% else %}
+                        <p class="text-muted">{{ trans('no_recent_receipts', default='No recent receipts found.') | escape }}</p>
+                        {% endif %}
+                        <a href="{{ url_for('receipts.index') }}" class="btn btn-outline-success btn-sm">{{ trans('general_view_all', default='View All') | escape }}</a>
+                    </div>
+                </div>
+            </div>
+            <!-- Recent Payments -->
+            <div class="col-md-6">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ trans('payments_money_out', default='Expenses') | escape }}</h5>
+                        {% if recent_payments %}
+                        <table class="table table-sm table-hover">
+                            <thead>
+                                <tr>
+                                    <th>{{ trans('general_date', default='Date') | escape }}</th>
+                                    <th>{{ trans('general_party_name', default='Party Name') | escape }}</th>
+                                    <th>{{ trans('general_amount', default='Amount') | escape }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for payment in recent_payments %}
+                                <tr>
+                                    <td>{{ payment.created_at | format_date | escape }}</td>
+                                    <td>{{ payment.party_name | escape }}</td>
+                                    <td>{{ payment.amount | format_currency }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        {% else %}
+                        <p class="text-muted">{{ trans('no_recent_payments', default='No recent payments found.') | escape }}</p>
+                        {% endif %}
+                        <a href="{{ url_for('payments.index') }}" class="btn btn-outline-danger btn-sm">{{ trans('general_view_all', default='View All') | escape }}</a>
+                    </div>
+                </div>
+            </div>
+            <!-- Recent Inventory -->
+            <div class="col-md-6">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ trans('inventory_nav_label', default='Inventory') | escape }}</h5>
+                        {% if recent_inventory %}
+                        <table class="table table-sm table-hover">
+                            <thead>
+                                <tr>
+                                    <th>{{ trans('general_date', default='Date') | escape }}</th>
+                                    <th>{{ trans('general_name', default='Name') | escape }}</th>
+                                    <th>{{ trans('general_cost', default='Cost') | escape }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in recent_inventory %}
+                                <tr>
+                                    <td>{{ item.created_at | format_date | escape }}</td>
+                                    <td>{{ item.name | escape }}</td>
+                                    <td>{{ item.cost | format_currency }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        {% else %}
+                        <p class="text-muted">{{ trans('no_recent_inventory', default='No recent inventory items found.') | escape }}</p>
+                        {% endif %}
+                        <a href="{{ url_for('inventory.index') }}" class="btn btn-outline-primary btn-sm">{{ trans('general_view_all', default='View All') | escape }}</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 
     <!-- User Streak Card -->
     {% if current_user.is_authenticated %}
@@ -250,12 +412,11 @@
             <a href="{{ url_for('payments.add') }}" class="btn btn-primary">{{ trans('payments_add_money_out', default='Add Money Out') | escape }}</a>
             <a href="{{ url_for('receipts.add') }}" class="btn btn-primary">{{ trans('receipts_add_money_in', default='Add Money In') | escape }}</a>
             {% if current_user.role == 'admin' %}
-                <a href="{{ url_for('admin.dashboard') }}" class="btn btn-warning">{{ trans('admin_dashboard', default='Admin Dashboard') | escape }}</a>
+            <a href="{{ url_for('admin.dashboard') }}" class="btn btn-warning">{{ trans('admin_dashboard', default='Admin Dashboard') | escape }}</a>
             {% endif %}
         </div>
     </div>
     {% endif %}
-
 
     {% else %}
     <div class="text-center py-5">
@@ -264,7 +425,6 @@
         <a href="{{ url_for('users.login') }}" class="btn btn-primary">{{ trans('general_login', default='Log In') | escape }}</a>
     </div>
     {% endif %}
-
 
 </div>
 
@@ -281,8 +441,8 @@
         window.dashboardData = {
             inventoryLoss: {{ 'true' if inventory_loss else 'false' }},
             debts: {
-                unpaidDebtors: {{ unpaid_debtors | tojson if unpaid_debtors else '[]' }},
-                unpaidCreditors: {{ unpaid_creditors | tojson if unpaid_creditors else '[]' }}
+                unpaidDebtors: {{ unpaid_debtors | tojson | safe if unpaid_debtors else '[]' }},
+                unpaidCreditors: {{ unpaid_creditors | tojson | safe if unpaid_creditors else '[]' }}
             }
         };
     });
