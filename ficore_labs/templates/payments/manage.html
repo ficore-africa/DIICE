@@ -11,14 +11,19 @@
         {% if can_interact %}
             <a href="{{ url_for('payments.add') }}" class="btn btn-primary">{{ t('payments_add_title', default='Add Money Out') }}</a>
         {% else %}
-            <a href="{{ url_for('general_bp.subscription_required') }}" class="btn btn-primary">{{ t('payments_add_title', default='Add Money Out') }}</a>
+            <a href="{{ url_for('subscribe_bp.subscribe') }}" class="btn btn-primary">{{ t('payments_add_title', default='Add Money Out') }}</a>
         {% endif %}
     </div>
     {% if payments|length > 0 %}
-        <!-- Search and Filter Controls -->
         <div class="row mb-4">
             <div class="col-md-6">
-                <input type="text" id="searchInput" class="form-control" placeholder="{{ t('general_search', default='Search payments...') }}">
+                <input type="text" id="searchInput" class="form-control" 
+                       placeholder="{{ t('general_search', default='Search payments...') }}"
+                       aria-label="{{ t('general_search', default='Search payments') }}"
+                       aria-describedby="search-help">
+                <div id="search-help" class="form-text">
+                    {{ t('general_search_help', default='Search by recipient name or category') }}
+                </div>
             </div>
             <div class="col-md-6">
                 <select id="categoryFilter" class="form-select" 
@@ -34,10 +39,11 @@
                     <option value="personal_expenses">{{ t('category_personal_expenses', default='Personal Expenses') }}</option>
                     <option value="statutory_legal">{{ t('category_statutory_legal', default='Statutory & Legal Contributions') }}</option>
                 </select>
+                <div id="category-filter-help" class="form-text">
+                    {{ t('general_filter_by_category_help', default='Filter payments by expense category') }}
+                </div>
             </div>
         </div>
-        
-        <!-- Summary Statistics -->
         <div class="row mb-4">
             <div class="col-12">
                 <div class="card">
@@ -114,16 +120,17 @@
                                         {{ t('general_edit', default='Edit') }}
                                     </a>
                                     <form action="{{ url_for('payments.delete', id=payment._id) }}" method="POST" class="d-inline">
-                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        {{ form.hidden_tag() }}
                                         <button type="submit" class="btn btn-danger btn-sm" 
                                                 onclick="return confirm('{{ t('general_confirm_delete', default='Are you sure?') }}')"
                                                 data-bs-toggle="tooltip" 
-                                                title="{{ t('general_delete', default='Delete') }}">
+                                                title="{{ t('general_delete', default='Delete') }}"
+                                                aria-label="{{ t('general_delete', default='Delete') }}">
                                             {{ t('general_delete', default='Delete') }}
                                         </button>
                                     </form>
                                 {% else %}
-                                    <a href="{{ url_for('general_bp.subscription_required') }}" 
+                                    <a href="{{ url_for('subscribe_bp.subscribe') }}" 
                                        class="btn btn-primary btn-sm disabled"
                                        data-bs-toggle="tooltip" 
                                        title="{{ t('general_edit', default='Edit') }}">
@@ -132,7 +139,8 @@
                                     <button class="btn btn-danger btn-sm disabled" 
                                             data-bs-toggle="tooltip" 
                                             title="{{ t('general_delete', default='Delete') }}"
-                                            onclick="alert('{{ t('payments_subscription_required', default='Your trial has expired or you do not have an active subscription. Please subscribe to delete payments.') }}')">
+                                            onclick="alert('{{ t('payments_subscription_required', default='Your trial has expired or you do not have an active subscription. Please subscribe to delete payments.') }}')"
+                                            aria-label="{{ t('general_delete', default='Delete') }}">
                                         {{ t('general_delete', default='Delete') }}
                                     </button>
                                 {% endif %}
@@ -160,7 +168,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchInput = document.getElementById('searchInput');
     const categoryFilter = document.getElementById('categoryFilter');
     const table = document.getElementById('paymentsTable');
-    const rows = Array.from(table.getElementsByTagName('tr')).slice(1); // Skip header row
+    const rows = Array.from(table.getElementsByTagName('tr')).slice(1);
 
     function filterRows() {
         const searchFilter = searchInput.value.toLowerCase();
@@ -172,10 +180,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         rows.forEach(row => {
             const cells = row.getElementsByTagName('td');
-            const categoryCell = cells[4]; // Category column
-            const amountCell = cells[1]; // Amount column
+            const categoryCell = cells[4];
+            const amountCell = cells[1];
             
-            // Check search filter
             let searchMatch = !searchFilter;
             if (searchFilter) {
                 for (let j = 0; j < cells.length - 1; j++) {
@@ -186,7 +193,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
             
-            // Check category filter
             let categoryMatch = !selectedCategory;
             if (selectedCategory && categoryCell) {
                 const categoryText = categoryCell.textContent.trim();
@@ -199,13 +205,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (shouldShow) {
                 row.style.display = '';
                 visibleCount++;
-                
-                // Extract amount for statistics
                 const amountText = amountCell.textContent.replace(/[₦,]/g, '');
                 const amount = parseFloat(amountText) || 0;
                 visibleTotal += amount;
-                
-                // Check if tax deductible
                 const isDeductible = !categoryCell.querySelector('.badge.bg-warning');
                 if (isDeductible) {
                     visibleDeductible += amount;
@@ -217,7 +219,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
         
-        // Update summary statistics
         updateSummaryStats(visibleCount, visibleTotal, visibleDeductible, visibleNonDeductible);
     }
 
@@ -232,8 +233,6 @@ document.addEventListener('DOMContentLoaded', () => {
             '{{ t("category_personal_expenses", default="Personal Expenses") }}': 'personal_expenses',
             '{{ t("category_statutory_legal", default="Statutory & Legal Contributions") }}': 'statutory_legal'
         };
-        
-        // Remove badge text and trim
         const cleanText = categoryText.replace(/Not Tax Deductible/g, '').trim();
         return categoryMap[cleanText] || '';
     }
@@ -257,7 +256,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Add event listeners
     searchInput.addEventListener('input', filterRows);
     categoryFilter.addEventListener('change', filterRows);
 });
