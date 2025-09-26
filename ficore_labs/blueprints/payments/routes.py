@@ -4,6 +4,7 @@ from flask_wtf import FlaskForm
 from flask_wtf.csrf import CSRFError
 from translations import trans
 import utils
+from utils import serialize_for_json, safe_json_response, clean_document_for_json, bulk_clean_documents_for_json
 from bson import ObjectId
 from datetime import datetime, timezone, date
 from zoneinfo import ZoneInfo
@@ -169,27 +170,23 @@ def view(id):
         query = {'_id': ObjectId(id), 'user_id': str(current_user.id), 'type': 'payment'}
         payment = db.cashflows.find_one(query)
         if not payment:
-            return jsonify({'error': trans('payments_record_not_found', default='Record not found')}), 404
+            return safe_json_response({'error': trans('payments_record_not_found', default='Record not found')}, 404)
         
-        # Convert naive datetimes to timezone-aware
-        if payment.get('created_at') and payment['created_at'].tzinfo is None:
-            payment['created_at'] = payment['created_at'].replace(tzinfo=ZoneInfo("UTC"))
-        
-        payment['_id'] = str(payment['_id'])
-        payment['created_at'] = payment['created_at'].isoformat() if payment.get('created_at') else None
-        return jsonify(payment)
+        # Use comprehensive JSON cleaning for the payment document
+        payment = clean_document_for_json(payment)
+        return safe_json_response(payment)
     except ValueError:
         logger.error(
             f"Invalid payment ID {id} for user {current_user.id}",
             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
         )
-        return jsonify({'error': trans('payments_invalid_id', default='Invalid payment ID')}), 404
+        return safe_json_response({'error': trans('payments_invalid_id', default='Invalid payment ID')}, 404)
     except Exception as e:
         logger.error(
             f"Error fetching payment {id} for user {current_user.id}: {str(e)}",
             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
         )
-        return jsonify({'error': trans('payments_fetch_error', default='An error occurred')}), 500
+        return safe_json_response({'error': trans('payments_fetch_error', default='An error occurred')}, 500)
 
 @payments_bp.route('/generate_pdf/<id>')
 @login_required
@@ -559,10 +556,10 @@ def share():
     """Share a payment receipt via SMS or WhatsApp."""
     try:
         if not utils.can_user_interact(current_user):
-            return jsonify({
+            return safe_json_response({
                 'success': False,
                 'message': trans('payments_subscription_required', default='Your trial has expired or you do not have an active subscription. Please subscribe to share payments.')
-            }), 403
+            }, 403)
         
         data = request.get_json()
         payment_id = data.get('paymentId')
@@ -575,10 +572,10 @@ def share():
                 f"Missing fields in share payment request for user {current_user.id}",
                 extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
             )
-            return jsonify({
+            return safe_json_response({
                 'success': False,
                 'message': trans('payments_missing_fields', default='Missing required fields')
-            }), 400
+            }, 400)
         
         valid_share_types = ['sms', 'whatsapp']
         if share_type not in valid_share_types:
@@ -586,10 +583,10 @@ def share():
                 f"Invalid share type {share_type} in share payment request for user {current_user.id}",
                 extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
             )
-            return jsonify({
+            return safe_json_response({
                 'success': False,
                 'message': trans('payments_invalid_share_type', default='Invalid share type')
-            }), 400
+            }, 400)
         
         db = utils.get_mongo_db()
         query = {'_id': ObjectId(payment_id), 'user_id': str(current_user.id), 'type': 'payment'}
@@ -599,10 +596,10 @@ def share():
                 f"Payment {payment_id} not found for user {current_user.id}",
                 extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
             )
-            return jsonify({
+            return safe_json_response({
                 'success': False,
                 'message': trans('payments_record_not_found', default='Payment not found')
-            }), 404
+            }, 404)
         
         success = utils.send_message(recipient=recipient, message=message, type=share_type)
         if success:
@@ -610,40 +607,40 @@ def share():
                 f"Payment {payment_id} shared via {share_type} for user {current_user.id}",
                 extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
             )
-            return jsonify({'success': True})
+            return safe_json_response({'success': True})
         else:
             logger.error(
                 f"Failed to share payment {payment_id} via {share_type} for user {current_user.id}",
                 extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
             )
-            return jsonify({
+            return safe_json_response({
                 'success': False,
                 'message': trans('payments_share_failed', default='Failed to share payment')
-            }), 500
+            }, 500)
     except ValueError:
         logger.error(
             f"Invalid payment ID {payment_id} for user {current_user.id}",
             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
         )
-        return jsonify({
+        return safe_json_response({
             'success': False,
             'message': trans('payments_invalid_id', default='Invalid payment ID')
-        }), 404
+        }, 404)
     except CSRFError as e:
         logger.error(
             f"CSRF error in sharing payment {payment_id} for user {current_user.id}: {str(e)}",
             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
         )
-        return jsonify({
+        return safe_json_response({
             'success': False,
             'message': trans('payments_csrf_error', default='Invalid CSRF token. Please try again.')
-        }), 400
+        }, 400)
     except Exception as e:
         logger.error(
             f"Error sharing payment {payment_id} for user {current_user.id}: {str(e)}",
             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
         )
-        return jsonify({
+        return safe_json_response({
             'success': False,
             'message': trans('payments_share_error', default='Error sharing payment')
-        }), 500
+        }, 500)

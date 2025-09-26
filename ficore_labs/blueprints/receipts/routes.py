@@ -4,6 +4,7 @@ from flask_wtf import FlaskForm
 from flask_wtf.csrf import CSRFError
 from translations import trans
 import utils
+from utils import serialize_for_json, safe_json_response, clean_document_for_json, bulk_clean_documents_for_json
 from bson import ObjectId
 from datetime import datetime, timezone, date
 from zoneinfo import ZoneInfo
@@ -159,7 +160,7 @@ def api_view(id):
                 f"Receipt {id} not found for user {current_user.id}",
                 extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
             )
-            return jsonify({'error': trans('receipts_record_not_found', default='Record not found')}), 404
+            return safe_json_response({'error': trans('receipts_record_not_found', default='Record not found')}, 404)
         
         # Convert naive datetimes to timezone-aware
         if receipt.get('created_at') and receipt['created_at'].tzinfo is None:
@@ -171,19 +172,21 @@ def api_view(id):
             f"Fetched receipt API data {id} for user {current_user.id}",
             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
         )
-        return jsonify(receipt)
+        # Clean receipt for JSON serialization
+        receipt = clean_document_for_json(receipt)
+        return safe_json_response(receipt)
     except ValueError:
         logger.error(
             f"Invalid receipt ID {id} for user {current_user.id}",
             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
         )
-        return jsonify({'error': trans('receipts_invalid_id', default='Invalid receipt ID')}), 404
+        return safe_json_response({'error': trans('receipts_invalid_id', default='Invalid receipt ID')}, 404)
     except Exception as e:
         logger.error(
             f"Error fetching receipt {id} for user {current_user.id}: {str(e)}",
             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
         )
-        return jsonify({'error': trans('receipts_fetch_error', default='An error occurred')}), 500
+        return safe_json_response({'error': trans('receipts_fetch_error', default='An error occurred')}, 500)
 
 @receipts_bp.route('/generate_pdf/<id>')
 @login_required
@@ -486,23 +489,23 @@ def process_voice_sale():
     """Process voice input for sales logging."""
     try:
         if not utils.can_user_interact(current_user):
-            return jsonify({
+            return safe_json_response({
                 'success': False,
                 'message': trans('receipts_subscription_required', default='Your trial has expired or you do not have an active subscription.')
-            }), 403
+            }, 403)
         
         if 'audio' not in request.files:
-            return jsonify({
+            return safe_json_response({
                 'success': False,
                 'message': trans('voice_no_audio', default='No audio file provided')
-            }), 400
+            }, 400)
         
         audio_file = request.files['audio']
         if audio_file.filename == '':
-            return jsonify({
+            return safe_json_response({
                 'success': False,
                 'message': trans('voice_empty_audio', default='Empty audio file')
-            }), 400
+            }, 400)
         
         # Save audio file temporarily
         with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as temp_file:
@@ -514,19 +517,19 @@ def process_voice_sale():
             transcription = transcribe_audio(temp_audio_path)
             
             if not transcription:
-                return jsonify({
+                return safe_json_response({
                     'success': False,
                     'message': trans('voice_transcription_failed', default='Could not understand the audio')
-                }), 400
+                }, 400)
             
             # Parse the transcription to extract sale details
             parsed_data = parse_sale_transcription(transcription)
             
             if not parsed_data:
-                return jsonify({
+                return safe_json_response({
                     'success': False,
                     'message': trans('voice_parsing_failed', default='Could not extract sale details from speech')
-                }), 400
+                }, 400)
             
             # Create the sale record
             db = utils.get_mongo_db()
@@ -552,7 +555,7 @@ def process_voice_sale():
                 extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
             )
             
-            return jsonify({
+            return safe_json_response({
                 'success': True,
                 'message': trans('voice_sale_success', default='Sale recorded successfully!'),
                 'sale_id': str(result.inserted_id),
@@ -570,10 +573,10 @@ def process_voice_sale():
             f"Error processing voice sale for user {current_user.id}: {str(e)}",
             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
         )
-        return jsonify({
+        return safe_json_response({
             'success': False,
             'message': trans('voice_processing_error', default='Error processing voice input')
-        }), 500
+        }, 500)
 
 def transcribe_audio(audio_path):
     """Transcribe audio using AssemblyAI or similar service."""
@@ -660,10 +663,10 @@ def share():
     """Share a receipt via SMS or WhatsApp."""
     try:
         if not utils.can_user_interact(current_user):
-            return jsonify({
+            return safe_json_response({
                 'success': False,
                 'message': trans('receipts_subscription_required', default='Your trial has expired or you do not have an active subscription. Please subscribe to share receipts.')
-            }), 403
+            }, 403)
         
         data = request.get_json()
         receipt_id = data.get('receiptId')
@@ -676,10 +679,10 @@ def share():
                 f"Missing fields in share receipt request for user {current_user.id}",
                 extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
             )
-            return jsonify({
+            return safe_json_response({
                 'success': False,
                 'message': trans('receipts_missing_fields', default='Missing required fields')
-            }), 400
+            }, 400)
         
         valid_share_types = ['sms', 'whatsapp']
         if share_type not in valid_share_types:
@@ -687,10 +690,10 @@ def share():
                 f"Invalid share type {share_type} in share receipt request for user {current_user.id}",
                 extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
             )
-            return jsonify({
+            return safe_json_response({
                 'success': False,
                 'message': trans('receipts_invalid_share_type', default='Invalid share type')
-            }), 400
+            }, 400)
         
         db = utils.get_mongo_db()
         query = {'_id': ObjectId(receipt_id), 'user_id': str(current_user.id), 'type': 'receipt'}
@@ -700,10 +703,10 @@ def share():
                 f"Receipt {receipt_id} not found for user {current_user.id}",
                 extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
             )
-            return jsonify({
+            return safe_json_response({
                 'success': False,
                 'message': trans('receipts_record_not_found', default='Receipt not found')
-            }), 404
+            }, 404)
         
         success = utils.send_message(recipient=recipient, message=message, type=share_type)
         if success:
@@ -711,40 +714,40 @@ def share():
                 f"Receipt {receipt_id} shared via {share_type} for user {current_user.id}",
                 extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
             )
-            return jsonify({'success': True})
+            return safe_json_response({'success': True})
         else:
             logger.error(
                 f"Failed to share receipt {receipt_id} via {share_type} for user {current_user.id}",
                 extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
             )
-            return jsonify({
+            return safe_json_response({
                 'success': False,
                 'message': trans('receipts_share_failed', default='Failed to share receipt')
-            }), 500
+            }, 500)
     except ValueError:
         logger.error(
             f"Invalid receipt ID {receipt_id} for user {current_user.id}",
             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
         )
-        return jsonify({
+        return safe_json_response({
             'success': False,
             'message': trans('receipts_invalid_id', default='Invalid receipt ID')
-        }), 404
+        }, 404)
     except CSRFError as e:
         logger.error(
             f"CSRF error in sharing receipt {receipt_id} for user {current_user.id}: {str(e)}",
             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
         )
-        return jsonify({
+        return safe_json_response({
             'success': False,
             'message': trans('receipts_csrf_error', default='Invalid CSRF token. Please try again.')
-        }), 400
+        }, 400)
     except Exception as e:
         logger.error(
             f"Error sharing receipt {receipt_id} for user {current_user.id}: {str(e)}",
             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
         )
-        return jsonify({
+        return safe_json_response({
             'success': False,
             'message': trans('receipts_share_error', default='Error sharing receipt')
-        }), 500
+        }, 500)

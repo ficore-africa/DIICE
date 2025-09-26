@@ -6,7 +6,7 @@ from bson import ObjectId
 import logging
 from translations import trans
 import utils
-from utils import format_date
+from utils import format_date, serialize_for_json, safe_json_response, clean_document_for_json, bulk_clean_documents_for_json, create_dashboard_safe_response
 from helpers import reminders
 
 logger = logging.getLogger(__name__)
@@ -22,12 +22,6 @@ def test_notifications():
                          unpaid_debtors=[{'name': 'Test Debtor', 'amount': 1000}],
                          unpaid_creditors=[{'name': 'Test Creditor', 'amount': 500}],
                          stats={}, 
-                         recent_creditors=[], 
-                         recent_debtors=[], 
-                         recent_payments=[], 
-                         recent_receipts=[], 
-                         recent_funds=[], 
-                         recent_inventory=[],
                          can_interact=True,
                          show_daily_log_reminder=False,
                          streak=0,
@@ -80,10 +74,10 @@ def weekly_profit_data():
                     'payments': 0
                 })
         
-        return jsonify({'data': profit_per_day, 'success': True})
+        return safe_json_response({'data': profit_per_day, 'success': True})
     except Exception as e:
         logger.error(f"Error generating weekly profit data: {str(e)}")
-        return jsonify({'error': 'Failed to generate profit data', 'success': False}), 500
+        return safe_json_response({'error': 'Failed to generate profit data', 'success': False}, 500)
 
 # API endpoint for real-time dashboard data refresh
 @dashboard_bp.route('/api/refresh_data')
@@ -144,7 +138,7 @@ def refresh_dashboard_data():
             
         except Exception as stats_error:
             logger.error(f"Error calculating refresh stats: {str(stats_error)}")
-            return jsonify({'error': 'Failed to calculate statistics', 'success': False}), 500
+            return safe_json_response({'error': 'Failed to calculate statistics', 'success': False}, 500)
         
         # Format currency values for display
         formatted_stats = {}
@@ -155,7 +149,7 @@ def refresh_dashboard_data():
             else:
                 formatted_stats[key] = value
         
-        return jsonify({
+        return safe_json_response({
             'stats': formatted_stats,
             'success': True,
             'timestamp': datetime.now(timezone.utc).isoformat()
@@ -163,7 +157,7 @@ def refresh_dashboard_data():
         
     except Exception as e:
         logger.error(f"Error refreshing dashboard data: {str(e)}")
-        return jsonify({'error': 'Failed to refresh data', 'success': False}), 500
+        return safe_json_response({'error': 'Failed to refresh data', 'success': False}, 500)
 
 @dashboard_bp.route('/')
 @login_required
@@ -218,9 +212,8 @@ def index():
             streak = 0
             flash(trans('reminder_load_error', default='Unable to load reminders or streak data.'), 'warning')
 
-        # Fetch recent data with enhanced error handling and fallbacks
+        # Handle tax prep mode calculations with proper error handling
         try:
-            # Handle tax prep mode calculations with proper error handling
             if tax_prep_mode:
                 try:
                     # Calculate true profit: Total Income - (Expenses + Inventory Cost)
@@ -253,71 +246,6 @@ def index():
                     logger.error(f"Error calculating tax prep mode data: {str(tax_error)}", 
                                extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
                     stats['profit_only'] = 0
-            
-            # Fetch recent data with individual error handling for each data type
-            try:
-                recent_creditors = list(db.records.find({**query, 'type': 'creditor'}).sort('created_at', -1).limit(5))
-            except Exception as e:
-                logger.warning(f"Error fetching recent creditors: {str(e)}", 
-                             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-                recent_creditors = []
-            
-            try:
-                recent_debtors = list(db.records.find({**query, 'type': 'debtor'}).sort('created_at', -1).limit(5))
-            except Exception as e:
-                logger.warning(f"Error fetching recent debtors: {str(e)}", 
-                             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-                recent_debtors = []
-            
-            try:
-                recent_payments = utils.safe_find_cashflows(db, {**query, 'type': 'payment'}, 'created_at', -1)[:5]
-                if not recent_payments:
-                    # Fallback: try direct query if safe_find returns empty
-                    fallback_payments = list(db.cashflows.find({**query, 'type': 'payment'}).sort('created_at', -1).limit(5))
-                    recent_payments = []
-                    for payment in fallback_payments:
-                        try:
-                            cleaned_payment = utils.clean_cashflow_record(payment)
-                            if cleaned_payment:
-                                recent_payments.append(cleaned_payment)
-                        except Exception:
-                            continue
-            except Exception as e:
-                logger.warning(f"Error fetching recent payments: {str(e)}", 
-                             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-                recent_payments = []
-            
-            try:
-                recent_receipts = utils.safe_find_cashflows(db, {**query, 'type': 'receipt'}, 'created_at', -1)[:5]
-                if not recent_receipts:
-                    # Fallback: try direct query if safe_find returns empty
-                    fallback_receipts = list(db.cashflows.find({**query, 'type': 'receipt'}).sort('created_at', -1).limit(5))
-                    recent_receipts = []
-                    for receipt in fallback_receipts:
-                        try:
-                            cleaned_receipt = utils.clean_cashflow_record(receipt)
-                            if cleaned_receipt:
-                                recent_receipts.append(cleaned_receipt)
-                        except Exception:
-                            continue
-            except Exception as e:
-                logger.warning(f"Error fetching recent receipts: {str(e)}", 
-                             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-                recent_receipts = []
-            
-            try:
-                recent_funds = list(db.records.find({**query, 'type': 'fund'}).sort('created_at', -1).limit(5))
-            except Exception as e:
-                logger.warning(f"Error fetching recent funds: {str(e)}", 
-                             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-                recent_funds = []
-            
-            try:
-                recent_inventory = list(db.records.find({**query, 'type': 'inventory'}).sort('created_at', -1).limit(5))
-            except Exception as e:
-                logger.warning(f"Error fetching recent inventory: {str(e)}", 
-                             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-                recent_inventory = []
                 
         except Exception as e:
             logger.error(f"Critical error querying MongoDB for dashboard data: {str(e)}", 
@@ -325,154 +253,6 @@ def index():
             flash(trans('dashboard_load_error', default='Failed to load some dashboard data. Displaying available information.'), 'warning')
             # Ensure all variables are initialized even on error
             recent_creditors = recent_debtors = recent_payments = recent_receipts = recent_funds = recent_inventory = []
-
-        # Sanitize and convert datetimes
-        for item in recent_creditors + recent_debtors:
-            try:
-                if item.get('created_at') and item['created_at'].tzinfo is None:
-                    item['created_at'] = item['created_at'].replace(tzinfo=ZoneInfo("UTC"))
-                if item.get('reminder_date') and item['reminder_date'].tzinfo is None:
-                    item['reminder_date'] = item['reminder_date'].replace(tzinfo=ZoneInfo("UTC"))
-                item['name'] = utils.sanitize_input(item.get('name', ''), max_length=100)
-                item['description'] = utils.sanitize_input(item.get('description', 'No description provided'), max_length=500)
-                item['contact'] = utils.sanitize_input(item.get('contact', 'N/A'), max_length=50)
-                # Ensure ObjectId is converted to string to prevent JSON serialization errors
-                if '_id' in item:
-                    item['_id'] = str(item['_id'])
-                # Convert datetime objects to ISO strings for JSON serialization
-                if 'created_at' in item and item['created_at']:
-                    item['created_at'] = item['created_at'].isoformat() if hasattr(item['created_at'], 'isoformat') else str(item['created_at'])
-                if 'updated_at' in item and item['updated_at']:
-                    item['updated_at'] = item['updated_at'].isoformat() if hasattr(item['updated_at'], 'isoformat') else str(item['updated_at'])
-                if 'reminder_date' in item and item['reminder_date']:
-                    item['reminder_date'] = item['reminder_date'].isoformat() if hasattr(item['reminder_date'], 'isoformat') else str(item['reminder_date'])
-            except Exception as e:
-                logger.warning(f"Error processing creditor/debtor item {item.get('_id', 'unknown')}: {str(e)}")
-                # Ensure _id is string even on error
-                if '_id' in item:
-                    item['_id'] = str(item['_id'])
-                # Ensure datetime fields are strings even on error
-                for date_field in ['created_at', 'updated_at', 'reminder_date']:
-                    if date_field in item and item[date_field]:
-                        item[date_field] = str(item[date_field])
-                continue
-
-        # Process payments with enhanced field mapping
-        for item in recent_payments:
-            try:
-                if item.get('created_at') and item['created_at'].tzinfo is None:
-                    item['created_at'] = item['created_at'].replace(tzinfo=ZoneInfo("UTC"))
-                item['description'] = utils.sanitize_input(item.get('description', 'No description provided'), max_length=500)
-                # Ensure ObjectId is converted to string to prevent JSON serialization errors
-                if '_id' in item:
-                    item['_id'] = str(item['_id'])
-                # Convert datetime objects to ISO strings for JSON serialization
-                if 'created_at' in item and item['created_at']:
-                    item['created_at'] = item['created_at'].isoformat() if hasattr(item['created_at'], 'isoformat') else str(item['created_at'])
-                if 'updated_at' in item and item['updated_at']:
-                    item['updated_at'] = item['updated_at'].isoformat() if hasattr(item['updated_at'], 'isoformat') else str(item['updated_at'])
-                # Map party_name to recipient for payments
-                item['recipient'] = utils.sanitize_input(item.get('party_name', 'N/A'), max_length=100)
-                # Ensure amount is properly formatted
-                item['amount'] = float(item.get('amount', 0))
-                # Add category information for display
-                if item.get('expense_category'):
-                    category_metadata = utils.get_category_metadata(item['expense_category'])
-                    item['category_display'] = category_metadata.get('name', item['expense_category'])
-                else:
-                    item['category_display'] = 'No category'
-            except Exception as e:
-                logger.warning(f"Error processing payment item {item.get('_id', 'unknown')}: {str(e)}")
-                # Ensure _id is string even on error
-                if '_id' in item:
-                    item['_id'] = str(item['_id'])
-                # Ensure datetime fields are strings even on error
-                for date_field in ['created_at', 'updated_at']:
-                    if date_field in item and item[date_field]:
-                        item[date_field] = str(item[date_field])
-                continue
-        
-        # Process receipts with enhanced field mapping
-        for item in recent_receipts:
-            try:
-                if item.get('created_at') and item['created_at'].tzinfo is None:
-                    item['created_at'] = item['created_at'].replace(tzinfo=ZoneInfo("UTC"))
-                item['description'] = utils.sanitize_input(item.get('description', 'No description provided'), max_length=500)
-                # Ensure ObjectId is converted to string to prevent JSON serialization errors
-                if '_id' in item:
-                    item['_id'] = str(item['_id'])
-                # Convert datetime objects to ISO strings for JSON serialization
-                if 'created_at' in item and item['created_at']:
-                    item['created_at'] = item['created_at'].isoformat() if hasattr(item['created_at'], 'isoformat') else str(item['created_at'])
-                if 'updated_at' in item and item['updated_at']:
-                    item['updated_at'] = item['updated_at'].isoformat() if hasattr(item['updated_at'], 'isoformat') else str(item['updated_at'])
-                # Map party_name to payer for receipts
-                item['payer'] = utils.sanitize_input(item.get('party_name', 'N/A'), max_length=100)
-                # Ensure amount is properly formatted
-                item['amount'] = float(item.get('amount', 0))
-                # Add category information for display
-                item['category_display'] = utils.sanitize_input(item.get('category', 'No category'), max_length=50)
-            except Exception as e:
-                logger.warning(f"Error processing receipt item {item.get('_id', 'unknown')}: {str(e)}")
-                # Ensure _id is string even on error
-                if '_id' in item:
-                    item['_id'] = str(item['_id'])
-                # Ensure datetime fields are strings even on error
-                for date_field in ['created_at', 'updated_at']:
-                    if date_field in item and item[date_field]:
-                        item[date_field] = str(item[date_field])
-                continue
-
-        for item in recent_funds:
-            try:
-                if item.get('created_at') and item['created_at'].tzinfo is None:
-                    item['created_at'] = item['created_at'].replace(tzinfo=ZoneInfo("UTC"))
-                item['name'] = utils.sanitize_input(item.get('source', ''), max_length=100)
-                item['description'] = utils.sanitize_input(item.get('description', 'No description provided'), max_length=500)
-                # Ensure ObjectId is converted to string to prevent JSON serialization errors
-                if '_id' in item:
-                    item['_id'] = str(item['_id'])
-                # Convert datetime objects to ISO strings for JSON serialization
-                if 'created_at' in item and item['created_at']:
-                    item['created_at'] = item['created_at'].isoformat() if hasattr(item['created_at'], 'isoformat') else str(item['created_at'])
-                if 'updated_at' in item and item['updated_at']:
-                    item['updated_at'] = item['updated_at'].isoformat() if hasattr(item['updated_at'], 'isoformat') else str(item['updated_at'])
-            except Exception as e:
-                logger.warning(f"Error processing fund item {item.get('_id', 'unknown')}: {str(e)}")
-                # Ensure _id is string even on error
-                if '_id' in item:
-                    item['_id'] = str(item['_id'])
-                # Ensure datetime fields are strings even on error
-                for date_field in ['created_at', 'updated_at']:
-                    if date_field in item and item[date_field]:
-                        item[date_field] = str(item[date_field])
-                continue
-
-        for item in recent_inventory:
-            try:
-                if item.get('created_at') and item['created_at'].tzinfo is None:
-                    item['created_at'] = item['created_at'].replace(tzinfo=ZoneInfo("UTC"))
-                item['name'] = utils.sanitize_input(item.get('name', ''), max_length=100)
-                item['cost'] = float(item.get('cost', 0))
-                item['expected_margin'] = float(item.get('expected_margin', 0))
-                # Ensure ObjectId is converted to string to prevent JSON serialization errors
-                if '_id' in item:
-                    item['_id'] = str(item['_id'])
-                # Convert datetime objects to ISO strings for JSON serialization
-                if 'created_at' in item and item['created_at']:
-                    item['created_at'] = item['created_at'].isoformat() if hasattr(item['created_at'], 'isoformat') else str(item['created_at'])
-                if 'updated_at' in item and item['updated_at']:
-                    item['updated_at'] = item['updated_at'].isoformat() if hasattr(item['updated_at'], 'isoformat') else str(item['updated_at'])
-            except Exception as e:
-                logger.warning(f"Error processing inventory item {item.get('_id', 'unknown')}: {str(e)}")
-                # Ensure _id is string even on error
-                if '_id' in item:
-                    item['_id'] = str(item['_id'])
-                # Ensure datetime fields are strings even on error
-                for date_field in ['created_at', 'updated_at']:
-                    if date_field in item and item[date_field]:
-                        item[date_field] = str(item[date_field])
-                continue
 
         # Calculate stats with enhanced error handling and fallbacks
         try:
@@ -616,15 +396,9 @@ def index():
                         extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
             flash(trans('interaction_check_error', default='Unable to verify interaction status.'), 'warning')
 
-        # Render dashboard with all required variables
+        # Render dashboard with required variables (removed unused recent data)
         return render_template(
             'dashboard/index.html',
-            recent_creditors=recent_creditors,
-            recent_debtors=recent_debtors,
-            recent_payments=recent_payments,
-            recent_receipts=recent_receipts,
-            recent_funds=recent_funds,
-            recent_inventory=recent_inventory,
             stats=stats,
             can_interact=can_interact,
             show_daily_log_reminder=show_daily_log_reminder,
@@ -641,12 +415,6 @@ def index():
         flash(trans('dashboard_critical_error', default='An error occurred while loading the dashboard. Please try again later.'), 'danger')
         return render_template(
             'dashboard/index.html',
-            recent_creditors=[],
-            recent_debtors=[],
-            recent_payments=[],
-            recent_receipts=[],
-            recent_funds=[],
-            recent_inventory=[],
             stats=stats,
             can_interact=False,
             show_daily_log_reminder=False,

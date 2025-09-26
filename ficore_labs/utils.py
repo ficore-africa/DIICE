@@ -141,49 +141,41 @@ TRADER_TOOLS = [
 ]
 
 TRADER_NAV = [
-        {
+    {
+        "endpoint": "general_bp.home",
+        "label": "Home",
+        "label_key": "general_business_home",
+        "description_key": "general_business_home_desc",
+        "tooltip_key": "general_business_home_tooltip",
+        "icon": "bi-house"
+    },
+    {
         "endpoint": "receipts.index",
-        "label": "Receipts",
+        "label": "Sales",
         "label_key": "receipts_dashboard",
         "description_key": "receipts_dashboard_desc",
         "tooltip_key": "receipts_tooltip",
         "icon": "bi-cash-coin"
     },
     {
-        "endpoint": "debtors.index",
-        "label": "Debtors",
-        "label_key": "debtors_dashboard",
-        "description_key": "debtors_dashboard_desc",
-        "tooltip_key": "debtors_tooltip",
-        "icon": "bi-person-plus"
-    },
-    {
-        "endpoint": "tax.tax_calculator",
-        "label": "Tax Calculator",
-        "label_key": "tax_calculator",
-        "description_key": "tax_calculator_desc",
-        "tooltip_key": "tax_calculator_tooltip",
-        "icon": "bi-percent"
+        "endpoint": "payments.index",
+        "label": "Payments",
+        "label_key": "payments_dashboard",
+        "description_key": "payments_dashboard_desc",
+        "tooltip_key": "payments_tooltip",
+        "icon": "bi-calculator"
     },
     {
         "endpoint": "education.education_home",
-        "label": "Tax Education",
+        "label": "Learn",
         "label_key": "tax_education",
         "description_key": "tax_education_desc",
         "tooltip_key": "tax_education_tooltip",
         "icon": "bi-mortarboard"
     },
     {
-        "endpoint": "reports.index",
-        "label": "Profit Summary",
-        "label_key": "profit_summary",
-        "description_key": "profit_summary_desc",
-        "tooltip_key": "profit_summary_tooltip",
-        "icon": "bi-graph-up-arrow"
-    },
-    {
         "endpoint": "settings.profile",
-        "label": "Profile",
+        "label": "Settings",
         "label_key": "profile_settings",
         "description_key": "profile_settings_desc",
         "tooltip_key": "profile_tooltip",
@@ -2272,3 +2264,198 @@ def calculate_four_step_tax_liability(user_id, tax_year):
         }
 
 
+
+# JSON Serialization Helper Functions
+from bson import ObjectId
+import json
+from decimal import Decimal
+
+def serialize_for_json(obj):
+    """
+    Convert MongoDB documents and Python objects to JSON-serializable format.
+    Handles ObjectId, datetime, and other non-serializable types.
+    
+    Args:
+        obj: Object to serialize (dict, list, or individual value)
+        
+    Returns:
+        JSON-serializable object
+    """
+    try:
+        if isinstance(obj, dict):
+            return {key: serialize_for_json(value) for key, value in obj.items()}
+        elif isinstance(obj, list):
+            return [serialize_for_json(item) for item in obj]
+        elif isinstance(obj, ObjectId):
+            return str(obj)
+        elif isinstance(obj, datetime):
+            # Convert datetime to ISO string with timezone info
+            if obj.tzinfo is None:
+                obj = obj.replace(tzinfo=ZoneInfo("UTC"))
+            return obj.isoformat()
+        elif isinstance(obj, date):
+            return obj.isoformat()
+        elif isinstance(obj, Decimal):
+            return float(obj)
+        elif hasattr(obj, '__dict__'):
+            # Handle custom objects by converting to dict
+            return serialize_for_json(obj.__dict__)
+        else:
+            return obj
+    except Exception as e:
+        logger.warning(f"Error serializing object {type(obj)}: {str(e)}")
+        return str(obj)
+
+def safe_json_response(data, status_code=200):
+    """
+    Create a safe JSON response that handles ObjectId and datetime serialization.
+    
+    Args:
+        data: Data to serialize
+        status_code: HTTP status code
+        
+    Returns:
+        Flask JSON response
+    """
+    try:
+        from flask import jsonify
+        serialized_data = serialize_for_json(data)
+        return jsonify(serialized_data), status_code
+    except Exception as e:
+        logger.error(f"Error creating safe JSON response: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': 'JSON serialization error',
+            'message': 'Unable to serialize response data'
+        }), 500
+
+def clean_document_for_json(document):
+    """
+    Clean a MongoDB document for JSON serialization.
+    Specifically handles ObjectId and datetime fields.
+    
+    Args:
+        document: MongoDB document (dict)
+        
+    Returns:
+        Cleaned document ready for JSON serialization
+    """
+    if not isinstance(document, dict):
+        return serialize_for_json(document)
+    
+    cleaned = {}
+    for key, value in document.items():
+        if key == '_id' and isinstance(value, ObjectId):
+            cleaned[key] = str(value)
+        elif isinstance(value, datetime):
+            # Ensure timezone info and convert to ISO string
+            if value.tzinfo is None:
+                value = value.replace(tzinfo=ZoneInfo("UTC"))
+            cleaned[key] = value.isoformat()
+        elif isinstance(value, ObjectId):
+            cleaned[key] = str(value)
+        elif isinstance(value, dict):
+            cleaned[key] = clean_document_for_json(value)
+        elif isinstance(value, list):
+            cleaned[key] = [clean_document_for_json(item) if isinstance(item, dict) else serialize_for_json(item) for item in value]
+        else:
+            cleaned[key] = serialize_for_json(value)
+    
+    return cleaned
+
+def bulk_clean_documents_for_json(documents):
+    """
+    Clean multiple MongoDB documents for JSON serialization.
+    
+    Args:
+        documents: List of MongoDB documents
+        
+    Returns:
+        List of cleaned documents ready for JSON serialization
+    """
+    try:
+        if not isinstance(documents, list):
+            return clean_document_for_json(documents)
+        
+        cleaned_documents = []
+        for doc in documents:
+            try:
+                cleaned_doc = clean_document_for_json(doc)
+                cleaned_documents.append(cleaned_doc)
+            except Exception as e:
+                logger.warning(f"Error cleaning document {doc.get('_id', 'unknown')}: {str(e)}")
+                # Add a minimal cleaned version
+                cleaned_documents.append({
+                    '_id': str(doc.get('_id', 'unknown')),
+                    'error': 'Document cleaning failed',
+                    'original_keys': list(doc.keys()) if isinstance(doc, dict) else []
+                })
+        
+        return cleaned_documents
+    except Exception as e:
+        logger.error(f"Error in bulk document cleaning: {str(e)}")
+        return []
+
+def ensure_json_serializable(data):
+    """
+    Ensure data is JSON serializable by converting problematic types.
+    This is a more aggressive approach that prioritizes serialization over data integrity.
+    
+    Args:
+        data: Data to make JSON serializable
+        
+    Returns:
+        JSON-serializable data
+    """
+    try:
+        # Test if already serializable
+        json.dumps(data)
+        return data
+    except (TypeError, ValueError):
+        # If not serializable, clean it
+        return serialize_for_json(data)
+
+def create_dashboard_safe_response(stats, recent_data, additional_data=None):
+    """
+    Create a dashboard response that's guaranteed to be JSON serializable.
+    Specifically designed for dashboard API endpoints.
+    
+    Args:
+        stats: Statistics dictionary
+        recent_data: Dictionary of recent data lists
+        additional_data: Optional additional data
+        
+    Returns:
+        JSON-safe response dictionary
+    """
+    try:
+        response = {
+            'success': True,
+            'timestamp': datetime.now(timezone.utc).isoformat(),
+            'stats': clean_document_for_json(stats),
+            'recent_data': {}
+        }
+        
+        # Clean recent data
+        for key, data_list in recent_data.items():
+            if isinstance(data_list, list):
+                response['recent_data'][key] = bulk_clean_documents_for_json(data_list)
+            else:
+                response['recent_data'][key] = serialize_for_json(data_list)
+        
+        # Add additional data if provided
+        if additional_data:
+            response['additional_data'] = clean_document_for_json(additional_data)
+        
+        # Final safety check
+        response = ensure_json_serializable(response)
+        
+        return response
+    except Exception as e:
+        logger.error(f"Error creating dashboard safe response: {str(e)}")
+        return {
+            'success': False,
+            'error': 'Response serialization failed',
+            'message': 'Unable to create safe JSON response',
+            'timestamp': datetime.now(timezone.utc).isoformat()
+        }

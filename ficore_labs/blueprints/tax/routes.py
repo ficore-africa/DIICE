@@ -765,5 +765,4 @@ def update_entity_type():
         return jsonify({
             'success': False,
             'error': str(e)
-
         }), 400
