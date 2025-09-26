@@ -125,7 +125,7 @@ def refresh_dashboard_data():
             stats['total_debtors_amount'] = debtors_data.get('total_amount', 0)
 
             # Calculate creditors
-            creditors_result = db.cashflows.aggregate([
+            creditors_result = db.records.aggregate([  # Fixed to use db.records
                 {'$match': {**query, 'type': 'creditor'}},
                 {'$group': {'_id': None, 'total_amount': {'$sum': '$amount_owed'}, 'count': {'$sum': 1}}}
             ])
@@ -208,6 +208,8 @@ def index():
             rewards_data = db.rewards.find_one({'user_id': str(current_user.id)})
             streak = rewards_data.get('streak', 0) if rewards_data else 0
             unpaid_debtors, unpaid_creditors = reminders.get_unpaid_debts_credits(db, current_user.id)
+            unpaid_debtors = bulk_clean_documents_for_json(unpaid_debtors)  # Ensure JSON-safe
+            unpaid_creditors = bulk_clean_documents_for_json(unpaid_creditors)  # Ensure JSON-safe
             inventory_loss = reminders.detect_inventory_loss(db, current_user.id)
             logger.debug(
                 f"Calculated streak: {streak} for user_id: {current_user.id}",
@@ -275,7 +277,7 @@ def index():
             stats['total_creditors'] = db.records.count_documents({**query, 'type': 'creditor'}, hint=[('user_id', 1), ('type', 1)]) or len(recent_creditors)
             stats['total_payments'] = db.cashflows.count_documents({**query, 'type': 'payment'}, hint=[('user_id', 1), ('type', 1)]) or len(recent_payments)
             stats['total_receipts'] = db.cashflows.count_documents({**query, 'type': 'receipt'}, hint=[('user_id', 1), ('type', 1)]) or len(recent_receipts)
-            stats['total_inventory'] = db.cashflows.count_documents({**query, 'type': 'inventory'}, hint=[('user_id', 1), ('type', 1)]) or len(recent_inventory)
+            stats['total_inventory'] = db.records.count_documents({**query, 'type': 'inventory'}, hint=[('user_id', 1), ('type', 1)]) or len(recent_inventory)  # Fixed to use db.records
 
             # Amounts
             total_debtors_amount = sum(doc.get('amount_owed', 0) for doc in get_records(db, {**query, 'type': 'debtor'})) or sum(item.get('amount_owed', 0) for item in recent_debtors)
