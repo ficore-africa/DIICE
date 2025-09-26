@@ -358,6 +358,29 @@ def create_anonymous_session():
         session['is_anonymous'] = True
         session.modified = True
 
+def safe_parse_datetime(value):
+    """Convert a datetime value (string or naive datetime) to a timezone-aware UTC datetime."""
+    if value is None:
+        logger.warning("Received None for datetime parsing, returning current UTC time")
+        return datetime.now(timezone.utc)
+    
+    if isinstance(value, str):
+        try:
+            dt = datetime.fromisoformat(value)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=ZoneInfo("UTC"))
+            return dt
+        except ValueError as e:
+            logger.warning(f"Invalid datetime string format: {value}, error: {str(e)}")
+            return datetime.now(timezone.utc)  # Fallback to current UTC time
+    elif isinstance(value, datetime):
+        if value.tzinfo is None:
+            return value.replace(tzinfo=ZoneInfo("UTC"))
+        return value
+    else:
+        logger.warning(f"Unexpected datetime type: {type(value)}, value: {value}")
+        return datetime.now(timezone.utc)  # Fallback to current UTC time
+
 def normalize_datetime(dt):
     """
     Centralized datetime normalization function to ensure all datetimes are UTC-aware ISO strings.
@@ -2870,3 +2893,4 @@ def create_dashboard_safe_response(stats, recent_data, additional_data=None):
             'timestamp': datetime.now(timezone.utc).isoformat()
 
         }
+
