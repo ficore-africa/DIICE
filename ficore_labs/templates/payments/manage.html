@@ -95,18 +95,18 @@
                 <tbody>
                     {% for payment in payments %}
                         <tr>
-                            <td data-label="{{ t('payments_party_name', default='Party Name') }}">{{ payment.party_name }}</td>
+                            <td data-label="{{ t('payments_party_name', default='Party Name') }}">{{ payment.party_name | e }}</td>
                             <td data-label="{{ t('general_amount', default='Amount') }}">{{ format_currency(payment.amount) }}</td>
                             <td data-label="{{ t('general_date', default='Date') }}">{{ format_date(payment.created_at) }}</td>
-                            <td data-label="{{ t('payments_payment_method', default='Payment Method') }}">{{ payment.method or '-' }}</td>
+                            <td data-label="{{ t('payments_payment_method', default='Payment Method') }}">{{ payment.method or '-' | e }}</td>
                             <td data-label="{{ t('general_category', default='Category') }}">
                                 {% if payment.category_metadata and payment.category_metadata.category_display_name %}
-                                    {{ payment.category_metadata.category_display_name }}
+                                    {{ payment.category_metadata.category_display_name | e }}
                                     {% if payment.category_metadata.is_personal %}
                                         <span class="badge bg-warning text-dark ms-1">{{ t('not_tax_deductible', default='Not Tax Deductible') }}</span>
                                     {% endif %}
                                 {% elif payment.expense_category %}
-                                    {{ payment.expense_category | title }}
+                                    {{ payment.expense_category | title | e }}
                                 {% else %}
                                     -
                                 {% endif %}
@@ -116,16 +116,16 @@
                                     <a href="{{ url_for('payments.edit', id=payment._id) }}" 
                                        class="btn btn-primary btn-sm"
                                        data-bs-toggle="tooltip" 
-                                       title="{{ t('general_edit', default='Edit') }}">
+                                       title="{{ t('general_edit', default='Edit') | e }}">
                                         {{ t('general_edit', default='Edit') }}
                                     </a>
                                     <form action="{{ url_for('payments.delete', id=payment._id) }}" method="POST" class="d-inline">
                                         {{ form.hidden_tag() }}
                                         <button type="submit" class="btn btn-danger btn-sm" 
-                                                onclick="return confirm('{{ t('general_confirm_delete', default='Are you sure?') }}')"
+                                                onclick="return confirm('{{ t('general_confirm_delete', default='Are you sure?') | e }}')"
                                                 data-bs-toggle="tooltip" 
-                                                title="{{ t('general_delete', default='Delete') }}"
-                                                aria-label="{{ t('general_delete', default='Delete') }}">
+                                                title="{{ t('general_delete', default='Delete') | e }}"
+                                                aria-label="{{ t('general_delete', default='Delete') | e }}">
                                             {{ t('general_delete', default='Delete') }}
                                         </button>
                                     </form>
@@ -133,14 +133,14 @@
                                     <a href="{{ url_for('subscribe_bp.subscribe') }}" 
                                        class="btn btn-primary btn-sm disabled"
                                        data-bs-toggle="tooltip" 
-                                       title="{{ t('general_edit', default='Edit') }}">
+                                       title="{{ t('general_edit', default='Edit') | e }}">
                                         {{ t('general_edit', default='Edit') }}
                                     </a>
                                     <button class="btn btn-danger btn-sm disabled" 
                                             data-bs-toggle="tooltip" 
-                                            title="{{ t('general_delete', default='Delete') }}"
-                                            onclick="alert('{{ t('payments_subscription_required', default='Your trial has expired or you do not have an active subscription. Please subscribe to delete payments.') }}')"
-                                            aria-label="{{ t('general_delete', default='Delete') }}">
+                                            title="{{ t('general_delete', default='Delete') | e }}"
+                                            onclick="alert('{{ t('payments_subscription_required', default='Your trial has expired or you do not have an active subscription. Please subscribe to delete payments.') | e }}')"
+                                            aria-label="{{ t('general_delete', default='Delete') | e }}">
                                         {{ t('general_delete', default='Delete') }}
                                     </button>
                                 {% endif %}
@@ -223,18 +223,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function getCategoryKeyFromText(categoryText) {
-        const categoryMap = {
-            '{{ t("category_office_admin", default="Office & Admin") }}': 'office_admin',
-            '{{ t("category_staff_wages", default="Staff & Wages") }}': 'staff_wages',
-            '{{ t("category_business_travel", default="Business Travel & Transport") }}': 'business_travel',
-            '{{ t("category_rent_utilities", default="Rent & Utilities") }}': 'rent_utilities',
-            '{{ t("category_marketing_sales", default="Marketing & Sales") }}': 'marketing_sales',
-            '{{ t("category_cogs", default="Cost of Goods Sold (COGS)") }}': 'cogs',
-            '{{ t("category_personal_expenses", default="Personal Expenses") }}': 'personal_expenses',
-            '{{ t("category_statutory_legal", default="Statutory & Legal Contributions") }}': 'statutory_legal'
-        };
+        const categoryMap = {{ expense_categories | tojson }};
         const cleanText = categoryText.replace(/Not Tax Deductible/g, '').trim();
-        return categoryMap[cleanText] || '';
+        for (const [key, value] of Object.entries(categoryMap)) {
+            if (value.name === cleanText) {
+                return key;
+            }
+        }
+        return '';
     }
     
     function updateSummaryStats(count, total, deductible, nonDeductible) {
@@ -250,7 +246,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     function formatCurrency(amount) {
-        return '{{ t("general_currency_symbol", default="₦") }}' + amount.toLocaleString('en-NG', {
+        return amount.toLocaleString('en-NG', {
+            style: 'currency',
+            currency: '{{ t("general_currency_code", default="NGN") }}',
             minimumFractionDigits: 2,
             maximumFractionDigits: 2
         });
