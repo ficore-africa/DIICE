@@ -4,7 +4,7 @@ from flask_wtf import FlaskForm
 from flask_wtf.csrf import CSRFError
 from translations import trans
 import utils
-from utils import serialize_for_json, safe_json_response, clean_document_for_json, bulk_clean_documents_for_json, safe_parse_datetime
+from utils import serialize_for_json, safe_json_response, clean_document_for_json, bulk_clean_documents_for_json, safe_parse_datetime, sanitize_input
 from bson import ObjectId
 from datetime import datetime, timezone, date
 from zoneinfo import ZoneInfo
@@ -159,7 +159,7 @@ class PaymentForm(FlaskForm):
 payments_bp = Blueprint('payments', __name__, url_prefix='/payments')
 
 def fetch_payments_with_fallback(db, query, sort_field='created_at', sort_direction=-1, limit=50):
-    """Fetch payments with fallback logic for robustness."""
+    """Fetch payments with fallback logic and enhanced sanitization for robustness."""
     payments = utils.safe_find_cashflows(db, query, sort_field=sort_field, sort_direction=sort_direction)
     if not payments:
         try:
@@ -173,6 +173,10 @@ def fetch_payments_with_fallback(db, query, sort_field='created_at', sort_direct
                 payments = []
                 for payment in raw_payments:
                     try:
+                        # Sanitize string fields to remove problematic characters
+                        for field in ['party_name', 'contact', 'description']:
+                            if field in payment and isinstance(payment[field], str):
+                                payment[field] = sanitize_input(payment[field], max_length=1000)
                         from models import to_dict_cashflow
                         cleaned_payment = to_dict_cashflow(payment)
                         if cleaned_payment:
@@ -192,6 +196,8 @@ def normalize_datetime(doc):
     """Convert created_at to timezone-aware datetime if it's a string or naive datetime."""
     if 'created_at' in doc:
         doc['created_at'] = safe_parse_datetime(doc['created_at'])
+    if 'updated_at' in doc:
+        doc['updated_at'] = safe_parse_datetime(doc['updated_at'])
     return doc
 
 @payments_bp.route('/')
@@ -205,11 +211,21 @@ def index():
         query = {'user_id': str(current_user.id), 'type': 'payment'}
         
         payments = [normalize_datetime(doc) for doc in fetch_payments_with_fallback(db, query)]
-        category_stats = utils.calculate_payment_category_stats(payments)
+        # Ensure all payments are serialized safely for template rendering
+        cleaned_payments = []
+        for payment in payments:
+            try:
+                cleaned_payment = serialize_for_json(payment)
+                cleaned_payments.append(cleaned_payment)
+            except Exception as e:
+                logger.warning(f"Failed to serialize payment {payment.get('_id', 'unknown')}: {str(e)}")
+                continue
+        
+        category_stats = utils.calculate_payment_category_stats(cleaned_payments)
         
         return render_template(
             'payments/index.html',
-            payments=payments,
+            payments=cleaned_payments,
             category_stats=category_stats,
             format_currency=utils.format_currency,
             format_date=utils.format_date,
@@ -235,11 +251,21 @@ def manage():
         query = {'user_id': str(current_user.id), 'type': 'payment'}
         
         payments = [normalize_datetime(doc) for doc in fetch_payments_with_fallback(db, query)]
-        category_stats = utils.calculate_payment_category_stats(payments)
+        # Serialize payments safely
+        cleaned_payments = []
+        for payment in payments:
+            try:
+                cleaned_payment = serialize_for_json(payment)
+                cleaned_payments.append(cleaned_payment)
+            except Exception as e:
+                logger.warning(f"Failed to serialize payment {payment.get('_id', 'unknown')}: {str(e)}")
+                continue
+        
+        category_stats = utils.calculate_payment_category_stats(cleaned_payments)
         
         return render_template(
             'payments/manage.html',
-            payments=payments,
+            payments=cleaned_payments,
             category_stats=category_stats,
             format_currency=utils.format_currency,
             format_date=utils.format_date,
