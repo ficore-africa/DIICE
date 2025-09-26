@@ -55,7 +55,8 @@ payments_bp = Blueprint('payments', __name__, url_prefix='/payments')
 
 def fetch_payments_with_fallback(db, query, sort_key='created_at', sort_direction=-1, limit=50):
     """Fetch payments with fallback logic for robustness."""
-    payments = utils.safe_find_cashflows(db, query, sort_key, sort_direction, limit)
+    # Adjusted call to safe_find_cashflows to match expected signature (db, query, sort_key, sort_direction)
+    payments = utils.safe_find_cashflows(db, query, sort_key=sort_key, sort_direction=sort_direction)
     if not payments:
         try:
             test_count = db.cashflows.count_documents(query, hint=[('user_id', 1), ('type', 1)])
@@ -64,6 +65,7 @@ def fetch_payments_with_fallback(db, query, sort_key='created_at', sort_directio
                     f"Found {test_count} payments for user {current_user.id} but safe_find returned empty",
                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
                 )
+                # Apply limit in the fallback query
                 raw_payments = list(db.cashflows.find(query, hint=[('user_id', 1), ('type', 1)]).sort(sort_key, sort_direction).limit(limit))
                 payments = []
                 for payment in raw_payments:
