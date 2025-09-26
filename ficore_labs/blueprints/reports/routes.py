@@ -93,7 +93,7 @@ def to_dict_cashflow(record):
 
 @reports_bp.route('/')
 @login_required
-@utils.requires_role(['trader', 'admin'])
+@utils.requires_role(['admin'])
 def index():
     try:
         can_interact = utils.can_user_interact(current_user)

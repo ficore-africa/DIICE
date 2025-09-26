@@ -234,7 +234,7 @@ ENTITY_TYPES = {
         'name': 'Registered Limited Liability Company',
         'description': 'Incorporated company with RC number',
         'tax_type': 'Companies Income Tax (CIT)',
-        'tax_details': '0% for <=NGN 50M revenue, 30% for >NGN 50M revenue'
+        'tax_details': '0% for revenue up to NGN 50M, 30% for revenue above NGN 50M'
     }
 }
 

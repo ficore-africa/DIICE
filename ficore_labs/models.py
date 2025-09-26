@@ -150,6 +150,8 @@ def to_dict_cashflow(record):
         'method': sanitize_input(record.get('method', ''), max_length=50),
         'category': sanitize_input(record.get('category', ''), max_length=50),
         'expense_category': sanitize_input(record.get('expense_category', ''), max_length=50),
+        'contact': sanitize_input(record.get('contact', ''), max_length=100) if record.get('contact') else '',
+        'description': sanitize_input(record.get('description', ''), max_length=1000) if record.get('description') else '',
         'is_tax_deductible': record.get('is_tax_deductible'),
         'tax_year': record.get('tax_year'),
         'category_metadata': record.get('category_metadata'),
@@ -245,6 +247,15 @@ def migrate_naive_datetimes():
             upsert=True
         )
         logger.info("Marked datetime migration as completed in system_config", extra={'session_id': 'no-session-id'})
+        
+        # Run a final audit to confirm all issues are resolved
+        from utils import audit_datetime_fields
+        remaining_issues = audit_datetime_fields(db, 'cashflows')
+        if remaining_issues:
+            logger.warning(f"Found {len(remaining_issues)} remaining datetime issues in cashflows after migration", 
+                         extra={'session_id': 'no-session-id'})
+        else:
+            logger.info("All datetime issues in cashflows have been resolved", extra={'session_id': 'no-session-id'})
 
     except Exception as e:
         logger.error(f"Failed to migrate naive datetimes: {str(e)}", exc_info=True, extra={'session_id': 'no-session-id'})
@@ -289,6 +300,37 @@ def check_and_migrate_naive_datetimes(db, collection_name='cashflows'):
         logger.error(f"Failed to check and migrate naive datetimes in {collection_name}: {str(e)}", 
                     exc_info=True, extra={'session_id': 'no-session-id'})
         raise
+
+def force_datetime_migration():
+    """
+    Force re-run of datetime migration to fix any remaining naive datetime issues.
+    This can be called manually to resolve the 44 datetime naive field warnings.
+    """
+    try:
+        db = get_db()
+        
+        # Reset migration flag to force re-run
+        db.system_config.update_one(
+            {'_id': 'datetime_migration_completed'},
+            {'$set': {'value': False}},
+            upsert=True
+        )
+        logger.info("Reset datetime migration flag to force re-run", extra={'session_id': 'no-session-id'})
+        
+        # Run migration
+        migrate_naive_datetimes()
+        
+        # Run additional checks for cashflows specifically
+        check_and_migrate_naive_datetimes(db, 'cashflows')
+        check_and_migrate_naive_datetimes(db, 'records')
+        
+        logger.info("Forced datetime migration completed successfully", extra={'session_id': 'no-session-id'})
+        return True
+        
+    except Exception as e:
+        logger.error(f"Failed to force datetime migration: {str(e)}", 
+                    exc_info=True, extra={'session_id': 'no-session-id'})
+        return False
 
 def assign_default_category_for_historical_data(party_name, amount, existing_category=None):
     """

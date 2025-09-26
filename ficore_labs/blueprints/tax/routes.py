@@ -814,3 +814,32 @@ def update_entity_type():
             'success': False,
             'error': str(e)
         }), 400
+
+@tax_bp.route('/log-client-error', methods=['POST'])
+@login_required
+def log_client_error():
+    """Log client-side JavaScript errors for debugging"""
+    try:
+        data = request.get_json()
+        error_message = data.get('error', 'Unknown error')
+        error_stack = data.get('stack', '')
+        page_url = data.get('url', '')
+        user_agent = data.get('userAgent', '')
+        
+        # Log the client-side error with user context
+        logger.error(
+            f"Client-side error for user {current_user.id}: {error_message}",
+            extra={
+                'session_id': session.get('sid', 'no-session-id'),
+                'user_id': current_user.id,
+                'error_stack': error_stack,
+                'page_url': page_url,
+                'user_agent': user_agent
+            }
+        )
+        
+        return jsonify({'success': True, 'message': 'Error logged successfully'})
+        
+    except Exception as e:
+        logger.error(f"Error logging client-side error: {str(e)}")
+        return jsonify({'success': False, 'error': 'Failed to log error'}), 500
