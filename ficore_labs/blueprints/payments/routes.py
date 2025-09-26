@@ -15,10 +15,14 @@ import io
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import inch
+from reportlab.lib.utils import ImageReader
+from reportlab.platypus import Paragraph
+from reportlab.lib.styles import getSampleStyleSheet
 
 logger = logging.getLogger(__name__)
 
 class PaymentForm(FlaskForm):
+    """Form for adding or editing a payment cashflow."""
     party_name = StringField(trans('payments_recipient_name', default='Recipient Name'), validators=[DataRequired(), Length(max=100)])
     date = DateField(trans('general_date', default='Date'), validators=[DataRequired()])
     amount = FloatField(trans('payments_amount', default='Amount'), validators=[DataRequired(), NumberRange(min=0.01)])
@@ -35,10 +39,50 @@ class PaymentForm(FlaskForm):
     
     def __init__(self, *args, **kwargs):
         super(PaymentForm, self).__init__(*args, **kwargs)
-        # Populate expense category choices from utils
-        self.expense_category.choices = utils.get_category_choices_for_forms()
+        try:
+            # Populate expense category choices from utils
+            self.expense_category.choices = utils.get_category_choices_for_forms()
+        except Exception as e:
+            logger.warning(f"Failed to load expense category choices: {str(e)}")
+            # Fallback to default categories
+            self.expense_category.choices = [
+                ('office_admin', trans('category_office_admin', default='Office Admin')),
+                ('utilities', trans('category_utilities', default='Utilities')),
+                ('travel', trans('category_travel', default='Travel'))
+            ]
 
 payments_bp = Blueprint('payments', __name__, url_prefix='/payments')
+
+def fetch_payments_with_fallback(db, query, sort_key='created_at', sort_direction=-1, limit=50):
+    """Fetch payments with fallback logic for robustness."""
+    payments = utils.safe_find_cashflows(db, query, sort_key, sort_direction, limit)
+    if not payments:
+        try:
+            test_count = db.cashflows.count_documents(query, hint=[('user_id', 1), ('type', 1)])
+            if test_count > 0:
+                logger.warning(
+                    f"Found {test_count} payments for user {current_user.id} but safe_find returned empty",
+                    extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
+                )
+                raw_payments = list(db.cashflows.find(query, hint=[('user_id', 1), ('type', 1)]).sort(sort_key, sort_direction).limit(limit))
+                payments = []
+                for payment in raw_payments:
+                    try:
+                        cleaned_payment = utils.aggressively_clean_record(payment)
+                        if cleaned_payment:
+                            if '_id' in cleaned_payment:
+                                cleaned_payment['_id'] = str(cleaned_payment['_id'])
+                            payments.append(cleaned_payment)
+                    except Exception as clean_error:
+                        logger.debug(f"Failed to clean payment record {payment.get('_id', 'unknown')}: {str(clean_error)}")
+                        continue
+                logger.info(f"Fallback cleaning recovered {len(payments)} payments for user {current_user.id}")
+        except Exception as fallback_error:
+            logger.error(
+                f"Fallback query failed for user {current_user.id}: {str(fallback_error)}",
+                extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
+            )
+    return bulk_clean_documents_for_json(payments)
 
 @payments_bp.route('/')
 @login_required
@@ -49,38 +93,7 @@ def index():
         db = utils.get_mongo_db()
         query = {'user_id': str(current_user.id), 'type': 'payment'}
         
-        # Use the enhanced safe_find_cashflows function
-        payments = utils.safe_find_cashflows(db, query, 'created_at', -1)
-        
-        # If we got no payments but expected some, try a fallback query
-        if not payments:
-            try:
-                # Try a simpler query to see if there are any records at all
-                test_count = db.cashflows.count_documents(query)
-                if test_count > 0:
-                    logger.warning(f"Found {test_count} payments for user {current_user.id} but safe_find returned empty", 
-                                 extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-                    # Try to get at least some records with aggressive cleaning
-                    raw_payments = list(db.cashflows.find(query).sort('created_at', -1).limit(50))
-                    payments = []
-                    for payment in raw_payments:
-                        try:
-                            # Use the aggressive cleaning function from utils
-                            cleaned_payment = utils.aggressively_clean_record(payment)
-                            if cleaned_payment:
-                                # Ensure ObjectId is converted to string
-                                if '_id' in cleaned_payment:
-                                    cleaned_payment['_id'] = str(cleaned_payment['_id'])
-                                payments.append(cleaned_payment)
-                        except Exception as clean_error:
-                            logger.debug(f"Failed to clean payment record {payment.get('_id', 'unknown')}: {str(clean_error)}")
-                            continue
-                    logger.info(f"Fallback cleaning recovered {len(payments)} payments for user {current_user.id}")
-            except Exception as fallback_error:
-                logger.error(f"Fallback query also failed for user {current_user.id}: {str(fallback_error)}", 
-                           extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-        
-        # Calculate category-based summary statistics
+        payments = fetch_payments_with_fallback(db, query)
         category_stats = utils.calculate_payment_category_stats(payments)
         
         return render_template(
@@ -109,38 +122,7 @@ def manage():
         db = utils.get_mongo_db()
         query = {'user_id': str(current_user.id), 'type': 'payment'}
         
-        # Use the enhanced safe_find_cashflows function
-        payments = utils.safe_find_cashflows(db, query, 'created_at', -1)
-        
-        # If we got no payments but expected some, try a fallback query
-        if not payments:
-            try:
-                # Try a simpler query to see if there are any records at all
-                test_count = db.cashflows.count_documents(query)
-                if test_count > 0:
-                    logger.warning(f"Found {test_count} payments for user {current_user.id} but safe_find returned empty in manage", 
-                                 extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-                    # Try to get at least some records with aggressive cleaning
-                    raw_payments = list(db.cashflows.find(query).sort('created_at', -1).limit(50))
-                    payments = []
-                    for payment in raw_payments:
-                        try:
-                            # Use the aggressive cleaning function from utils
-                            cleaned_payment = utils.aggressively_clean_record(payment)
-                            if cleaned_payment:
-                                # Ensure ObjectId is converted to string
-                                if '_id' in cleaned_payment:
-                                    cleaned_payment['_id'] = str(cleaned_payment['_id'])
-                                payments.append(cleaned_payment)
-                        except Exception as clean_error:
-                            logger.debug(f"Failed to clean payment record {payment.get('_id', 'unknown')}: {str(clean_error)}")
-                            continue
-                    logger.info(f"Fallback cleaning recovered {len(payments)} payments for user {current_user.id} in manage")
-            except Exception as fallback_error:
-                logger.error(f"Fallback query also failed for user {current_user.id} in manage: {str(fallback_error)}", 
-                           extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-        
-        # Calculate category-based summary statistics
+        payments = fetch_payments_with_fallback(db, query)
         category_stats = utils.calculate_payment_category_stats(payments)
         
         return render_template(
@@ -163,16 +145,36 @@ def manage():
 @payments_bp.route('/view/<id>')
 @login_required
 @utils.requires_role(['trader', 'startup', 'admin'])
+@utils.limiter.limit('20 per minute')
 def view(id):
     """View detailed information about a specific payment."""
     try:
         db = utils.get_mongo_db()
         query = {'_id': ObjectId(id), 'user_id': str(current_user.id), 'type': 'payment'}
-        payment = db.cashflows.find_one(query)
+        payment = db.cashflows.find_one(query, hint=[('_id', 1)])
         if not payment:
+            logger.warning(
+                f"Payment {id} not found for user {current_user.id}",
+                extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
+            )
             return safe_json_response({'error': trans('payments_record_not_found', default='Record not found')}, 404)
         
-        # Use comprehensive JSON cleaning for the payment document
+        # Ensure required fields
+        required_fields = ['party_name', 'amount', 'created_at']
+        for field in required_fields:
+            if field not in payment:
+                logger.warning(
+                    f"Payment {id} missing required field {field} for user {current_user.id}",
+                    extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
+                )
+                return safe_json_response({'error': trans('payments_invalid_data', default='Invalid payment data')}, 500)
+        
+        # Set defaults for optional fields
+        payment.setdefault('method', 'N/A')
+        payment.setdefault('expense_category', 'office_admin')
+        payment.setdefault('contact', '')
+        payment.setdefault('description', '')
+        
         payment = clean_document_for_json(payment)
         return safe_json_response(payment)
     except ValueError:
@@ -200,8 +202,12 @@ def generate_pdf(id):
         
         db = utils.get_mongo_db()
         query = {'_id': ObjectId(id), 'user_id': str(current_user.id), 'type': 'payment'}
-        payment = db.cashflows.find_one(query)
+        payment = db.cashflows.find_one(query, hint=[('_id', 1)])
         if not payment:
+            logger.warning(
+                f"Payment {id} not found for user {current_user.id}",
+                extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
+            )
             flash(trans('payments_record_not_found', default='Record not found'), 'danger')
             return redirect(url_for('payments.index'))
         
@@ -211,7 +217,6 @@ def generate_pdf(id):
         
         # Sanitize inputs for PDF generation
         payment['party_name'] = utils.sanitize_input(payment['party_name'], max_length=100)
-        # Use category_metadata display name if available, otherwise fallback to expense_category
         category_display = payment.get('category_metadata', {}).get('category_display_name', 
                                      payment.get('expense_category', 'No category provided'))
         payment['category_display'] = utils.sanitize_input(category_display, max_length=50)
@@ -221,27 +226,46 @@ def generate_pdf(id):
         buffer = io.BytesIO()
         p = canvas.Canvas(buffer, pagesize=letter)
         width, height = letter
+        styles = getSampleStyleSheet()
+        max_width = width - 2 * inch
+
+        # Title
         p.setFont("Helvetica-Bold", 24)
         p.drawString(inch, height - inch, trans('payments_pdf_title', default='FiCore Records - Money Out Receipt'))
+
+        # Content
         p.setFont("Helvetica", 12)
         y_position = height - inch - 0.5 * inch
-        p.drawString(inch, y_position, f"{trans('payments_recipient_name', default='Recipient')}: {payment['party_name']}")
-        y_position -= 0.3 * inch
-        p.drawString(inch, y_position, f"{trans('payments_amount', default='Amount Paid')}: {utils.format_currency(payment['amount'])}")
-        y_position -= 0.3 * inch
-        p.drawString(inch, y_position, f"{trans('general_payment_method', default='Payment Method')}: {payment.get('method', 'N/A')}")
-        y_position -= 0.3 * inch
-        p.drawString(inch, y_position, f"{trans('general_category', default='Category')}: {payment['category_display']}")
-        y_position -= 0.3 * inch
-        p.drawString(inch, y_position, f"{trans('general_date', default='Date')}: {utils.format_date(payment['created_at'])}")
-        y_position -= 0.3 * inch
-        p.drawString(inch, y_position, f"{trans('payments_id', default='Payment ID')}: {str(payment['_id'])}")
-        y_position -= 0.3 * inch
-        if payment['contact']:
-            p.drawString(inch, y_position, f"{trans('general_contact', default='Contact')}: {payment['contact']}")
+        fields = [
+            (trans('payments_recipient_name', default='Recipient'), payment['party_name']),
+            (trans('payments_amount', default='Amount Paid'), utils.format_currency(payment['amount'])),
+            (trans('general_payment_method', default='Payment Method'), payment.get('method', 'N/A')),
+            (trans('general_category', default='Category'), payment['category_display']),
+            (trans('general_date', default='Date'), utils.format_date(payment['created_at'])),
+            (trans('payments_id', default='Payment ID'), str(payment['_id']))
+        ]
+        for label, value in fields:
+            p.drawString(inch, y_position, f"{label}:")
+            text = Paragraph(value, styles['Normal'])
+            text.wrapOn(p, max_width - inch, 100)
+            text.drawOn(p, inch + 100, y_position - 10)
             y_position -= 0.3 * inch
+
+        if payment['contact']:
+            p.drawString(inch, y_position, f"{trans('general_contact', default='Contact')}:")
+            text = Paragraph(payment['contact'], styles['Normal'])
+            text.wrapOn(p, max_width - inch, 100)
+            text.drawOn(p, inch + 100, y_position - 10)
+            y_position -= 0.3 * inch
+
         if payment['description']:
-            p.drawString(inch, y_position, f"{trans('general_description', default='Description')}: {payment['description']}")
+            p.drawString(inch, y_position, f"{trans('general_description', default='Description')}:")
+            text = Paragraph(payment['description'], styles['Normal'])
+            text.wrapOn(p, max_width - inch, 200)
+            text.drawOn(p, inch + 100, y_position - 10)
+            y_position -= text.height + 0.3 * inch
+
+        # Footer
         p.setFont("Helvetica-Oblique", 10)
         p.drawString(inch, inch, trans('payments_pdf_footer', default='This document serves as an official payment receipt generated by FiCore Records.'))
         p.showPage()
@@ -283,7 +307,6 @@ def add():
         form = PaymentForm()
         if form.validate_on_submit():
             try:
-                # Additional server-side validation
                 form_data = {
                     'party_name': form.party_name.data,
                     'date': form.date.data,
@@ -309,9 +332,7 @@ def add():
                     )
                 
                 db = utils.get_mongo_db()
-                # Convert date to datetime with UTC timezone
                 payment_date = datetime.combine(form.date.data, datetime.min.time(), tzinfo=ZoneInfo("UTC"))
-                # Get category metadata for the selected expense category
                 category_metadata = utils.get_category_metadata(form.expense_category.data)
                 
                 cashflow = {
@@ -358,12 +379,7 @@ def add():
             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
         )
         flash(trans('payments_csrf_error', default='Invalid CSRF token. Please try again.'), 'danger')
-        return render_template(
-            'payments/add.html',
-            form=form,
-            title=trans('payments_add_title', default='Add Money Out', lang=session.get('lang', 'en')),
-            can_interact=utils.can_user_interact(current_user)
-        ), 400
+        return redirect(url_for('payments.index')), 400
 
 @payments_bp.route('/edit/<id>', methods=['GET', 'POST'])
 @login_required
@@ -378,7 +394,7 @@ def edit(id):
         
         db = utils.get_mongo_db()
         query = {'_id': ObjectId(id), 'user_id': str(current_user.id), 'type': 'payment'}
-        payment = db.cashflows.find_one(query)
+        payment = db.cashflows.find_one(query, hint=[('_id', 1)])
         if not payment:
             logger.warning(
                 f"Payment {id} not found for user {current_user.id}",
@@ -393,16 +409,15 @@ def edit(id):
         
         form = PaymentForm(data={
             'party_name': payment['party_name'],
-            'date': payment['created_at'].date(),  # Extract date part for form
+            'date': payment['created_at'].date(),
             'amount': payment['amount'],
             'method': payment.get('method'),
-            'expense_category': payment.get('expense_category', 'office_admin'),  # Default fallback
+            'expense_category': payment.get('expense_category', 'office_admin'),
             'contact': payment.get('contact'),
             'description': payment.get('description')
         })
         if form.validate_on_submit():
             try:
-                # Additional server-side validation
                 form_data = {
                     'party_name': form.party_name.data,
                     'date': form.date.data,
@@ -428,10 +443,7 @@ def edit(id):
                         can_interact=utils.can_user_interact(current_user)
                     )
                 
-                # Convert date to datetime with UTC timezone
                 payment_date = datetime.combine(form.date.data, datetime.min.time(), tzinfo=ZoneInfo("UTC"))
-                
-                # Get category metadata for the selected expense category
                 category_metadata = utils.get_category_metadata(form.expense_category.data)
                 
                 updated_cashflow = {
@@ -451,7 +463,7 @@ def edit(id):
                     'created_at': payment_date,
                     'updated_at': datetime.now(timezone.utc)
                 }
-                db.cashflows.update_one({'_id': ObjectId(id)}, {'$set': updated_cashflow})
+                db.cashflows.update_one({'_id': ObjectId(id)}, {'$set': updated_cashflow}, hint=[('_id', 1)])
                 logger.info(
                     f"Payment {id} updated for user {current_user.id}",
                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
@@ -484,13 +496,7 @@ def edit(id):
             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
         )
         flash(trans('payments_csrf_error', default='Invalid CSRF token. Please try again.'), 'danger')
-        return render_template(
-            'payments/edit.html',
-            form=form,
-            payment=payment,
-            title=trans('payments_edit_title', default='Edit Payment', lang=session.get('lang', 'en')),
-            can_interact=utils.can_user_interact(current_user)
-        ), 400
+        return redirect(url_for('payments.index')), 400
     except Exception as e:
         logger.error(
             f"Error fetching payment {id} for user {current_user.id}: {str(e)}",
@@ -512,7 +518,7 @@ def delete(id):
         
         db = utils.get_mongo_db()
         query = {'_id': ObjectId(id), 'user_id': str(current_user.id), 'type': 'payment'}
-        result = db.cashflows.delete_one(query)
+        result = db.cashflows.delete_one(query, hint=[('_id', 1)])
         if result.deleted_count:
             logger.info(
                 f"Payment {id} deleted for user {current_user.id}",
@@ -539,7 +545,7 @@ def delete(id):
             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
         )
         flash(trans('payments_csrf_error', default='Invalid CSRF token. Please try again.'), 'danger')
-        return redirect(url_for('payments.index'))
+        return redirect(url_for('payments.index')), 400
     except Exception as e:
         logger.error(
             f"Error deleting payment {id} for user {current_user.id}: {str(e)}",
@@ -590,7 +596,7 @@ def share():
         
         db = utils.get_mongo_db()
         query = {'_id': ObjectId(payment_id), 'user_id': str(current_user.id), 'type': 'payment'}
-        payment = db.cashflows.find_one(query)
+        payment = db.cashflows.find_one(query, hint=[('_id', 1)])
         if not payment:
             logger.warning(
                 f"Payment {payment_id} not found for user {current_user.id}",
