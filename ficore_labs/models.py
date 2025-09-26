@@ -138,15 +138,18 @@ def to_dict_cashflow(record):
     if not record:
         return {'party_name': None, 'amount': None}
     
+    # Import sanitize_input to clean string fields
+    from utils import sanitize_input
+    
     return {
         'id': str(record.get('_id', '')),
         'user_id': record.get('user_id', ''),
         'type': record.get('type', ''),
-        'party_name': record.get('party_name', ''),
+        'party_name': sanitize_input(record.get('party_name', ''), max_length=100),
         'amount': record.get('amount', 0),
-        'method': record.get('method', ''),
-        'category': record.get('category', ''),
-        'expense_category': record.get('expense_category', ''),
+        'method': sanitize_input(record.get('method', ''), max_length=50),
+        'category': sanitize_input(record.get('category', ''), max_length=50),
+        'expense_category': sanitize_input(record.get('expense_category', ''), max_length=50),
         'is_tax_deductible': record.get('is_tax_deductible'),
         'tax_year': record.get('tax_year'),
         'category_metadata': record.get('category_metadata'),

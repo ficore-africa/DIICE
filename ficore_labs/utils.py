@@ -620,6 +620,12 @@ def sanitize_input(input_string, max_length=None):
         # Remove any control characters and non-printable characters
         sanitized = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', sanitized)
         
+        # Remove curly braces that can cause JSON parsing issues
+        sanitized = sanitized.replace('{', '').replace('}', '')
+        
+        # Remove square brackets that can cause issues
+        sanitized = sanitized.replace('[', '').replace(']', '')
+        
         # Clean up multiple spaces
         sanitized = re.sub(r'\s+', ' ', sanitized).strip()
         
@@ -676,6 +682,45 @@ def clean_cashflow_record(record):
         
     except Exception as e:
         logger.error(f"Error cleaning cashflow record: {str(e)}", extra={'session_id': session.get('sid', 'no-session-id')})
+        return record
+
+def clean_record(record):
+    """
+    Clean and sanitize a general record to prevent parsing errors.
+    This function handles problematic characters in existing database records.
+    """
+    if not record or not isinstance(record, dict):
+        return record
+    
+    try:
+        # Create a copy to avoid modifying the original
+        cleaned_record = record.copy()
+        
+        # Clean string fields that might contain problematic characters
+        string_fields = ['name', 'business_name', 'contact', 'description', 'notes', 
+                        'address', 'phone', 'email', 'reference', 'category']
+        
+        for field in string_fields:
+            if field in cleaned_record and cleaned_record[field] is not None:
+                original_value = cleaned_record[field]
+                cleaned_value = sanitize_input(original_value, max_length=1000 if field in ['description', 'notes'] else 100)
+                cleaned_record[field] = cleaned_value
+                
+                # Log if we cleaned something significant
+                if original_value != cleaned_value and len(str(original_value)) > 0:
+                    logger.info(f"Cleaned record field '{field}': '{original_value}' -> '{cleaned_value}'", 
+                               extra={'session_id': session.get('sid', 'no-session-id')})
+        
+        # Ensure datetime fields are properly handled and JSON serializable
+        datetime_fields = ['created_at', 'updated_at']
+        for field in datetime_fields:
+            if field in cleaned_record and cleaned_record[field]:
+                cleaned_record[field] = normalize_datetime(cleaned_record[field])
+        
+        return cleaned_record
+        
+    except Exception as e:
+        logger.error(f"Error cleaning record: {str(e)}", extra={'session_id': session.get('sid', 'no-session-id')})
         return record
 
 def standardize_stats_dictionary(stats=None, log_defaults=True):

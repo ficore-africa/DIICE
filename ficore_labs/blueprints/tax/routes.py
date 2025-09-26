@@ -25,10 +25,20 @@ def get_expense_categories():
             name_key = f"{category_key}_cat"
             desc_key = f"{category_key}_desc"
             
+            # Sanitize string fields to prevent JSON parsing errors
+            name = trans(name_key, default=category_data.get('name', category_key))
+            description = trans(desc_key, default=category_data.get('description', ''))
+            examples = category_data.get('examples', [])
+            
+            # Use json.dumps to ensure proper escaping, then remove quotes
+            safe_name = json.dumps(str(name))[1:-1] if name else ''
+            safe_description = json.dumps(str(description))[1:-1] if description else ''
+            safe_examples = [json.dumps(str(ex))[1:-1] for ex in examples if ex]
+            
             translated_categories[category_key] = {
-                'name': trans(name_key, default=category_data.get('name', category_key)),
-                'description': trans(desc_key, default=category_data.get('description', '')),
-                'examples': category_data.get('examples', []),
+                'name': safe_name,
+                'description': safe_description,
+                'examples': safe_examples,
                 'tax_deductible': category_data.get('tax_deductible', False),
                 'is_personal': category_data.get('is_personal', False),
                 'is_statutory': category_data.get('is_statutory', False)
@@ -129,6 +139,23 @@ def tax_calculator():
             'non_deductible_categories': [key for key, data in expense_categories.items() 
                                         if not data.get('tax_deductible', False)]
         }
+        
+        # Add debug logging for template variables
+        logger.debug(f"Tax calculator template variables for user {current_user.id}: "
+                    f"entity_type={user_entity_type}, categories_count={len(expense_categories)}, "
+                    f"annual_rent={current_user.annual_rent or 0}")
+        
+        # Test JSON serialization of template variables to catch issues early
+        try:
+            json.dumps({
+                'expense_categories': expense_categories,
+                'user_entity_type': user_entity_type,
+                'entity_info': entity_info,
+                'calculation_context': calculation_context
+            })
+        except (TypeError, ValueError) as json_error:
+            logger.error(f"JSON serialization check failed for user {current_user.id}: {str(json_error)}")
+            # Continue with rendering but log the issue
         
         return render_template('tax/tax_calculator.html', 
                              expense_categories=expense_categories,
@@ -665,6 +692,27 @@ def update_annual_rent():
             'success': False,
             'error': str(e)
         }), 400
+
+@tax_bp.route('/log-client-error', methods=['POST'])
+@login_required
+def log_client_error():
+    """Log client-side errors for debugging"""
+    try:
+        data = request.get_json()
+        error_message = data.get('error', 'Unknown client error')
+        error_details = data.get('details', {})
+        
+        logger.error(f"Client-side error for user {current_user.id}: {error_message}", 
+                    extra={
+                        'session_id': session.get('sid', 'no-session-id'),
+                        'user_id': current_user.id,
+                        'error_details': error_details
+                    })
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        logger.error(f"Error logging client error: {str(e)}")
+        return jsonify({'success': False}), 500
 
 @tax_bp.route('/calculate-realtime', methods=['POST'])
 @login_required

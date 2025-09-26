@@ -239,13 +239,15 @@ def index():
 
         # Fetch recent records (limit to 5 for performance)
         try:
-            recent_debtors = [normalize_datetime(doc) for doc in get_records(db, {**query, 'type': 'debtor'}, sort=[('created_at', -1)], limit=5)]
-            recent_creditors = [normalize_datetime(doc) for doc in get_records(db, {**query, 'type': 'creditor'}, sort=[('created_at', -1)], limit=5)]
-            recent_payments = [normalize_datetime(doc) for doc in utils.safe_find_cashflows(db, {**query, 'type': 'payment'}, sort_key='created_at', sort_direction=-1)]
+            # Fix: get_records only accepts filter_kwargs, use safe_find_records for sorting
+            from utils import safe_find_records
+            recent_debtors = [normalize_datetime(doc) for doc in safe_find_records(db, {**query, 'type': 'debtor'}, sort_field='created_at', sort_direction=-1)[:5]]
+            recent_creditors = [normalize_datetime(doc) for doc in safe_find_records(db, {**query, 'type': 'creditor'}, sort_field='created_at', sort_direction=-1)[:5]]
+            recent_payments = [normalize_datetime(doc) for doc in utils.safe_find_cashflows(db, {**query, 'type': 'payment'}, sort_field='created_at', sort_direction=-1)]
             recent_payments = bulk_clean_documents_for_json(recent_payments)
-            recent_receipts = [normalize_datetime(doc) for doc in utils.safe_find_cashflows(db, {**query, 'type': 'receipt'}, sort_key='created_at', sort_direction=-1)]
+            recent_receipts = [normalize_datetime(doc) for doc in utils.safe_find_cashflows(db, {**query, 'type': 'receipt'}, sort_field='created_at', sort_direction=-1)]
             recent_receipts = bulk_clean_documents_for_json(recent_receipts)
-            recent_inventory = [normalize_datetime(doc) for doc in get_records(db, {**query, 'type': 'inventory'}, sort=[('created_at', -1)], limit=5)]
+            recent_inventory = [normalize_datetime(doc) for doc in safe_find_records(db, {**query, 'type': 'inventory'}, sort_field='created_at', sort_direction=-1)[:5]]
         except Exception as e:
             logger.warning(
                 f"Failed to fetch recent records: {str(e)}",

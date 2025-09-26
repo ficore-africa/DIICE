@@ -228,13 +228,13 @@ ENTITY_TYPES = {
         'name': 'Individual/Sole Proprietor',
         'description': 'Personal business, freelancer, or individual trader',
         'tax_type': 'Personal Income Tax (PIT)',
-        'tax_details': 'Progressive tax bands with ₦800,000 exemption'
+        'tax_details': 'Progressive tax bands with NGN 800,000 exemption'
     },
     'limited_liability': {
         'name': 'Registered Limited Liability Company',
         'description': 'Incorporated company with RC number',
         'tax_type': 'Companies Income Tax (CIT)',
-        'tax_details': '0% for ≤₦50M revenue, 30% for >₦50M revenue'
+        'tax_details': '0% for <=NGN 50M revenue, 30% for >NGN 50M revenue'
     }
 }
 
@@ -253,6 +253,10 @@ def get_user_entity_type(user_id, db):
         entity_record = db.user_entities.find_one({'user_id': user_id})
         if entity_record:
             entity_type = entity_record.get('business_entity_type', 'sole_proprietor')
+            # Sanitize the entity type to prevent JSON parsing issues
+            entity_type = str(entity_type).strip()
+            if entity_type not in ENTITY_TYPES:
+                entity_type = 'sole_proprietor'
             logger.info(f"Retrieved entity type for user {user_id}: {entity_type}")
             return entity_type
         else:
@@ -323,7 +327,20 @@ def get_entity_type_info(entity_type):
     Returns:
         dict: Entity type information or None if invalid
     """
-    return ENTITY_TYPES.get(entity_type)
+    import json
+    
+    entity_info = ENTITY_TYPES.get(entity_type)
+    if entity_info:
+        # Sanitize string fields to prevent JSON parsing issues
+        sanitized_info = {}
+        for key, value in entity_info.items():
+            if isinstance(value, str):
+                # Use json.dumps to ensure proper escaping, then remove quotes
+                sanitized_info[key] = json.dumps(value)[1:-1]
+            else:
+                sanitized_info[key] = value
+        return sanitized_info
+    return None
 
 def get_total_income(user_id, tax_year, db):
     """
