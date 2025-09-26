@@ -191,18 +191,27 @@ def get_db():
     Returns:
         Database object
     """
+    uri = os.getenv('MONGO_URI', 'mongodb://localhost:27017/business_finance')
+    
     try:
-        uri = os.getenv('MONGO_URI', 'mongodb://localhost:27017/business_finance')
-        parsed = urlparse(uri)
-        if not parsed.scheme or parsed.scheme != 'mongodb':
-            logger.error(f"Invalid MongoDB URI: {uri[:20]}...", extra={'session_id': 'no-session-id'})
-            raise ValueError("Invalid MongoDB URI")
+        # The manual URI parsing and scheme check has been removed.
+        # get_mongo_db() (using the driver) is now responsible for validation.
         db = get_mongo_db()
-        logger.info(f"Successfully connected to MongoDB database: {db.name}", extra={'session_id': 'no-session-id'})
+        
+        # Check if db has a 'name' attribute, useful for logging, 
+        # as get_mongo_db() might return the database object or the client object.
+        db_name = getattr(db, 'name', 'UNKNOWN_DB') 
+
+        logger.info(f"Successfully connected to MongoDB database: {db_name}", extra={'session_id': 'no-session-id'})
         return db
+    
     except Exception as e:
-        logger.error(f"Error connecting to database {uri[:20]}...: {str(e)}", exc_info=True, extra={'session_id': 'no-session-id'})
+        # The Exception here will catch both connection errors and invalid URI errors 
+        # raised by the underlying MongoDB driver.
+        logger.error(f"Error connecting to database (URI start: {uri[:20]}...): {str(e)}", exc_info=True, extra={'session_id': 'no-session-id'})
         raise
+    
+    
 
 def verify_no_naive_datetimes(db):
     """
