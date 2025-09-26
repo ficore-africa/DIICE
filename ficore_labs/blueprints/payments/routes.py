@@ -4,7 +4,7 @@ from flask_wtf import FlaskForm
 from flask_wtf.csrf import CSRFError
 from translations import trans
 import utils
-from utils import serialize_for_json, safe_json_response, clean_document_for_json, bulk_clean_documents_for_json
+from utils import serialize_for_json, safe_json_response, clean_document_for_json, bulk_clean_documents_for_json, safe_parse_datetime
 from bson import ObjectId
 from datetime import datetime, timezone, date
 from zoneinfo import ZoneInfo
@@ -188,6 +188,12 @@ def fetch_payments_with_fallback(db, query, sort_field='created_at', sort_direct
             )
     return payments
 
+def normalize_datetime(doc):
+    """Convert created_at to timezone-aware datetime if it's a string or naive datetime."""
+    if 'created_at' in doc:
+        doc['created_at'] = safe_parse_datetime(doc['created_at'])
+    return doc
+
 @payments_bp.route('/')
 @login_required
 @utils.requires_role(['trader', 'startup', 'admin'])
@@ -198,7 +204,7 @@ def index():
         utils.audit_datetime_fields(db, 'cashflows')  # Run audit
         query = {'user_id': str(current_user.id), 'type': 'payment'}
         
-        payments = fetch_payments_with_fallback(db, query)
+        payments = [normalize_datetime(doc) for doc in fetch_payments_with_fallback(db, query)]
         category_stats = utils.calculate_payment_category_stats(payments)
         
         return render_template(
@@ -228,7 +234,7 @@ def manage():
         db = utils.get_mongo_db()
         query = {'user_id': str(current_user.id), 'type': 'payment'}
         
-        payments = fetch_payments_with_fallback(db, query)
+        payments = [normalize_datetime(doc) for doc in fetch_payments_with_fallback(db, query)]
         category_stats = utils.calculate_payment_category_stats(payments)
         
         return render_template(
@@ -267,6 +273,7 @@ def view(id):
             )
             return safe_json_response({'error': trans('payments_record_not_found', default='Record not found')}, 404)
         
+        payment = normalize_datetime(payment)
         required_fields = ['party_name', 'amount', 'created_at']
         for field in required_fields:
             if field not in payment:
@@ -318,6 +325,7 @@ def generate_pdf(id):
             flash(trans('payments_record_not_found', default='Record not found'), 'danger')
             return redirect(url_for('payments.index'))
         
+        payment = normalize_datetime(payment)
         from models import to_dict_cashflow
         payment = to_dict_cashflow(payment)
         
@@ -344,12 +352,12 @@ def generate_pdf(id):
             (trans('payments_amount', default='Amount Paid'), utils.format_currency(payment['amount'])),
             (trans('general_payment_method', default='Payment Method'), payment.get('method', 'N/A')),
             (trans('general_category', default='Category'), payment['category_display']),
-            (trans('general_date', default='Date'), payment['created_at']),
+            (trans('general_date', default='Date'), utils.format_date(payment['created_at'])),
             (trans('payments_id', default='Payment ID'), payment['id'])
         ]
         for label, value in fields:
             p.drawString(inch, y_position, f"{label}:")
-            text = Paragraph(value, styles['Normal'])
+            text = Paragraph(str(value), styles['Normal'])
             text.wrapOn(p, max_width - inch, 100)
             text.drawOn(p, inch + 100, y_position - 10)
             y_position -= 0.3 * inch
@@ -436,7 +444,7 @@ def add():
                     )
                 
                 db = utils.get_mongo_db()
-                payment_date = datetime.combine(form.date.data, datetime.min.time(), tzinfo=ZoneInfo('UTC'))
+                payment_date = safe_parse_datetime(datetime.combine(form.date.data, datetime.min.time(), tzinfo=ZoneInfo('UTC')))
                 category_metadata = utils.get_category_metadata(form.expense_category.data)
                 
                 cashflow = {
@@ -456,7 +464,7 @@ def add():
                     'contact': utils.sanitize_input(form.contact.data, max_length=100) if form.contact.data else None,
                     'description': utils.sanitize_input(form.description.data, max_length=1000) if form.description.data else None,
                     'created_at': payment_date,
-                    'updated_at': datetime.now(tz=ZoneInfo('UTC'))
+                    'updated_at': safe_parse_datetime(datetime.now(tz=ZoneInfo('UTC')))
                 }
                 create_cashflow(db, cashflow)
                 logger.info(
@@ -508,12 +516,13 @@ def edit(id):
             flash(trans('payments_record_not_found', default='Cashflow not found'), 'danger')
             return redirect(url_for('payments.index'))
         
+        payment = normalize_datetime(payment)
         from models import to_dict_cashflow
         payment = to_dict_cashflow(payment)
         
         form = PaymentForm(data={
             'party_name': payment['party_name'],
-            'date': datetime.fromisoformat(payment['created_at']).date(),
+            'date': safe_parse_datetime(payment['created_at']).date(),
             'amount': payment['amount'],
             'method': payment.get('method'),
             'expense_category': payment.get('expense_category', 'office_admin'),
@@ -549,7 +558,7 @@ def edit(id):
                         expense_categories=expense_categories
                     )
                 
-                payment_date = datetime.combine(form.date.data, datetime.min.time(), tzinfo=ZoneInfo('UTC'))
+                payment_date = safe_parse_datetime(datetime.combine(form.date.data, datetime.min.time(), tzinfo=ZoneInfo('UTC')))
                 category_metadata = utils.get_category_metadata(form.expense_category.data)
                 
                 updated_cashflow = {
@@ -567,7 +576,7 @@ def edit(id):
                     'contact': utils.sanitize_input(form.contact.data, max_length=100) if form.contact.data else None,
                     'description': utils.sanitize_input(form.description.data, max_length=1000) if form.description.data else None,
                     'created_at': payment_date,
-                    'updated_at': datetime.now(tz=ZoneInfo('UTC'))
+                    'updated_at': safe_parse_datetime(datetime.now(tz=ZoneInfo('UTC')))
                 }
                 update_cashflow(db, id, updated_cashflow)
                 logger.info(
@@ -714,6 +723,7 @@ def share():
                 'message': trans('payments_record_not_found', default='Payment not found')
             }, 404)
         
+        payment = normalize_datetime(payment)
         success = utils.send_message(recipient=recipient, message=message, type=share_type)
         if success:
             logger.info(
