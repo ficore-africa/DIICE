@@ -3,7 +3,7 @@ from flask_login import current_user, login_required
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 import utils
-from utils import logger
+from utils import logger, get_mongo_db, safe_parse_datetime, safe_json_response, serialize_for_json
 from translations import trans
 
 business = Blueprint('business', __name__, url_prefix='/business')
@@ -216,111 +216,41 @@ def cashflow_summary():
 @login_required
 @utils.requires_role(['trader', 'admin'])
 def recent_activity():
-    """Fetch recent activities (debts, cashflows, feedback) for the authenticated user."""
+    """Fetch and display recent activity for the current user."""
     try:
         db = utils.get_mongo_db()
-        user_id = current_user.id
+        user_id = str(current_user.id)
         lang = session.get('lang', 'en')
-        activities = []
 
-        # Fetch recent debt records
-        records = db.records.find({'user_id': user_id}).sort('created_at', -1).limit(3)
-        for record in records:
-            created_at = (
-                record['created_at'].replace(tzinfo=ZoneInfo("UTC"))
-                if 'created_at' in record and record['created_at'].tzinfo is None
-                else record.get('created_at')
-            )
-            if not created_at:
-                continue
-            activity_type = (
-                'debtor_added' if record.get('type') == 'debtor'
-                else 'creditor_added' if record.get('type') == 'creditor'
-                else f"{record.get('type', 'unknown')}_added"
-            )
-            description_key = f"{record.get('type', 'unknown')}_added_description"
-            name = utils.sanitize_input(
-                record.get('name', record.get('title', record.get('source', 'Unknown')))
-            )
-            description = trans(
-                description_key,
-                lang=lang,
-                default=f"{'Owed by' if record.get('type') == 'debtor' else 'Owe to' if record.get('type') == 'creditor' else record.get('type', '').capitalize()} {name}"
-            )
-            amount = utils.clean_currency(
-                record.get('amount_owed', record.get('amount', record.get('projected_revenue', 0)))
-            )
-            activities.append({
-                'type': activity_type,
-                'description': description,
-                'amount': amount,
-                'timestamp': created_at.isoformat(),
-                'icon': 'bi-person-plus' if record.get('type') in ['debtor', 'creditor'] else 'bi-file-earmark-plus'
-            })
-
-        # Fetch recent cashflows
-        cashflows = utils.safe_find_cashflows(db, {'user_id': user_id}, 'created_at', -1)[:3]
+        # Fetch recent cashflows, limit to 10 for performance
+        cashflows = list(db.cashflows.find({'user_id': user_id}).sort('created_at', -1).limit(10))
+        
+        # Normalize datetime fields
+        cashflows = [normalize_datetime(doc) for doc in cashflows]
+        
+        # Clean and serialize data for JSON response
+        cleaned_cashflows = []
         for cashflow in cashflows:
-            created_at = (
-                cashflow['created_at'].replace(tzinfo=ZoneInfo("UTC"))
-                if 'created_at' in cashflow and cashflow['created_at'].tzinfo is None
-                else cashflow.get('created_at')
-            )
-            if not created_at:
+            try:
+                cleaned_cashflow = serialize_for_json(cashflow)
+                cleaned_cashflows.append(cleaned_cashflow)
+            except Exception as e:
+                logger.warning(f"Failed to clean cashflow record {cashflow.get('_id', 'unknown')}: {str(e)}")
                 continue
-            activity_type = 'money_in' if cashflow.get('type') == 'receipt' else 'money_out'
-            party_name = utils.sanitize_input(cashflow.get('party_name', 'Unknown'))
-            description = trans(
-                'money_in_description' if cashflow.get('type') == 'receipt' else 'money_out_description',
-                lang=lang,
-                default=f"{'Received from' if cashflow.get('type') == 'receipt' else 'Paid to'} {party_name}"
-            )
-            amount = utils.clean_currency(cashflow.get('amount', 0))
-            activities.append({
-                'type': activity_type,
-                'description': description,
-                'amount': amount,
-                'timestamp': created_at.isoformat(),
-                'icon': 'bi-arrow-down-circle' if activity_type == 'money_in' else 'bi-arrow-up-circle'
-            })
-
-        # Fetch recent feedback
-        feedback_records = db.feedback.find({'user_id': user_id}).sort('timestamp', -1).limit(3)
-        for feedback in feedback_records:
-            timestamp = (
-                feedback['timestamp'].replace(tzinfo=ZoneInfo("UTC"))
-                if 'timestamp' in feedback and feedback['timestamp'].tzinfo is None
-                else feedback.get('timestamp')
-            )
-            if not timestamp:
-                continue
-            tool_name = utils.sanitize_input(feedback.get('tool_name', 'unknown').capitalize())
-            activities.append({
-                'type': 'feedback_submitted',
-                'description': trans(
-                    'feedback_submitted_description',
-                    lang=lang,
-                    default=f"Submitted feedback for {tool_name}"
-                ),
-                'amount': utils.clean_currency(feedback.get('rating', 0)),
-                'timestamp': timestamp.isoformat(),
-                'icon': 'bi-star-fill'
-            })
-
-        # Sort activities by timestamp (descending)
-        activities.sort(key=lambda x: datetime.fromisoformat(x['timestamp']), reverse=True)
-        activities = activities[:5]
-
-        logger.info(
-            f"Fetched {len(activities)} recent activities for user {user_id}",
-            extra={'session_id': session.get('sid', 'no-session-id'), 'ip_address': request.remote_addr}
-        )
-        return jsonify(activities)
+        
+        return safe_json_response(cleaned_cashflows)
     except Exception as e:
         logger.error(
             f"Error fetching recent activity for user {user_id}: {str(e)}",
-            extra={'session_id': session.get('sid', 'no-session-id'), 'ip_address': request.remote_addr}
+            extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': user_id}
         )
-        return jsonify({
-            'error': trans('activity_error', default='An error occurred while fetching recent activity')
-        }), 500
+        return safe_json_response({
+            'error': trans('activity_error', default='An error occurred while loading recent activity. Please try again.')
+        }, 500)
+
+def normalize_datetime(doc):
+    """Convert created_at and updated_at to timezone-aware datetime if they are strings or naive datetimes."""
+    for field in ['created_at', 'updated_at']:
+        if field in doc:
+            doc[field] = safe_parse_datetime(doc[field])
+    return doc
