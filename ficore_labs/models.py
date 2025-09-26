@@ -10,14 +10,35 @@ from translations import trans
 from utils import get_mongo_db, logger, normalize_datetime
 import time
 from zoneinfo import ZoneInfo
+from dateutil.parser import parse as parse_datetime
+from urllib.parse import urlparse
+import os
 
 # Configure logger for the application
 logger = logging.getLogger('business_finance_app')
 logger.setLevel(logging.INFO)
 
+def parse_and_normalize_datetime(value):
+    """
+    Parse and normalize datetime values, handling strings and naive datetimes.
+    
+    Args:
+        value: Datetime or string input
+        
+    Returns:
+        datetime: UTC-aware datetime or None if invalid
+    """
+    if isinstance(value, str):
+        try:
+            dt = parse_datetime(value)
+            return dt.replace(tzinfo=ZoneInfo("UTC")) if dt.tzinfo is None else dt
+        except ValueError:
+            raise ValueError(f"Invalid datetime string: {value}")
+    return normalize_datetime(value)
+
 def manage_index(collection, keys, options=None, name=None):
     """
-    Manage MongoDB index creation with conflict resolution.
+    Manage MongoDB index creation with conflict resolution and retry logic.
     
     Args:
         collection: MongoDB collection object
@@ -31,69 +52,74 @@ def manage_index(collection, keys, options=None, name=None):
     if options is None:
         options = {}
     
-    try:
-        # Generate index name if not provided
-        if not name:
-            name = '_'.join(f"{k}_{v if isinstance(v, int) else str(v).replace(' ', '_')}" for k, v in keys)
-        
-        # Get existing indexes
-        existing_indexes = collection.index_information()
-        index_key_tuple = tuple(keys)
-        
-        # Check if index with same key pattern already exists
-        for existing_name, existing_info in existing_indexes.items():
-            if tuple(existing_info['key']) == index_key_tuple:
-                # Skip _id index
-                if existing_name == '_id_':
-                    logger.info(f"Skipping _id index on {collection.name}", 
-                               extra={'session_id': 'no-session-id'})
-                    return False
-                
-                # Compare options (exclude internal MongoDB fields)
-                existing_options = {k: v for k, v in existing_info.items() 
-                                  if k not in ['key', 'v', 'ns']}
-                
-                if existing_options == options and existing_name == name:
-                    logger.info(f"Index already exists on {collection.name}: {keys} with options {options}", 
-                               extra={'session_id': 'no-session-id'})
-                    return False
-                else:
-                    # Drop conflicting index and recreate with correct name/options
-                    logger.info(f"Dropping conflicting index {existing_name} on {collection.name}", 
-                               extra={'session_id': 'no-session-id'})
-                    collection.drop_index(existing_name)
-                    break
-        
-        # Create the index
-        collection.create_index(keys, name=name, **options)
-        logger.info(f"Created index on {collection.name}: {keys} with name '{name}' and options {options}", 
-                   extra={'session_id': 'no-session-id'})
-        return True
-        
-    except Exception as e:
-        if 'IndexOptionsConflict' in str(e) or 'IndexKeySpecsConflict' in str(e):
-            logger.info(f"Resolving index conflict for {collection.name}: {name}", 
-                       extra={'session_id': 'no-session-id'})
-            try:
-                # Try to drop by name first
-                collection.drop_index(name)
-            except:
-                # If drop by name fails, find and drop by key pattern
-                existing_indexes = collection.index_information()
-                for existing_name, existing_info in existing_indexes.items():
-                    if tuple(existing_info['key']) == index_key_tuple and existing_name != '_id_':
+    for attempt in range(3):
+        try:
+            # Generate index name if not provided
+            if not name:
+                name = '_'.join(f"{k}_{v if isinstance(v, int) else str(v).replace(' ', '_')}" for k, v in keys)
+            
+            # Get existing indexes
+            existing_indexes = collection.index_information()
+            index_key_tuple = tuple(keys)
+            
+            # Check if index with same key pattern already exists
+            for existing_name, existing_info in existing_indexes.items():
+                if tuple(existing_info['key']) == index_key_tuple:
+                    # Skip _id index
+                    if existing_name == '_id_':
+                        logger.info(f"Skipping _id index on {collection.name}", 
+                                   extra={'session_id': 'no-session-id'})
+                        return False
+                    
+                    # Compare options (exclude internal MongoDB fields)
+                    existing_options = {k: v for k, v in existing_info.items() 
+                                      if k not in ['key', 'v', 'ns']}
+                    
+                    if existing_options == options and existing_name == name:
+                        logger.info(f"Index already exists on {collection.name}: {keys} with options {options}", 
+                                   extra={'session_id': 'no-session-id'})
+                        return False
+                    else:
+                        # Drop conflicting index and recreate with correct name/options
+                        logger.info(f"Dropping conflicting index {existing_name} on {collection.name}", 
+                                   extra={'session_id': 'no-session-id'})
                         collection.drop_index(existing_name)
                         break
             
-            # Recreate the index
+            # Create the index
             collection.create_index(keys, name=name, **options)
-            logger.info(f"Recreated index on {collection.name}: {keys} with name '{name}' and options {options}", 
+            logger.info(f"Created index on {collection.name}: {keys} with name '{name}' and options {options}", 
                        extra={'session_id': 'no-session-id'})
             return True
-        else:
-            logger.error(f"Failed to create index on {collection.name}: {str(e)}", 
-                        exc_info=True, extra={'session_id': 'no-session-id'})
-            raise
+            
+        except Exception as e:
+            if 'IndexOptionsConflict' in str(e) or 'IndexKeySpecsConflict' in str(e):
+                logger.info(f"Resolving index conflict for {collection.name}: {name}", 
+                           extra={'session_id': 'no-session-id'})
+                try:
+                    # Try to drop by name first
+                    collection.drop_index(name)
+                except:
+                    # If drop by name fails, find and drop by key pattern
+                    existing_indexes = collection.index_information()
+                    for existing_name, existing_info in existing_indexes.items():
+                        if tuple(existing_info['key']) == index_key_tuple and existing_name != '_id_':
+                            collection.drop_index(existing_name)
+                            break
+                
+                # Recreate the index
+                collection.create_index(keys, name=name, **options)
+                logger.info(f"Recreated index on {collection.name}: {keys} with name '{name}' and options {options}", 
+                           extra={'session_id': 'no-session-id'})
+                return True
+            elif attempt < 2:
+                logger.warning(f"Retrying index creation on {collection.name} (attempt {attempt + 1}/3): {str(e)}", 
+                              extra={'session_id': 'no-session-id'})
+                time.sleep(1)
+            else:
+                logger.error(f"Failed to create index on {collection.name}: {str(e)}", 
+                            exc_info=True, extra={'session_id': 'no-session-id'})
+                raise
 
 def to_dict_record(record):
     """
@@ -138,7 +164,6 @@ def to_dict_cashflow(record):
     if not record:
         return {'party_name': None, 'amount': None}
     
-    # Import sanitize_input to clean string fields
     from utils import sanitize_input
     
     return {
@@ -167,12 +192,38 @@ def get_db():
         Database object
     """
     try:
+        uri = os.getenv('MONGO_URI', 'mongodb://localhost:27017/business_finance')
+        parsed = urlparse(uri)
+        if not parsed.scheme or parsed.scheme != 'mongodb':
+            logger.error(f"Invalid MongoDB URI: {uri[:20]}...", extra={'session_id': 'no-session-id'})
+            raise ValueError("Invalid MongoDB URI")
         db = get_mongo_db()
         logger.info(f"Successfully connected to MongoDB database: {db.name}", extra={'session_id': 'no-session-id'})
         return db
     except Exception as e:
-        logger.error(f"Error connecting to database: {str(e)}", exc_info=True, extra={'session_id': 'no-session-id'})
+        logger.error(f"Error connecting to database {uri[:20]}...: {str(e)}", exc_info=True, extra={'session_id': 'no-session-id'})
         raise
+
+def verify_no_naive_datetimes(db):
+    """
+    Verify no naive datetimes remain in any collection after migration.
+    
+    Args:
+        db: MongoDB database instance
+    """
+    for collection_name in db.list_collection_names():
+        collection = db[collection_name]
+        datetime_fields = ['created_at', 'updated_at', 'timestamp']
+        naive_count = collection.count_documents({
+            '$or': [
+                {field: {'$type': 'date', '$not': {'$type': 'timestamp'}}}
+                for field in datetime_fields
+                if field in (collection.find_one() or {})
+            ]
+        })
+        if naive_count > 0:
+            logger.warning(f"Found {naive_count} naive datetimes in {collection_name} after migration", 
+                         extra={'session_id': 'no-session-id'})
 
 def migrate_naive_datetimes():
     """
@@ -186,7 +237,6 @@ def migrate_naive_datetimes():
             logger.info("Datetime migration already completed, skipping.", extra={'session_id': 'no-session-id'})
             return
 
-        # Define collections and their datetime fields
         datetime_fields_by_collection = {
             'users': ['trial_start', 'trial_end', 'subscription_start', 'subscription_end', 'created_at', 'reset_token_expiry', 'otp_expiry'],
             'records': ['created_at', 'updated_at'],
@@ -220,7 +270,6 @@ def migrate_naive_datetimes():
                 updates = {}
                 for field in datetime_fields:
                     if field in doc and isinstance(doc[field], datetime) and doc[field].tzinfo is None:
-                        # Convert naive datetime to UTC-aware
                         updates[field] = doc[field].replace(tzinfo=timezone.utc)
                 
                 if updates:
@@ -240,7 +289,6 @@ def migrate_naive_datetimes():
                 extra={'session_id': 'no-session-id'}
             )
 
-        # Mark migration as complete
         db.system_config.update_one(
             {'_id': 'datetime_migration_completed'},
             {'$set': {'value': True}},
@@ -248,7 +296,6 @@ def migrate_naive_datetimes():
         )
         logger.info("Marked datetime migration as completed in system_config", extra={'session_id': 'no-session-id'})
         
-        # Run a final audit to confirm all issues are resolved
         from utils import audit_datetime_fields
         remaining_issues = audit_datetime_fields(db, 'cashflows')
         if remaining_issues:
@@ -264,7 +311,6 @@ def migrate_naive_datetimes():
 def check_and_migrate_naive_datetimes(db, collection_name='cashflows'):
     """
     Periodic check to re-run migration for new records with naive datetimes.
-    This handles records that may have been inserted with naive datetimes after the initial migration.
     
     Args:
         db: MongoDB database instance
@@ -274,7 +320,6 @@ def check_and_migrate_naive_datetimes(db, collection_name='cashflows'):
         collection = db[collection_name]
         datetime_fields = ['created_at', 'updated_at']
         
-        # Find documents with naive datetimes
         query = {'$or': [{field: {'$type': 'date', '$not': {'$type': 'timestamp'}}} for field in datetime_fields]}
         documents = collection.find(query)
         
@@ -304,12 +349,10 @@ def check_and_migrate_naive_datetimes(db, collection_name='cashflows'):
 def force_datetime_migration():
     """
     Force re-run of datetime migration to fix any remaining naive datetime issues.
-    This can be called manually to resolve the 44 datetime naive field warnings.
     """
     try:
         db = get_db()
         
-        # Reset migration flag to force re-run
         db.system_config.update_one(
             {'_id': 'datetime_migration_completed'},
             {'$set': {'value': False}},
@@ -317,12 +360,12 @@ def force_datetime_migration():
         )
         logger.info("Reset datetime migration flag to force re-run", extra={'session_id': 'no-session-id'})
         
-        # Run migration
         migrate_naive_datetimes()
         
-        # Run additional checks for cashflows specifically
         check_and_migrate_naive_datetimes(db, 'cashflows')
         check_and_migrate_naive_datetimes(db, 'records')
+        
+        verify_no_naive_datetimes(db)
         
         logger.info("Forced datetime migration completed successfully", extra={'session_id': 'no-session-id'})
         return True
@@ -335,7 +378,6 @@ def force_datetime_migration():
 def assign_default_category_for_historical_data(party_name, amount, existing_category=None):
     """
     Assign default expense category for historical cashflow data based on party name and amount patterns.
-    This provides intelligent categorization for existing records without categories.
     
     Args:
         party_name (str): The party name from the cashflow record
@@ -346,72 +388,60 @@ def assign_default_category_for_historical_data(party_name, amount, existing_cat
         str: The assigned expense category key
     """
     try:
-        # If category already exists, keep it
         if existing_category:
             return existing_category
         
         if not party_name:
-            return 'office_admin'  # Default fallback
+            return 'office_admin'
         
         party_name_lower = party_name.lower().strip()
         
-        # Staff and wages patterns
         staff_keywords = ['salary', 'wage', 'staff', 'employee', 'payroll', 'bonus', 'allowance']
         if any(keyword in party_name_lower for keyword in staff_keywords):
             return 'staff_wages'
         
-        # Rent and utilities patterns
         rent_keywords = ['rent', 'landlord', 'property', 'utilities', 'electricity', 'water', 'nepa', 'phcn', 'dstv', 'gotv']
         if any(keyword in party_name_lower for keyword in rent_keywords):
             return 'rent_utilities'
         
-        # Business travel and transport patterns
         transport_keywords = ['fuel', 'petrol', 'diesel', 'transport', 'taxi', 'uber', 'bolt', 'keke', 'bus', 'flight', 'travel']
         if any(keyword in party_name_lower for keyword in transport_keywords):
             return 'business_travel'
         
-        # Marketing and sales patterns
         marketing_keywords = ['advert', 'marketing', 'promotion', 'facebook', 'google', 'instagram', 'social media', 'flyer', 'banner']
         if any(keyword in party_name_lower for keyword in marketing_keywords):
             return 'marketing_sales'
         
-        # Cost of goods sold patterns
         cogs_keywords = ['supplier', 'wholesale', 'raw material', 'inventory', 'stock', 'goods', 'materials', 'production']
         if any(keyword in party_name_lower for keyword in cogs_keywords):
             return 'cogs'
         
-        # Statutory and legal patterns
         statutory_keywords = ['lawyer', 'legal', 'accountant', 'audit', 'consultant', 'professional', 'cac', 'tax', 'firs']
         if any(keyword in party_name_lower for keyword in statutory_keywords):
             return 'statutory_legal'
         
-        # Personal expenses patterns (high amounts might be personal)
         personal_keywords = ['personal', 'family', 'wife', 'husband', 'child', 'school fees', 'medical', 'hospital']
         if any(keyword in party_name_lower for keyword in personal_keywords):
             return 'personal_expenses'
         
-        # Amount-based heuristics for ambiguous cases
-        if amount and amount > 500000:  # Large amounts might be rent, COGS, or personal
+        if amount and amount > 500000:
             if any(keyword in party_name_lower for keyword in ['shop', 'office', 'space']):
                 return 'rent_utilities'
             elif any(keyword in party_name_lower for keyword in ['purchase', 'buy', 'order']):
                 return 'cogs'
             else:
-                return 'office_admin'  # Conservative default for large amounts
+                return 'office_admin'
         
-        # Default to office_admin for unmatched patterns
         return 'office_admin'
         
     except Exception as e:
         logger.error(f"Error assigning default category for party '{party_name}': {str(e)}", 
                     exc_info=True, extra={'session_id': 'no-session-id'})
-        return 'office_admin'  # Safe fallback
+        return 'office_admin'
 
 def migrate_cashflows_expense_categories():
     """
     One-time migration script to add expense category fields to existing cashflow records.
-    Adds expense_category, is_tax_deductible, tax_year, and category_metadata fields.
-    Includes intelligent default category assignment for historical data.
     """
     try:
         from utils import get_category_metadata, is_category_tax_deductible
@@ -422,14 +452,12 @@ def migrate_cashflows_expense_categories():
             logger.info("Expense categories migration already completed, skipping.", extra={'session_id': 'no-session-id'})
             return
 
-        # Check if cashflows collection exists
         if 'cashflows' not in db.list_collection_names():
             logger.info("Cashflows collection does not exist, skipping migration.", extra={'session_id': 'no-session-id'})
             return
 
         collection = db.cashflows
         
-        # Find cashflow records that don't have the new expense category fields
         query = {
             '$or': [
                 {'expense_category': {'$exists': False}},
@@ -446,9 +474,7 @@ def migrate_cashflows_expense_categories():
         for doc in documents:
             updates = {}
             
-            # Assign default expense_category using intelligent logic for historical data
             if 'expense_category' not in doc:
-                # Only assign categories for payment type records (expenses)
                 if doc.get('type') == 'payment':
                     assigned_category = assign_default_category_for_historical_data(
                         doc.get('party_name', ''),
@@ -462,10 +488,8 @@ def migrate_cashflows_expense_categories():
                         extra={'session_id': 'no-session-id'}
                     )
                 else:
-                    # For receipts, set to None as they don't need expense categories
                     updates['expense_category'] = None
             
-            # Set is_tax_deductible based on expense_category
             if 'is_tax_deductible' not in doc:
                 if updates.get('expense_category') or doc.get('expense_category'):
                     category = updates.get('expense_category') or doc.get('expense_category')
@@ -473,14 +497,12 @@ def migrate_cashflows_expense_categories():
                 else:
                     updates['is_tax_deductible'] = None
             
-            # Extract tax_year from created_at if not present
             if 'tax_year' not in doc and 'created_at' in doc:
                 if isinstance(doc['created_at'], datetime):
                     updates['tax_year'] = doc['created_at'].year
                 else:
                     updates['tax_year'] = None
             
-            # Set category_metadata based on expense_category
             if 'category_metadata' not in doc:
                 category = updates.get('expense_category') or doc.get('expense_category')
                 if category:
@@ -493,7 +515,6 @@ def migrate_cashflows_expense_categories():
                 else:
                     updates['category_metadata'] = None
             
-            # Apply updates if any
             if updates:
                 result = collection.update_one(
                     {'_id': doc['_id']},
@@ -507,7 +528,6 @@ def migrate_cashflows_expense_categories():
             extra={'session_id': 'no-session-id'}
         )
 
-        # Mark migration as complete
         db.system_config.update_one(
             {'_id': 'expense_categories_migration_completed'},
             {'$set': {'value': True}},
@@ -522,19 +542,16 @@ def migrate_cashflows_expense_categories():
 def rollback_cashflows_expense_categories_migration():
     """
     Rollback function to remove expense category fields from cashflow records.
-    This provides a safety mechanism to undo the migration if needed.
     """
     try:
         db = get_db()
         
-        # Check if cashflows collection exists
         if 'cashflows' not in db.list_collection_names():
             logger.info("Cashflows collection does not exist, nothing to rollback.", extra={'session_id': 'no-session-id'})
             return
 
         collection = db.cashflows
         
-        # Remove the new expense category fields
         result = collection.update_many(
             {},
             {
@@ -552,7 +569,6 @@ def rollback_cashflows_expense_categories_migration():
             extra={'session_id': 'no-session-id'}
         )
         
-        # Remove migration completion flag
         db.system_config.delete_one({'_id': 'expense_categories_migration_completed'})
         logger.info("Removed expense categories migration completion flag", extra={'session_id': 'no-session-id'})
 
@@ -562,13 +578,7 @@ def rollback_cashflows_expense_categories_migration():
 
 def initialize_app_data(app):
     """
-    Initialize MongoDB collections, indexes, and perform one-off migrations for business finance modules.
-    Creates a default admin account if it doesn't exist, ensuring password is hashed.
-
-    Adds a sample reward record if none exist to support the new rewards feature.
-    
-    Args:
-        app: Flask application instance
+    Initialize MongoDB collections, indexes, and perform one-off migrations.
     """
     max_retries = 3
     retry_delay = 1
@@ -593,7 +603,6 @@ def initialize_app_data(app):
             logger.info(f"MongoDB database: {db_instance.name}", extra={'session_id': 'no-session-id'})
             collections = db_instance.list_collection_names()
             
-            # Create or update default admin user if it doesn't exist or lacks required fields
             admin_user = db_instance.users.find_one({'_id': 'admin', 'role': 'admin'})
             if not admin_user or 'password_hash' not in admin_user:
                 ficore_user = db_instance.users.find_one({'_id': 'ficorerecords'})
@@ -635,7 +644,6 @@ def initialize_app_data(app):
             else:
                 logger.info(f"Admin user with ID 'admin' already exists with valid password_hash, skipping creation", extra={'session_id': 'no-session-id'})
             
-            # Define collection schemas for core business finance modules
             collection_schemas = {
                 'users': {
                     'validator': {
@@ -716,7 +724,6 @@ def initialize_app_data(app):
                                 'amount_owed': {'bsonType': ['number', 'null'], 'minimum': 0},
                                 'description': {'bsonType': ['string', 'null']},
                                 'reminder_count': {'bsonType': ['int', 'null'], 'minimum': 0},
-
                                 'cost': {'bsonType': ['number', 'null'], 'minimum': 0},
                                 'expected_margin': {'bsonType': ['number', 'null'], 'minimum': 0},
                                 'created_at': {'bsonType': 'date'},
@@ -727,7 +734,7 @@ def initialize_app_data(app):
                     'indexes': [
                         {'key': [('user_id', ASCENDING), ('type', ASCENDING)]},
                         {'key': [('created_at', DESCENDING)]},
-                        {'key': [('user_id', ASCENDING), ('created_at', DESCENDING)]}  # New compound index
+                        {'key': [('user_id', ASCENDING), ('created_at', DESCENDING)]}
                     ]
                 },
                 'cashflows': {
@@ -762,36 +769,23 @@ def initialize_app_data(app):
                         }
                     },
                     'indexes': [
-                        # Basic indexes
                         {'key': [('user_id', ASCENDING), ('type', ASCENDING)]},
                         {'key': [('created_at', DESCENDING)]},
                         {'key': [('user_id', ASCENDING), ('expense_category', ASCENDING)]},
                         {'key': [('user_id', ASCENDING), ('tax_year', ASCENDING)]},
                         {'key': [('user_id', ASCENDING), ('is_tax_deductible', ASCENDING)]},
-                        
-                        # New compound indexes for improved query performance
                         {'key': [('user_id', ASCENDING), ('created_at', DESCENDING)]},
                         {'key': [('user_id', ASCENDING), ('type', ASCENDING), ('created_at', DESCENDING)]},
-                        
-                        # Enhanced compound indexes for category-based operations
                         {'key': [('user_id', ASCENDING), ('expense_category', ASCENDING), ('tax_year', ASCENDING)]},
                         {'key': [('user_id', ASCENDING), ('type', ASCENDING), ('expense_category', ASCENDING)]},
                         {'key': [('user_id', ASCENDING), ('tax_year', ASCENDING), ('is_tax_deductible', ASCENDING)]},
                         {'key': [('user_id', ASCENDING), ('type', ASCENDING), ('tax_year', ASCENDING), ('expense_category', ASCENDING)]},
-                        
-                        # Specialized indexes for tax calculation queries
                         {'key': [('user_id', ASCENDING), ('type', ASCENDING), ('tax_year', ASCENDING), ('is_tax_deductible', ASCENDING)]},
-                        
-                        # Single field indexes for category operations
                         {'key': [('expense_category', ASCENDING)], 'sparse': True},
                         {'key': [('tax_year', ASCENDING)], 'sparse': True},
                         {'key': [('is_tax_deductible', ASCENDING)], 'sparse': True},
-                        
-                        # Index for category metadata queries
                         {'key': [('user_id', ASCENDING), ('category_metadata.is_personal', ASCENDING)], 'sparse': True},
                         {'key': [('user_id', ASCENDING), ('category_metadata.is_statutory', ASCENDING)], 'sparse': True},
-                        
-                        # Performance optimization indexes
                         {'key': [('created_at', DESCENDING), ('user_id', ASCENDING)]},
                         {'key': [('amount', DESCENDING), ('user_id', ASCENDING), ('expense_category', ASCENDING)]}
                     ]
@@ -1044,7 +1038,6 @@ def initialize_app_data(app):
                                     exc_info=True, extra={'session_id': 'no-session-id'})
                         raise
                 
-                # Create indexes using the manage_index function
                 collection_obj = db_instance[collection_name]
                 for index in config.get('indexes', []):
                     keys = index['key']
@@ -1058,9 +1051,6 @@ def initialize_app_data(app):
                                     exc_info=True, extra={'session_id': 'no-session-id'})
                         raise
             
-
-            
-            # Add sample reward record if none exist
             if 'rewards' in collections:
                 reward_exists = db_instance.rewards.find_one({'type': 'referral'})
                 if not reward_exists:
@@ -1082,7 +1072,6 @@ def initialize_app_data(app):
                                     exc_info=True, extra={'session_id': 'no-session-id'})
                         raise
             
-            # Add sample inventory record if none exist
             if 'records' in collections:
                 inventory_exists = db_instance.records.find_one({'type': 'inventory'})
                 if not inventory_exists:
@@ -1103,7 +1092,6 @@ def initialize_app_data(app):
                                     exc_info=True, extra={'session_id': 'no-session-id'})
                         raise
             
-            # Fix existing user documents to include trial and subscription fields (one-off migration)
             if 'users' in collections:
                 try:
                     fix_flag = db_instance.system_config.find_one({'_id': 'user_fixes_applied'})
@@ -1200,7 +1188,6 @@ def initialize_app_data(app):
                                 exc_info=True, extra={'session_id': 'no-session-id'})
                     raise
             
-            # Run datetime migration
             try:
                 migrate_naive_datetimes()
             except Exception as e:
@@ -1208,7 +1195,6 @@ def initialize_app_data(app):
                             exc_info=True, extra={'session_id': 'no-session-id'})
                 raise
             
-            # Run expense categories migration
             try:
                 migrate_cashflows_expense_categories()
             except Exception as e:
@@ -1216,16 +1202,13 @@ def initialize_app_data(app):
                             exc_info=True, extra={'session_id': 'no-session-id'})
                 raise
             
-            # Check and migrate any new naive datetimes
             try:
                 check_and_migrate_naive_datetimes(db_instance, 'cashflows')
                 check_and_migrate_naive_datetimes(db_instance, 'records')
             except Exception as e:
                 logger.error(f"Failed to check and migrate new naive datetimes: {str(e)}", 
                             exc_info=True, extra={'session_id': 'no-session-id'})
-                # Don't raise here as this is not critical for app startup
             
-            # Audit datetime fields to identify any remaining issues
             try:
                 from utils import audit_datetime_fields
                 audit_datetime_fields(db_instance, 'cashflows')
@@ -1233,7 +1216,6 @@ def initialize_app_data(app):
             except Exception as e:
                 logger.error(f"Failed to audit datetime fields: {str(e)}", 
                             exc_info=True, extra={'session_id': 'no-session-id'})
-                # Don't raise here as this is not critical for app startup
                 
         except Exception as e:
             logger.error(f"{trans('general_database_initialization_failed', default='Failed to initialize database')}: {str(e)}", 
@@ -1290,9 +1272,6 @@ class User:
     def is_trial_active(self):
         """
         Check if the user's trial or subscription is active.
-        
-        Returns:
-            bool: True if user is admin or trial/subscription is active, False otherwise
         """
         if self.role == 'admin' or self.is_admin:
             return True
@@ -1315,13 +1294,6 @@ class User:
 def create_user(db, user_data):
     """
     Create a new user in the users collection with trial and subscription settings.
-    
-    Args:
-        db: MongoDB database instance
-        user_data: Dictionary containing user information
-    
-    Returns:
-        User: Created user object
     """
     try:
         user_id = user_data.get('username', user_data['email'].split('@')[0]).lower()
@@ -1402,13 +1374,6 @@ def create_user(db, user_data):
 def get_user_by_email(db, email):
     """
     Retrieve a user by email from the users collection.
-    
-    Args:
-        db: MongoDB database instance
-        email: Email address of the user
-    
-    Returns:
-        User: User object or None if not found
     """
     try:
         user_doc = db.users.find_one({'email': email.lower()})
@@ -1445,13 +1410,6 @@ def get_user_by_email(db, email):
 def get_user(db, user_id):
     """
     Retrieve a user by ID from the users collection.
-    
-    Args:
-        db: MongoDB database instance
-        user_id: ID of the user
-    
-    Returns:
-        User: User object or None if not found
     """
     try:
         user_doc = db.users.find_one({'_id': user_id})
@@ -1487,14 +1445,6 @@ def get_user(db, user_id):
 def update_user(db, user_id, update_data):
     """
     Update a user in the users collection.
-    
-    Args:
-        db: MongoDB database instance
-        user_id: The ID of the user to update
-        update_data: Dictionary containing fields to update
-    
-    Returns:
-        bool: True if updated, False if not found or no changes made
     """
     try:
         if 'password' in update_data:
@@ -1519,15 +1469,7 @@ def update_user(db, user_id, update_data):
 
 def get_records(db, filter_kwargs):
     """
-    Retrieve records (debtors, creditors, inventory, etc.) based on filter criteria.
-    Uses safe_find_records for consistent datetime normalization and error handling.
-    
-    Args:
-        db: MongoDB database instance
-        filter_kwargs: Dictionary of filter criteria
-    
-    Returns:
-        list: List of standardized records with normalized datetime fields
+    Retrieve records based on filter criteria.
     """
     try:
         from utils import safe_find_records
@@ -1541,23 +1483,15 @@ def get_records(db, filter_kwargs):
 def create_record(db, record_data):
     """
     Create a new record in the records collection.
-    Ensures created_at is UTC-aware at insertion.
-    
-    Args:
-        db: MongoDB database instance
-        record_data: Dictionary containing record information
-    
-    Returns:
-        str: ID of the created record
     """
     try:
         required_fields = ['user_id', 'type', 'created_at']
         if not all(field in record_data for field in required_fields):
             raise ValueError(trans('general_missing_record_fields', default='Missing required record fields'))
         
-        # Normalize created_at to ensure UTC-aware datetime
-        if isinstance(record_data['created_at'], datetime) and record_data['created_at'].tzinfo is None:
-            record_data['created_at'] = record_data['created_at'].replace(tzinfo=ZoneInfo("UTC"))
+        record_data['created_at'] = parse_and_normalize_datetime(record_data['created_at'])
+        if 'updated_at' in record_data:
+            record_data['updated_at'] = parse_and_normalize_datetime(record_data['updated_at'])
         
         result = db.records.insert_one(record_data)
         logger.info(f"{trans('general_record_created', default='Created record with ID')}: {result.inserted_id}", 
@@ -1571,14 +1505,6 @@ def create_record(db, record_data):
 def update_record(db, record_id, update_data):
     """
     Update a record in the records collection.
-    
-    Args:
-        db: MongoDB database instance
-        record_id: The ID of the record to update
-        update_data: Dictionary containing fields to update
-    
-    Returns:
-        bool: True if updated, False if not found or no changes made
     """
     try:
         update_data['updated_at'] = datetime.now(timezone.utc)
@@ -1600,15 +1526,7 @@ def update_record(db, record_id, update_data):
 
 def get_cashflows(db, filter_kwargs):
     """
-    Retrieve cashflow records (receipts, payments) based on filter criteria.
-    Uses safe_find_cashflows for consistent datetime normalization and error handling.
-    
-    Args:
-        db: MongoDB database instance
-        filter_kwargs: Dictionary of filter criteria
-    
-    Returns:
-        list: List of standardized cashflow records with normalized datetime fields
+    Retrieve cashflow records based on filter criteria.
     """
     try:
         from utils import safe_find_cashflows
@@ -1622,23 +1540,15 @@ def get_cashflows(db, filter_kwargs):
 def create_cashflow(db, cashflow_data):
     """
     Create a new cashflow record in the cashflows collection.
-    Ensures created_at is UTC-aware at insertion.
-    
-    Args:
-        db: MongoDB database instance
-        cashflow_data: Dictionary containing cashflow information
-    
-    Returns:
-        str: ID of the created cashflow record
     """
     try:
         required_fields = ['user_id', 'type', 'party_name', 'amount', 'created_at']
         if not all(field in cashflow_data for field in required_fields):
             raise ValueError(trans('general_missing_cashflow_fields', default='Missing required cashflow fields'))
         
-        # Normalize created_at to ensure UTC-aware datetime
-        if isinstance(cashflow_data['created_at'], datetime) and cashflow_data['created_at'].tzinfo is None:
-            cashflow_data['created_at'] = cashflow_data['created_at'].replace(tzinfo=ZoneInfo("UTC"))
+        cashflow_data['created_at'] = parse_and_normalize_datetime(cashflow_data['created_at'])
+        if 'updated_at' in cashflow_data:
+            cashflow_data['updated_at'] = parse_and_normalize_datetime(cashflow_data['updated_at'])
         
         result = db.cashflows.insert_one(cashflow_data)
         logger.info(f"{trans('general_cashflow_created', default='Created cashflow record with ID')}: {result.inserted_id}", 
@@ -1652,14 +1562,6 @@ def create_cashflow(db, cashflow_data):
 def update_cashflow(db, cashflow_id, update_data):
     """
     Update a cashflow record in the cashflows collection.
-    
-    Args:
-        db: MongoDB database instance
-        cashflow_id: The ID of the cashflow record to update
-        update_data: Dictionary containing fields to update
-    
-    Returns:
-        bool: True if updated, False if not found or no changes made
     """
     try:
         update_data['updated_at'] = datetime.now(timezone.utc)
@@ -1682,13 +1584,6 @@ def update_cashflow(db, cashflow_id, update_data):
 def get_audit_logs(db, filter_kwargs):
     """
     Retrieve audit log records based on filter criteria.
-    
-    Args:
-        db: MongoDB database instance
-        filter_kwargs: Dictionary of filter criteria
-    
-    Returns:
-        list: List of audit log records
     """
     try:
         return list(db.audit_logs.find(filter_kwargs).sort('timestamp', DESCENDING))
@@ -1700,13 +1595,6 @@ def get_audit_logs(db, filter_kwargs):
 def create_audit_log(db, audit_data):
     """
     Create a new audit log in the audit_logs collection.
-    
-    Args:
-        db: MongoDB database instance
-        audit_data: Dictionary containing audit log information
-    
-    Returns:
-        str: ID of the created audit log
     """
     try:
         required_fields = ['admin_id', 'action', 'timestamp']
@@ -1724,13 +1612,6 @@ def create_audit_log(db, audit_data):
 def create_feedback(db, feedback_data):
     """
     Create a new feedback entry in the feedback collection.
-    
-    Args:
-        db: MongoDB database instance
-        feedback_data: Dictionary containing feedback information
-    
-    Returns:
-        str: ID of the created feedback entry
     """
     try:
         required_fields = ['tool_name', 'rating', 'timestamp']
@@ -1748,13 +1629,6 @@ def create_feedback(db, feedback_data):
 def get_feedback(db, filter_kwargs):
     """
     Retrieve feedback entries based on filter criteria.
-    
-    Args:
-        db: MongoDB database instance
-        filter_kwargs: Dictionary of filter criteria (e.g., {'user_id': 'user123', 'tool_name': 'inventory'})
-    
-    Returns:
-        list: List of feedback entries
     """
     try:
         return list(db.feedback.find(filter_kwargs).sort('timestamp', DESCENDING))
@@ -1766,12 +1640,6 @@ def get_feedback(db, filter_kwargs):
 def to_dict_feedback(record):
     """
     Convert feedback record to dictionary.
-    
-    Args:
-        record: Feedback document
-    
-    Returns:
-        dict: Feedback dictionary
     """
     if not record:
         return {'tool_name': None, 'rating': None}
@@ -1788,12 +1656,6 @@ def to_dict_feedback(record):
 def to_dict_user(user):
     """
     Convert user object to dictionary.
-    
-    Args:
-        user: User object
-    
-    Returns:
-        dict: User dictionary
     """
     if not user:
         return {'id': None, 'email': None}
@@ -1806,7 +1668,7 @@ def to_dict_user(user):
         'is_admin': user.is_admin,
         'setup_complete': user.setup_complete,
         'language': user.language,
-        'is_trial': user.is_trial,
+        'is_trial': user.trial,
         'trial_start': user.trial_start,
         'trial_end': user.trial_end,
         'is_subscribed': user.is_subscribed,
@@ -1820,101 +1682,16 @@ def to_dict_user(user):
         'security_settings': user.security_settings
     }
 
-def to_dict_record(record):
-    """
-    Convert record to dictionary.
-    
-    Args:
-        record: Record document
-    
-    Returns:
-        dict: Record dictionary
-    """
-    if not record:
-        return {'type': None}
-    result = {
-        'id': str(record.get('_id', '')),
-        'user_id': record.get('user_id', ''),
-        'type': record.get('type', ''),
-        'created_at': record.get('created_at'),
-        'updated_at': record.get('updated_at')
-    }
-    if record['type'] in ['debtor', 'creditor']:
-        result.update({
-            'name': record.get('name', ''),
-            'contact': record.get('contact', ''),
-            'amount_owed': record.get('amount_owed', 0),
-            'description': record.get('description', ''),
-            'reminder_count': record.get('reminder_count', 0)
-        })
-
-    elif record['type'] == 'inventory':
-        result.update({
-            'name': record.get('name', ''),
-            'cost': record.get('cost', 0),
-            'expected_margin': record.get('expected_margin', 0)
-        })
-    return result
-
-def to_dict_cashflow(record):
-    """
-    Convert cashflow record to dictionary.
-    
-    Args:
-        record: Cashflow document
-    
-    Returns:
-        dict: Cashflow dictionary
-    """
-    if not record:
-        return {'party_name': None, 'amount': None}
-    return {
-        'id': str(record.get('_id', '')),
-        'user_id': record.get('user_id', ''),
-        'type': record.get('type', ''),
-        'party_name': record.get('party_name', ''),
-        'amount': record.get('amount', 0),
-        'method': record.get('method', ''),
-        'category': record.get('category', ''),
-        'created_at': record.get('created_at'),
-        'updated_at': record.get('updated_at')
-    }
-
-def to_dict_audit_log(record):
-    """
-    Convert audit log record to dictionary.
-    
-    Args:
-        record: Audit log document
-    
-    Returns:
-        dict: Audit log dictionary
-    """
-    if not record:
-        return {'action': None, 'timestamp': None}
-    return {
-        'id': str(record.get('_id', '')),
-        'admin_id': record.get('admin_id', ''),
-        'action': record.get('action', ''),
-        'details': record.get('details', {}),
-        'timestamp': record.get('timestamp')
-    }
-
 def create_kyc_record(db, kyc_data):
     """
     Create a new KYC record in the kyc_records collection.
-    
-    Args:
-        db: MongoDB database instance
-        kyc_data: Dictionary containing KYC information
-    
-    Returns:
-        str: ID of the created KYC record
     """
     try:
         required_fields = ['user_id', 'full_name', 'id_type', 'id_number', 'uploaded_id_photo_url', 'status', 'created_at', 'updated_at']
         if not all(field in kyc_data for field in required_fields):
             raise ValueError(trans('general_missing_kyc_fields', default='Missing required KYC fields'))
+        kyc_data['created_at'] = parse_and_normalize_datetime(kyc_data['created_at'])
+        kyc_data['updated_at'] = parse_and_normalize_datetime(kyc_data['updated_at'])
         result = db.kyc_records.insert_one(kyc_data)
         logger.info(f"{trans('general_kyc_created', default='Created KYC record with ID')}: {result.inserted_id}", 
                    extra={'session_id': kyc_data.get('session_id', 'no-session-id')})
@@ -1922,36 +1699,6 @@ def create_kyc_record(db, kyc_data):
     except Exception as e:
         logger.error(f"{trans('general_kyc_creation_error', default='Error creating KYC record')}: {str(e)}", 
                     exc_info=True, extra={'session_id': kyc_data.get('session_id', 'no-session-id')})
-        raise
-
-def update_kyc_record(db, kyc_id, update_data):
-    """
-    Update a KYC record in the kyc_records collection.
-    
-    Args:
-        db: MongoDB database instance
-        kyc_id: The ID of the KYC record to update
-        update_data: Dictionary containing fields to update
-    
-    Returns:
-        bool: True if updated, False if not found or no changes made
-    """
-    try:
-        update_data['updated_at'] = datetime.now(timezone.utc)
-        result = db.kyc_records.update_one(
-            {'_id': ObjectId(kyc_id)},
-            {'$set': update_data}
-        )
-        if result.modified_count > 0:
-            logger.info(f"{trans('general_kyc_updated', default='Updated KYC record with ID')}: {kyc_id}", 
-                       extra={'session_id': 'no-session-id'})
-            return True
-        logger.info(f"{trans('general_kyc_no_change', default='No changes made to KYC record with ID')}: {kyc_id}", 
-                   extra={'session_id': 'no-session-id'})
-        return False
-    except Exception as e:
-        logger.error(f"{trans('general_kyc_update_error', default='Error updating KYC record with ID')} {kyc_id}: {str(e)}", 
-                    exc_info=True, extra={'session_id': 'no-session-id'})
         raise
 
 def get_kyc_record(db, filter_kwargs):
