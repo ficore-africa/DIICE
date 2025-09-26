@@ -21,6 +21,109 @@ from reportlab.lib.styles import getSampleStyleSheet
 
 logger = logging.getLogger(__name__)
 
+# Define expense categories (consistent with templates)
+expense_categories = {
+    'office_admin': {
+        'name': trans('category_office_admin', default='Office & Admin'),
+        'description': trans('category_office_admin_desc', default='Office supplies, stationery, internet/data, utility bills'),
+        'examples': [
+            trans('example_office_supplies', default='Office supplies'),
+            trans('example_stationery', default='Stationery'),
+            trans('example_internet', default='Internet/Data'),
+            trans('example_electricity', default='Electricity')
+        ],
+        'tax_deductible': True,
+        'is_personal': False,
+        'is_statutory': False
+    },
+    'staff_wages': {
+        'name': trans('category_staff_wages', default='Staff & Wages'),
+        'description': trans('category_staff_wages_desc', default='Employee salaries, wages, and related costs'),
+        'examples': [
+            trans('example_salaries', default='Salaries'),
+            trans('example_wages', default='Wages'),
+            trans('example_staff_benefits', default='Staff benefits'),
+            trans('example_payroll', default='Payroll costs')
+        ],
+        'tax_deductible': True,
+        'is_personal': False,
+        'is_statutory': False
+    },
+    'business_travel': {
+        'name': trans('category_business_travel', default='Business Travel & Transport'),
+        'description': trans('category_business_travel_desc', default='Fuel, vehicle maintenance, and travel expenses for business'),
+        'examples': [
+            trans('example_fuel', default='Fuel'),
+            trans('example_vehicle_maintenance', default='Vehicle maintenance'),
+            trans('example_business_travel', default='Business travel'),
+            trans('example_transport', default='Transport costs')
+        ],
+        'tax_deductible': True,
+        'is_personal': False,
+        'is_statutory': False
+    },
+    'rent_utilities': {
+        'name': trans('category_rent_utilities', default='Rent & Utilities'),
+        'description': trans('category_rent_utilities_desc', default='Rent for shop or business office'),
+        'examples': [
+            trans('example_shop_rent', default='Shop rent'),
+            trans('example_office_rent', default='Office rent'),
+            trans('example_business_premises', default='Business premises rent')
+        ],
+        'tax_deductible': True,
+        'is_personal': False,
+        'is_statutory': False
+    },
+    'marketing_sales': {
+        'name': trans('category_marketing_sales', default='Marketing & Sales'),
+        'description': trans('category_marketing_sales_desc', default='Advertising, social media promotion, business cards'),
+        'examples': [
+            trans('example_advertising', default='Advertising'),
+            trans('example_social_media', default='Social media promotion'),
+            trans('example_business_cards', default='Business cards')
+        ],
+        'tax_deductible': True,
+        'is_personal': False,
+        'is_statutory': False
+    },
+    'cogs': {
+        'name': trans('category_cogs', default='Cost of Goods Sold (COGS)'),
+        'description': trans('category_cogs_desc', default='Direct costs of producing goods or services'),
+        'examples': [
+            trans('example_raw_materials', default='Raw materials'),
+            trans('example_manufacturing', default='Manufacturing costs'),
+            trans('example_direct_labor', default='Direct labor')
+        ],
+        'tax_deductible': True,
+        'is_personal': False,
+        'is_statutory': False
+    },
+    'personal_expenses': {
+        'name': trans('category_personal_expenses', default='Personal Expenses'),
+        'description': trans('category_personal_expenses_desc', default='Personal expenses not related to business'),
+        'examples': [
+            trans('example_personal_meals', default='Personal meals'),
+            trans('example_personal_shopping', default='Personal shopping'),
+            trans('example_family_expenses', default='Family expenses')
+        ],
+        'tax_deductible': False,
+        'is_personal': True,
+        'is_statutory': False
+    },
+    'statutory_legal': {
+        'name': trans('category_statutory_legal', default='Statutory & Legal Contributions'),
+        'description': trans('category_statutory_legal_desc', default='Accounting, legal, and consulting fees directly related to business'),
+        'examples': [
+            trans('example_accounting_fees', default='Accounting fees'),
+            trans('example_legal_fees', default='Legal fees'),
+            trans('example_consulting_fees', default='Consulting fees')
+        ],
+        'tax_deductible': True,
+        'is_personal': False,
+        'is_statutory': True
+    }
+}
+
 class PaymentForm(FlaskForm):
     """Form for adding or editing a payment cashflow."""
     party_name = StringField(trans('payments_recipient_name', default='Recipient Name'), validators=[DataRequired(), Length(max=100)])
@@ -40,22 +143,23 @@ class PaymentForm(FlaskForm):
     def __init__(self, *args, **kwargs):
         super(PaymentForm, self).__init__(*args, **kwargs)
         try:
-            # Populate expense category choices from utils
-            self.expense_category.choices = utils.get_category_choices_for_forms()
+            # Populate expense category choices from expense_categories
+            self.expense_category.choices = [
+                (key, value['name']) for key, value in expense_categories.items()
+            ]
         except Exception as e:
             logger.warning(f"Failed to load expense category choices: {str(e)}")
-            # Fallback to default categories
+            # Fallback to minimal categories
             self.expense_category.choices = [
-                ('office_admin', trans('category_office_admin', default='Office Admin')),
-                ('utilities', trans('category_utilities', default='Utilities')),
-                ('travel', trans('category_travel', default='Travel'))
+                ('office_admin', trans('category_office_admin', default='Office & Admin')),
+                ('staff_wages', trans('category_staff_wages', default='Staff & Wages')),
+                ('personal_expenses', trans('category_personal_expenses', default='Personal Expenses'))
             ]
 
 payments_bp = Blueprint('payments', __name__, url_prefix='/payments')
 
 def fetch_payments_with_fallback(db, query, sort_field='created_at', sort_direction=-1, limit=50):
     """Fetch payments with fallback logic for robustness."""
-    # Use sort_field to align with safe_find_cashflows signature
     payments = utils.safe_find_cashflows(db, query, sort_field=sort_field, sort_direction=sort_direction)
     if not payments:
         try:
@@ -65,7 +169,6 @@ def fetch_payments_with_fallback(db, query, sort_field='created_at', sort_direct
                     f"Found {test_count} payments for user {current_user.id} but safe_find returned empty",
                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
                 )
-                # Apply limit in the fallback query
                 raw_payments = list(db.cashflows.find(query, hint=[('user_id', 1), ('type', 1)]).sort(sort_field, sort_direction).limit(limit))
                 payments = []
                 for payment in raw_payments:
@@ -105,7 +208,8 @@ def index():
             format_currency=utils.format_currency,
             format_date=utils.format_date,
             title=trans('payments_title', default='Money Out', lang=session.get('lang', 'en')),
-            can_interact=utils.can_user_interact(current_user)
+            can_interact=utils.can_user_interact(current_user),
+            expense_categories=expense_categories
         )
     except Exception as e:
         logger.error(
@@ -134,7 +238,9 @@ def manage():
             format_currency=utils.format_currency,
             format_date=utils.format_date,
             title=trans('payments_manage', default='Manage Payments', lang=session.get('lang', 'en')),
-            can_interact=utils.can_user_interact(current_user)
+            can_interact=utils.can_user_interact(current_user),
+            expense_categories=expense_categories,
+            form=PaymentForm()  # For delete form CSRF token
         )
     except Exception as e:
         logger.error(
@@ -161,7 +267,6 @@ def view(id):
             )
             return safe_json_response({'error': trans('payments_record_not_found', default='Record not found')}, 404)
         
-        # Ensure required fields
         required_fields = ['party_name', 'amount', 'created_at']
         for field in required_fields:
             if field not in payment:
@@ -171,14 +276,13 @@ def view(id):
                 )
                 return safe_json_response({'error': trans('payments_invalid_data', default='Invalid payment data')}, 500)
         
-        # Set defaults for optional fields
         payment.setdefault('method', 'N/A')
         payment.setdefault('expense_category', 'office_admin')
         payment.setdefault('contact', '')
         payment.setdefault('description', '')
         
         from models import to_dict_cashflow
-        payment = to_dict_cashflow(payment)  # Use to_dict_cashflow for consistent serialization
+        payment = to_dict_cashflow(payment)
         return safe_json_response(payment)
     except ValueError:
         logger.error(
@@ -215,9 +319,8 @@ def generate_pdf(id):
             return redirect(url_for('payments.index'))
         
         from models import to_dict_cashflow
-        payment = to_dict_cashflow(payment)  # Use to_dict_cashflow for consistent serialization
+        payment = to_dict_cashflow(payment)
         
-        # Sanitize inputs for PDF generation
         payment['party_name'] = utils.sanitize_input(payment['party_name'], max_length=100)
         category_display = payment.get('category_metadata', {}).get('category_display_name', 
                                      payment.get('expense_category', 'No category provided'))
@@ -231,11 +334,9 @@ def generate_pdf(id):
         styles = getSampleStyleSheet()
         max_width = width - 2 * inch
 
-        # Title
         p.setFont("Helvetica-Bold", 24)
         p.drawString(inch, height - inch, trans('payments_pdf_title', default='FiCore Records - Money Out Receipt'))
 
-        # Content
         p.setFont("Helvetica", 12)
         y_position = height - inch - 0.5 * inch
         fields = [
@@ -243,7 +344,7 @@ def generate_pdf(id):
             (trans('payments_amount', default='Amount Paid'), utils.format_currency(payment['amount'])),
             (trans('general_payment_method', default='Payment Method'), payment.get('method', 'N/A')),
             (trans('general_category', default='Category'), payment['category_display']),
-            (trans('general_date', default='Date'), payment['created_at']),  # ISO string from to_dict_cashflow
+            (trans('general_date', default='Date'), payment['created_at']),
             (trans('payments_id', default='Payment ID'), payment['id'])
         ]
         for label, value in fields:
@@ -267,7 +368,6 @@ def generate_pdf(id):
             text.drawOn(p, inch + 100, y_position - 10)
             y_position -= text.height + 0.3 * inch
 
-        # Footer
         p.setFont("Helvetica-Oblique", 10)
         p.drawString(inch, inch, trans('payments_pdf_footer', default='This document serves as an official payment receipt generated by FiCore Records.'))
         p.showPage()
@@ -331,11 +431,12 @@ def add():
                         'payments/add.html',
                         form=form,
                         title=trans('payments_add_title', default='Add Money Out', lang=session.get('lang', 'en')),
-                        can_interact=utils.can_user_interact(current_user)
+                        can_interact=utils.can_user_interact(current_user),
+                        expense_categories=expense_categories
                     )
                 
                 db = utils.get_mongo_db()
-                payment_date = datetime.fromisoformat(utils.normalize_datetime(form.date.data))
+                payment_date = datetime.combine(form.date.data, datetime.min.time(), tzinfo=ZoneInfo('UTC'))
                 category_metadata = utils.get_category_metadata(form.expense_category.data)
                 
                 cashflow = {
@@ -355,9 +456,9 @@ def add():
                     'contact': utils.sanitize_input(form.contact.data, max_length=100) if form.contact.data else None,
                     'description': utils.sanitize_input(form.description.data, max_length=1000) if form.description.data else None,
                     'created_at': payment_date,
-                    'updated_at': datetime.fromisoformat(utils.normalize_datetime(datetime.now()))
+                    'updated_at': datetime.now(tz=ZoneInfo('UTC'))
                 }
-                create_cashflow(db, cashflow)  # Use models.create_cashflow
+                create_cashflow(db, cashflow)
                 logger.info(
                     f"Payment added for user {current_user.id}",
                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
@@ -374,7 +475,8 @@ def add():
             'payments/add.html',
             form=form,
             title=trans('payments_add_title', default='Add Money Out', lang=session.get('lang', 'en')),
-            can_interact=utils.can_user_interact(current_user)
+            can_interact=utils.can_user_interact(current_user),
+            expense_categories=expense_categories
         )
     except CSRFError as e:
         logger.error(
@@ -406,9 +508,12 @@ def edit(id):
             flash(trans('payments_record_not_found', default='Cashflow not found'), 'danger')
             return redirect(url_for('payments.index'))
         
+        from models import to_dict_cashflow
+        payment = to_dict_cashflow(payment)
+        
         form = PaymentForm(data={
             'party_name': payment['party_name'],
-            'date': payment['created_at'].date(),
+            'date': datetime.fromisoformat(payment['created_at']).date(),
             'amount': payment['amount'],
             'method': payment.get('method'),
             'expense_category': payment.get('expense_category', 'office_admin'),
@@ -440,10 +545,11 @@ def edit(id):
                         form=form,
                         payment=payment,
                         title=trans('payments_edit_title', default='Edit Payment', lang=session.get('lang', 'en')),
-                        can_interact=utils.can_user_interact(current_user)
+                        can_interact=utils.can_user_interact(current_user),
+                        expense_categories=expense_categories
                     )
                 
-                payment_date = datetime.fromisoformat(utils.normalize_datetime(form.date.data))
+                payment_date = datetime.combine(form.date.data, datetime.min.time(), tzinfo=ZoneInfo('UTC'))
                 category_metadata = utils.get_category_metadata(form.expense_category.data)
                 
                 updated_cashflow = {
@@ -460,9 +566,10 @@ def edit(id):
                     },
                     'contact': utils.sanitize_input(form.contact.data, max_length=100) if form.contact.data else None,
                     'description': utils.sanitize_input(form.description.data, max_length=1000) if form.description.data else None,
-                    'created_at': payment_date
+                    'created_at': payment_date,
+                    'updated_at': datetime.now(tz=ZoneInfo('UTC'))
                 }
-                update_cashflow(db, id, updated_cashflow)  # Use models.update_cashflow
+                update_cashflow(db, id, updated_cashflow)
                 logger.info(
                     f"Payment {id} updated for user {current_user.id}",
                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
@@ -480,7 +587,8 @@ def edit(id):
             form=form,
             payment=payment,
             title=trans('payments_edit_title', default='Edit Payment', lang=session.get('lang', 'en')),
-            can_interact=utils.can_user_interact(current_user)
+            can_interact=utils.can_user_interact(current_user),
+            expense_categories=expense_categories
         )
     except ValueError:
         logger.error(
