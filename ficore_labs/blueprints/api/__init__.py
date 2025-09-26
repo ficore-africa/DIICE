@@ -1,1 +1,0 @@
-# API Blueprint for offline functionality
