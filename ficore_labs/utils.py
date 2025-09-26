@@ -13,6 +13,7 @@ from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
 from werkzeug.routing import BuildError
 from wtforms import ValidationError
 from flask_login import current_user
+import re
 
 # Import performance monitoring (will be created)
 try:
@@ -858,6 +859,7 @@ def validate_stats_completeness(stats, endpoint_name=None):
         )
         return False, ['validation_error'], [str(e)]
 
+
 def aggressively_clean_record(record):
     """
     Aggressively clean a record that failed normal cleaning.
@@ -867,9 +869,11 @@ def aggressively_clean_record(record):
         return None
     
     try:
-        # Start pe', 'payment'),
+        # Initialize a new cleaned record dictionary
+        cleaned_record = {
+            'type': record.get('type', 'payment'),  # Fixed the incomplete line
             'amount': record.get('amount', 0.0),
-            'created_at': record.get('created_at', datetime.now(timezone.utc))
+            'created_at': record.get('created_at', datetime.now(ZoneInfo("UTC")))
         }
         
         # Try to salvage string fields with extreme cleaning
@@ -881,7 +885,7 @@ def aggressively_clean_record(record):
                     # Convert to string and remove ALL non-alphanumeric characters except spaces and basic punctuation
                     value = str(record[field])
                     # Remove all backslashes and control characters
-                    value = re.sub(r'[\\\\]', '', value)
+                    value = re.sub(r'[\\]', '', value)
                     value = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', value)
                     # Keep only safe characters
                     value = re.sub(r'[^a-zA-Z0-9\s\-\.\,\(\)]', '', value)
@@ -903,7 +907,7 @@ def aggressively_clean_record(record):
         if not cleaned_record.get('expense_category'):
             cleaned_record['expense_category'] = 'office_admin'
         
-        # Ensure datetime is properly formatted and JSON serializable
+        # Ensure datetime fields are properly handled and JSON serializable
         datetime_fields = ['created_at', 'updated_at']
         for field in datetime_fields:
             if field in cleaned_record and cleaned_record[field]:
@@ -2653,4 +2657,5 @@ def create_dashboard_safe_response(stats, recent_data, additional_data=None):
             'error': 'Response serialization failed',
             'message': 'Unable to create safe JSON response',
             'timestamp': datetime.now(timezone.utc).isoformat()
+
         }
