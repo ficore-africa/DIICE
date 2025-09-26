@@ -14,6 +14,21 @@ logger = logging.getLogger(__name__)
 
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
 
+def normalize_datetime(doc):
+    """Convert created_at to timezone-aware datetime if it's a string or naive datetime."""
+    if 'created_at' in doc:
+        if isinstance(doc['created_at'], str):
+            try:
+                # Parse string to datetime and make it timezone-aware
+                doc['created_at'] = datetime.fromisoformat(doc['created_at']).replace(tzinfo=ZoneInfo("UTC"))
+            except ValueError:
+                logger.warning(f"Invalid created_at format in document {doc.get('_id', 'unknown')}: {doc['created_at']}")
+                doc['created_at'] = datetime.now(timezone.utc)  # Fallback to current time
+        elif isinstance(doc['created_at'], datetime) and doc['created_at'].tzinfo is None:
+            # Make naive datetime timezone-aware
+            doc['created_at'] = doc['created_at'].replace(tzinfo=ZoneInfo("UTC"))
+    return doc
+
 @dashboard_bp.route('/test-notifications')
 @login_required
 def test_notifications():
@@ -125,7 +140,7 @@ def refresh_dashboard_data():
             stats['total_debtors_amount'] = debtors_data.get('total_amount', 0)
 
             # Calculate creditors
-            creditors_result = db.records.aggregate([  # Fixed to use db.records
+            creditors_result = db.records.aggregate([
                 {'$match': {**query, 'type': 'creditor'}},
                 {'$group': {'_id': None, 'total_amount': {'$sum': '$amount_owed'}, 'count': {'$sum': 1}}}
             ])
@@ -224,13 +239,13 @@ def index():
 
         # Fetch recent records (limit to 5 for performance)
         try:
-            recent_debtors = list(get_records(db, {**query, 'type': 'debtor'}, sort=[('created_at', -1)], limit=5))
-            recent_creditors = list(get_records(db, {**query, 'type': 'creditor'}, sort=[('created_at', -1)], limit=5))
-            recent_payments = list(utils.safe_find_cashflows(db, {**query, 'type': 'payment'}, sort_key='created_at', sort_direction=-1, limit=5))
+            recent_debtors = [normalize_datetime(doc) for doc in get_records(db, {**query, 'type': 'debtor'}, sort=[('created_at', -1)], limit=5)]
+            recent_creditors = [normalize_datetime(doc) for doc in get_records(db, {**query, 'type': 'creditor'}, sort=[('created_at', -1)], limit=5)]
+            recent_payments = [normalize_datetime(doc) for doc in utils.safe_find_cashflows(db, {**query, 'type': 'payment'}, sort_key='created_at', sort_direction=-1)]
             recent_payments = bulk_clean_documents_for_json(recent_payments)
-            recent_receipts = list(utils.safe_find_cashflows(db, {**query, 'type': 'receipt'}, sort_key='created_at', sort_direction=-1, limit=5))
+            recent_receipts = [normalize_datetime(doc) for doc in utils.safe_find_cashflows(db, {**query, 'type': 'receipt'}, sort_key='created_at', sort_direction=-1)]
             recent_receipts = bulk_clean_documents_for_json(recent_receipts)
-            recent_inventory = list(get_records(db, {**query, 'type': 'inventory'}, sort=[('created_at', -1)], limit=5))
+            recent_inventory = [normalize_datetime(doc) for doc in get_records(db, {**query, 'type': 'inventory'}, sort=[('created_at', -1)], limit=5)]
         except Exception as e:
             logger.warning(
                 f"Failed to fetch recent records: {str(e)}",
@@ -277,7 +292,7 @@ def index():
             stats['total_creditors'] = db.records.count_documents({**query, 'type': 'creditor'}, hint=[('user_id', 1), ('type', 1)]) or len(recent_creditors)
             stats['total_payments'] = db.cashflows.count_documents({**query, 'type': 'payment'}, hint=[('user_id', 1), ('type', 1)]) or len(recent_payments)
             stats['total_receipts'] = db.cashflows.count_documents({**query, 'type': 'receipt'}, hint=[('user_id', 1), ('type', 1)]) or len(recent_receipts)
-            stats['total_inventory'] = db.records.count_documents({**query, 'type': 'inventory'}, hint=[('user_id', 1), ('type', 1)]) or len(recent_inventory)  # Fixed to use db.records
+            stats['total_inventory'] = db.records.count_documents({**query, 'type': 'inventory'}, hint=[('user_id', 1), ('type', 1)]) or len(recent_inventory)
 
             # Amounts
             total_debtors_amount = sum(doc.get('amount_owed', 0) for doc in get_records(db, {**query, 'type': 'debtor'})) or sum(item.get('amount_owed', 0) for item in recent_debtors)
