@@ -8,6 +8,7 @@ from translations import trans
 import utils
 from utils import format_date, serialize_for_json, safe_json_response, clean_document_for_json, bulk_clean_documents_for_json, create_dashboard_safe_response
 from helpers import reminders
+from models import get_records
 
 logger = logging.getLogger(__name__)
 
@@ -221,16 +222,13 @@ def index():
 
         # Fetch recent records (limit to 5 for performance)
         try:
-            recent_debtors = list(utils.safe_find_records(db, {**query, 'type': 'debtor'}, sort_key='created_at', sort_direction=-1, limit=5))
-            recent_debtors = bulk_clean_documents_for_json(recent_debtors)
-            recent_creditors = list(utils.safe_find_records(db, {**query, 'type': 'creditor'}, sort_key='created_at', sort_direction=-1, limit=5))
-            recent_creditors = bulk_clean_documents_for_json(recent_creditors)
+            recent_debtors = list(get_records(db, {**query, 'type': 'debtor'}, sort=[('created_at', -1)], limit=5))
+            recent_creditors = list(get_records(db, {**query, 'type': 'creditor'}, sort=[('created_at', -1)], limit=5))
             recent_payments = list(utils.safe_find_cashflows(db, {**query, 'type': 'payment'}, sort_key='created_at', sort_direction=-1, limit=5))
             recent_payments = bulk_clean_documents_for_json(recent_payments)
             recent_receipts = list(utils.safe_find_cashflows(db, {**query, 'type': 'receipt'}, sort_key='created_at', sort_direction=-1, limit=5))
             recent_receipts = bulk_clean_documents_for_json(recent_receipts)
-            recent_inventory = list(utils.safe_find_records(db, {**query, 'type': 'inventory'}, sort_key='created_at', sort_direction=-1, limit=5))
-            recent_inventory = bulk_clean_documents_for_json(recent_inventory)
+            recent_inventory = list(get_records(db, {**query, 'type': 'inventory'}, sort=[('created_at', -1)], limit=5))
         except Exception as e:
             logger.warning(
                 f"Failed to fetch recent records: {str(e)}",
@@ -254,7 +252,7 @@ def index():
                 ])
                 total_expenses = next(expenses_result, {}).get('total', 0) or 0
 
-                inventory_result = db.cashflows.aggregate([
+                inventory_result = db.records.aggregate([
                     {'$match': {**query, 'type': 'inventory'}},
                     {'$group': {'_id': None, 'total': {'$sum': '$cost'}}}
                 ])
@@ -280,11 +278,11 @@ def index():
             stats['total_inventory'] = db.cashflows.count_documents({**query, 'type': 'inventory'}, hint=[('user_id', 1), ('type', 1)]) or len(recent_inventory)
 
             # Amounts
-            total_debtors_amount = sum(doc.get('amount_owed', 0) for doc in utils.safe_find_records(db, {**query, 'type': 'debtor'})) or sum(item.get('amount_owed', 0) for item in recent_debtors)
-            total_creditors_amount = sum(doc.get('amount_owed', 0) for doc in utils.safe_find_records(db, {**query, 'type': 'creditor'})) or sum(item.get('amount_owed', 0) for item in recent_creditors)
+            total_debtors_amount = sum(doc.get('amount_owed', 0) for doc in get_records(db, {**query, 'type': 'debtor'})) or sum(item.get('amount_owed', 0) for item in recent_debtors)
+            total_creditors_amount = sum(doc.get('amount_owed', 0) for doc in get_records(db, {**query, 'type': 'creditor'})) or sum(item.get('amount_owed', 0) for item in recent_creditors)
             total_payments_amount = sum(doc.get('amount', 0) for doc in utils.safe_find_cashflows(db, {**query, 'type': 'payment'})) or sum(item.get('amount', 0) for item in recent_payments)
             total_receipts_amount = sum(doc.get('amount', 0) for doc in utils.safe_find_cashflows(db, {**query, 'type': 'receipt'})) or sum(item.get('amount', 0) for item in recent_receipts)
-            total_inventory_cost = sum(doc.get('cost', 0) for doc in utils.safe_find_records(db, {**query, 'type': 'inventory'})) or sum(item.get('cost', 0) for item in recent_inventory)
+            total_inventory_cost = sum(doc.get('cost', 0) for doc in get_records(db, {**query, 'type': 'inventory'})) or sum(item.get('cost', 0) for item in recent_inventory)
 
             # Update stats
             stats.update({
