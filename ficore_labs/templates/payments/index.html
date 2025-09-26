@@ -7,7 +7,7 @@
         <button onclick="history.back()" class="btn btn-outline-secondary me-3" aria-label="{{ t('general_back', default='Back') | e }}">
             <i class="bi bi-arrow-left"></i> {{ t('general_back', default='Back') | e }}
         </button>
-        <a href="{{ url_for('general_bp.home') | e }}" class="btn btn-link text-decoration-none">
+        <a href="{{ url_for('dashboard.index') | e }}" class="btn btn-link text-decoration-none">
             <i class="bi bi-house"></i> {{ t('general_back_to_home', default='Back to Home') | e }}
         </a>
     </div>
@@ -20,7 +20,7 @@
         {% if can_interact %}
             <a href="{{ url_for('payments.add') }}" class="btn btn-secondary">{{ t('payments_add_title', default='Add Money Out') }}</a>
         {% else %}
-            <a href="{{ url_for('general_bp.subscription_required') }}" class="btn btn-secondary">{{ t('payments_add_title', default='Add Money Out') }}</a>
+            <a href="{{ url_for('subscribe_bp.subscribe') }}" class="btn btn-secondary">{{ t('payments_add_title', default='Add Money Out') }}</a>
         {% endif %}
         <a href="{{ url_for('payments.manage') }}" class="btn btn-primary">{{ t('payments_manage', default='Manage Payments') }}</a>
     </div>
@@ -45,6 +45,9 @@
                             <option value="personal_expenses">{{ t('category_personal_expenses', default='Personal Expenses') }}</option>
                             <option value="statutory_legal">{{ t('category_statutory_legal', default='Statutory & Legal Contributions') }}</option>
                         </select>
+                        <small id="category-filter-help" class="form-text text-muted">
+                            {{ t('general_filter_by_category_help', default='Select a category to filter payments') }}
+                        </small>
                     </div>
                 </div>
             </div>
@@ -173,7 +176,7 @@
                     <a id="downloadBtn" class="btn btn-primary" href="#">{{ t('payments_download_receipt', default='Download Receipt') }}</a>
                     <button id="shareBtn" class="btn btn-primary" style="display: none;">{{ t('payments_share_receipt', default='Share Receipt') }}</button>
                 {% else %}
-                    <a id="downloadBtn" class="btn btn-primary disabled" href="{{ url_for('general_bp.subscription_required') }}">{{ t('payments_download_receipt', default='Download Receipt') }}</a>
+                    <a id="downloadBtn" class="btn btn-primary disabled" href="{{ url_for('subscribe_bp.subscribe') }}">{{ t('payments_download_receipt', default='Download Receipt') }}</a>
                     <button id="shareBtn" class="btn btn-primary disabled" style="display: none;" onclick="alert('{{ t('payments_subscription_required', default='Your trial has expired or you do not have an active subscription. Please subscribe to share payments.') }}')">{{ t('payments_share_receipt', default='Share Receipt') }}</button>
                 {% endif %}
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ t('general_close', default='Close') }}</button>
@@ -193,20 +196,24 @@
                 {% if not can_interact %}
                     <div class="alert alert-warning" role="alert">
                         {{ t('payments_subscription_required', default='Your trial has expired or you do not have an active subscription. Please subscribe to share payments.') }}
-                        <a href="{{ url_for('general_bp.subscription_required') }}" class="alert-link">{{ t('general_subscribe', default='Subscribe now') }}</a>
+                        <a href="{{ url_for('subscribe_bp.subscribe') }}" class="alert-link">{{ t('general_subscribe', default='Subscribe now') }}</a>
                     </div>
                 {% endif %}
                 <form id="shareForm" {% if not can_interact %}onsubmit="return false;"{% endif %}>
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="mb-3">
                         <label for="shareType" class="form-label">{{ t('payments_share_type', default='Share Type') }}</label>
-                        <select class="form-select" id="shareType" required {% if not can_interact %}disabled{% endif %}>
+                        <select class="form-select" id="shareType" required {% if not can_interact %}disabled{% endif %}
+                                aria-label="{{ t('payments_share_type', default='Share Type') }}">
                             <option value="sms">{{ t('general_sms', default='SMS') }}</option>
                             <option value="whatsapp">{{ t('general_whatsapp', default='WhatsApp') }}</option>
                         </select>
                     </div>
                     <div class="mb-3">
                         <label for="shareMessage" class="form-label">{{ t('general_message', default='Message') }}</label>
-                        <textarea class="form-control" id="shareMessage" rows="4" required {% if not can_interact %}disabled{% endif %}></textarea>
+                        <textarea class="form-control" id="shareMessage" rows="4" required {% if not can_interact %}disabled{% endif %}
+                                  aria-label="{{ t('general_message', default='Message') }}"></textarea>
+                        <div id="shareMessageError" class="invalid-feedback"></div>
                     </div>
                 </form>
             </div>
@@ -250,6 +257,14 @@
     background: var(--button-secondary-hover);
     color: var(--text-color);
     transform: translateY(-2px);
+}
+.invalid-feedback {
+    display: none;
+    color: #dc3545;
+    font-size: 0.875rem;
+}
+.was-validated .form-control:invalid ~ .invalid-feedback {
+    display: block;
 }
 </style>
 
@@ -331,15 +346,23 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (totalPaymentsEl) totalPaymentsEl.textContent = count;
         if (totalAmountEl) totalAmountEl.textContent = formatCurrency(total);
-        if (taxDeductibleAmountEl) taxDeductibleAmountEl.textContent = formatCurrency(deductible);
-        if (nonDeductibleAmountEl) nonDeductibleAmountEl.textContent = formatCurrency(nonDeductible);
+        if (taxDeductibleAmountEl) totalAmountEl.textContent = formatCurrency(deductible);
+        if (nonDeductibleAmountEl) totalAmountEl.textContent = formatCurrency(nonDeductible);
     }
     
     function formatCurrency(amount) {
-        return '{{ t("general_currency_symbol", default="₦") }}' + amount.toLocaleString('en-NG', {
+        returnrapeute amount to 2 decimal places
+        return amount.toLocaleString('en-NG', {
+            style: 'currency',
+            currency: '{{ t("general_currency_code", default="NGN") }}',
             minimumFractionDigits: 2,
             maximumFractionDigits: 2
         });
+    }
+
+    function getCsrfToken() {
+        const tokenInput = document.querySelector('input[name="csrf_token"]');
+        return tokenInput ? tokenInput.value : '';
     }
 
     function updateModalButtonClasses() {
@@ -391,7 +414,7 @@ document.addEventListener('DOMContentLoaded', () => {
             };
 
             document.getElementById('modalName').textContent = currentPaymentData.name;
-            document.getElementById('modalAmount').textContent = `{{ t('general_currency_symbol', default='₦') }}${currentPaymentData.amount}`;
+            document.getElementById('modalAmount').textContent = formatCurrency(parseFloat(currentPaymentData.amount));
             document.getElementById('modalMethod').textContent = currentPaymentData.method || '-';
             document.getElementById('modalCategory').textContent = currentPaymentData.category || '-';
             document.getElementById('modalDate').textContent = currentPaymentData.date;
@@ -410,7 +433,7 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('No payment data available');
             return;
         }
-        const defaultMessage = `Payment from FiCore Records\nRecipient: ${currentPaymentData.name}\nAmount: {{ t('general_currency_symbol', default='₦') }}${currentPaymentData.amount}\nDate: ${currentPaymentData.date}\nPayment ID: ${currentPaymentData._id}`;
+        const defaultMessage = `Payment from FiCore Records\nRecipient: ${currentPaymentData.name}\nAmount: ${formatCurrency(parseFloat(currentPaymentData.amount))}\nDate: ${currentPaymentData.date}\nPayment ID: ${currentPaymentData._id}`;
         document.getElementById('shareMessage').value = defaultMessage;
         new bootstrap.Modal(document.getElementById('shareModal')).show();
     });
@@ -421,16 +444,26 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         
-        const shareType = document.getElementById('shareType').value;
-        const message = document.getElementById('shareMessage').value;
+        const shareForm = document.getElementById('shareForm');
+        const shareType = document.getElementById('shareType');
+        const shareMessage = document.getElementById('shareMessage');
+        const shareMessageError = document.getElementById('shareMessageError');
         
-        if (!message.trim()) {
-            alert('{{ t('general_message_required', default='Message is required') }}');
+        // Reset validation state
+        shareForm.classList.remove('was-validated');
+        shareMessageError.textContent = '';
+        
+        // Validate form
+        if (!shareForm.checkValidity()) {
+            shareForm.classList.add('was-validated');
+            if (!shareMessage.value.trim()) {
+                shareMessageError.textContent = '{{ t("general_message_required", default="Message is required") }}';
+            }
             return;
         }
         
         this.disabled = true;
-        this.textContent = '{{ t('general_sending', default='Sending...') }}';
+        this.textContent = '{{ t("general_sending", default="Sending...") }}';
         
         fetch('/payments/share', {
             method: 'POST',
@@ -441,27 +474,32 @@ document.addEventListener('DOMContentLoaded', () => {
             body: JSON.stringify({
                 paymentId: currentPaymentData._id,
                 recipient: currentPaymentData.contact,
-                message,
-                type: shareType
+                message: shareMessage.value,
+                type: shareType.value
             })
         })
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
         .then(data => {
             if (data.success) {
-                alert('{{ t('payments_share_success', default='Payment shared successfully') }}');
+                alert('{{ t("payments_share_success", default="Payment shared successfully") }}');
                 bootstrap.Modal.getInstance(document.getElementById('shareModal')).hide();
                 bootstrap.Modal.getInstance(document.getElementById('actionsModal')).hide();
             } else {
-                alert('{{ t('payments_share_failed', default='Failed to share payment') }}: ' + (data.message || 'Unknown error'));
+                alert('{{ t("payments_share_failed", default="Failed to share payment") }}: ' + (data.message || 'Unknown error'));
             }
         })
         .catch(error => {
             console.error('Error sharing payment:', error);
-            alert('{{ t('payments_share_error', default='Error sharing payment') }}');
+            alert('{{ t("payments_share_error", default="Error sharing payment") }}: ' + error.message);
         })
         .finally(() => {
             this.disabled = false;
-            this.textContent = '{{ t('payments_share_receipt', default='Share Receipt') }}';
+            this.textContent = '{{ t("payments_share_receipt", default="Share Receipt") }}';
         });
     });
 });
