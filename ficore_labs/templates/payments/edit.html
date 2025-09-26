@@ -110,64 +110,8 @@ document.addEventListener('DOMContentLoaded', function() {
     var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
     tooltipTriggerList.map(function(tooltipTriggerEl) { return new bootstrap.Tooltip(tooltipTriggerEl); });
     
-    const categoryData = {
-        'office_admin': {
-            'name': '{{ t("category_office_admin", default="Office & Admin") }}',
-            'description': '{{ t("category_office_admin_desc", default="Office supplies, stationery, internet/data, utility bills") }}',
-            'examples': ['{{ t("example_office_supplies", default="Office supplies") }}', '{{ t("example_stationery", default="Stationery") }}', '{{ t("example_internet", default="Internet/Data") }}', '{{ t("example_electricity", default="Electricity") }}'],
-            'tax_deductible': true,
-            'is_personal': false
-        },
-        'staff_wages': {
-            'name': '{{ t("category_staff_wages", default="Staff & Wages") }}',
-            'description': '{{ t("category_staff_wages_desc", default="Employee salaries, wages, and related costs") }}',
-            'examples': ['{{ t("example_salaries", default="Salaries") }}', '{{ t("example_wages", default="Wages") }}', '{{ t("example_staff_benefits", default="Staff benefits") }}', '{{ t("example_payroll", default="Payroll costs") }}'],
-            'tax_deductible': true,
-            'is_personal': false
-        },
-        'business_travel': {
-            'name': '{{ t("category_business_travel", default="Business Travel & Transport") }}',
-            'description': '{{ t("category_business_travel_desc", default="Fuel, vehicle maintenance, and travel expenses for business") }}',
-            'examples': ['{{ t("example_fuel", default="Fuel") }}', '{{ t("example_vehicle_maintenance", default="Vehicle maintenance") }}', '{{ t("example_business_travel", default="Business travel") }}', '{{ t("example_transport", default="Transport costs") }}'],
-            'tax_deductible': true,
-            'is_personal': false
-        },
-        'rent_utilities': {
-            'name': '{{ t("category_rent_utilities", default="Rent & Utilities") }}',
-            'description': '{{ t("category_rent_utilities_desc", default="Rent for shop or business office") }}',
-            'examples': ['{{ t("example_shop_rent", default="Shop rent") }}', '{{ t("example_office_rent", default="Office rent") }}', '{{ t("example_business_premises", default="Business premises rent") }}'],
-            'tax_deductible': true,
-            'is_personal': false
-        },
-        'marketing_sales': {
-            'name': '{{ t("category_marketing_sales", default="Marketing & Sales") }}',
-            'description': '{{ t("category_marketing_sales_desc", default="Advertising, social media promotion, business cards") }}',
-            'examples': ['{{ t("example_advertising", default="Advertising") }}', '{{ t("example_social_media", default="Social media promotion") }}', '{{ t("example_business_cards", default="Business cards") }}'],
-            'tax_deductible': true,
-            'is_personal': false
-        },
-        'cogs': {
-            'name': '{{ t("category_cogs", default="Cost of Goods Sold (COGS)") }}',
-            'description': '{{ t("category_cogs_desc", default="Direct costs of producing goods or services") }}',
-            'examples': ['{{ t("example_raw_materials", default="Raw materials") }}', '{{ t("example_manufacturing", default="Manufacturing costs") }}', '{{ t("example_direct_labor", default="Direct labor") }}'],
-            'tax_deductible': true,
-            'is_personal': false
-        },
-        'personal_expenses': {
-            'name': '{{ t("category_personal_expenses", default="Personal Expenses") }}',
-            'description': '{{ t("category_personal_expenses_desc", default="Personal expenses not related to business") }}',
-            'examples': ['{{ t("example_personal_meals", default="Personal meals") }}', '{{ t("example_personal_shopping", default="Personal shopping") }}', '{{ t("example_family_expenses", default="Family expenses") }}'],
-            'tax_deductible': false,
-            'is_personal': true
-        },
-        'statutory_legal': {
-            'name': '{{ t("category_statutory_legal", default="Statutory & Legal Contributions") }}',
-            'description': '{{ t("category_statutory_legal_desc", default="Accounting, legal, and consulting fees directly related to business") }}',
-            'examples': ['{{ t("example_accounting_fees", default="Accounting fees") }}', '{{ t("example_legal_fees", default="Legal fees") }}', '{{ t("example_consulting_fees", default="Consulting fees") }}'],
-            'tax_deductible': true,
-            'is_personal': false
-        }
-    };
+    // Use Jinja2's tojson filter to safely serialize category data
+    const categoryData = {{ expense_categories | tojson }};
 
     const categorySelect = document.getElementById('expense_category');
     const categoryInfo = document.getElementById('category-info');
