@@ -133,7 +133,7 @@ GENERAL_TRANSLATIONS = {
         'general_amount': 'Amount',
         'general_expense_category': 'Expense Category',
         'expense_category_help': 'Choose the appropriate expense category to ensure accurate tax deductibility classification and compliance reporting',
-        'category_office_admin': 'Office & Admin',
+        'category_office_admin': 'Office and Admin',
         'category_examples': 'Examples',
         'not_tax_deductible': 'Not Tax Deductible',
         'tax_deductible': 'Tax Deductible',
@@ -658,7 +658,7 @@ GENERAL_TRANSLATIONS = {
         'general_who_we_serve_desc': 'Your Money, Your Terms',
         'general_our_tools': 'Our Tools',
         'general_tools_desc': 'Powerful tools to manage your finances effectively',
-        'general_debtors_creditors': 'Debtors & Creditors',
+        'general_debtors_creditors': 'Debtors and Creditors',
         'general_debtors_creditors_desc': 'Track what you owe and what is owed to you',
         'general_secure': 'Secure and Reliable',
         'general_faq_roles': 'What roles are available on FiCore?',
@@ -992,7 +992,7 @@ GENERAL_TRANSLATIONS = {
         'presumptive_point4': 'Reduces administrative burden on small businesses',
         
         # Deductions Module
-        'module_deductions_title': 'Deductions & Reliefs',
+        'module_deductions_title': 'Deductions and Reliefs',
         'module_deductions_desc': 'Learn about allowable deductions and reliefs to minimize your tax liability.',
         'business_expenses_title': 'Business Expenses',
         'business_expenses_content': 'Legitimate business expenses can be deducted from your taxable income.',
@@ -1072,7 +1072,7 @@ GENERAL_TRANSLATIONS = {
         'consequences_point4': 'Damage to business reputation and credibility',
         
         # Tracking Module
-        'module_tracking_title': 'Record Keeping & Compliance',
+        'module_tracking_title': 'Record Keeping and Compliance',
         'module_tracking_desc': 'Master essential record-keeping practices required for Nigerian tax compliance and sustainable business growth.',
         'digital_records_title': 'Digital Record Keeping',
         'digital_records_content': 'Modern tools make record keeping easier and more accurate.',
@@ -1102,25 +1102,25 @@ GENERAL_TRANSLATIONS = {
         'search_tip4': 'Browse our education modules directly',
         
         # Missing Tax Calculator Keys
-        'office_admin_cat': 'Office & Admin',
+        'office_admin_cat': 'Office and Admin',
         'office_admin_desc': 'Office supplies, stationery, internet/data, utility bills',
-        'staff_wages_cat': 'Staff & Wages',
+        'staff_wages_cat': 'Staff and Wages',
         'staff_wages_desc': 'Employee salaries, wages, and related costs',
-        'business_travel_cat': 'Business Travel & Transport',
+        'business_travel_cat': 'Business Travel and Transport',
         'business_travel_desc': 'Fuel, vehicle maintenance, and travel expenses for business',
-        'rent_utilities_cat': 'Rent & Utilities',
+        'rent_utilities_cat': 'Rent and Utilities',
         'rent_utilities_desc': 'Rent for shop or business office',
-        'marketing_sales_cat': 'Marketing & Sales',
+        'marketing_sales_cat': 'Marketing and Sales',
         'marketing_sales_desc': 'Advertising, social media promotion, business cards',
         'cogs_cat': 'Cost of Goods Sold (COGS)',
         'cogs_desc': 'Direct costs of producing goods or services',
         'personal_expenses_cat': 'Personal Expenses',
         'personal_expenses_desc': 'Personal expenses not related to business',
-        'statutory_legal_cat': 'Statutory & Legal Contributions',
+        'statutory_legal_cat': 'Statutory and Legal Contributions',
         'statutory_legal_desc': 'Accounting, legal, and consulting fees directly related to business',
         'business_entity_type': 'Business Entity Type',
         'change_entity_type': 'Change',
-        'income_expenses_title': 'Income & Expenses',
+        'income_expenses_title': 'Income and Expenses',
         'annual_income_title': 'Annual Income',
         'income_label': 'Total Annual Income',
         'total_income_placeholder': 'Enter your total annual income',
@@ -1137,7 +1137,7 @@ GENERAL_TRANSLATIONS = {
         'amount_label': 'Amount (₦)',
         'amount_placeholder': '0.00',
         'examples_label': 'Examples:',
-        'step2_statutory_title': 'Step 2: Statutory & Legal Contributions',
+        'step2_statutory_title': 'Step 2: Statutory and Legal Contributions',
         'step2_description': 'These expenses are deducted separately in Step 2 of the tax calculation.',
         'statutory_deduction': 'Statutory Deduction',
         'personal_expenses_title': 'Personal Expenses (Not Tax Deductible)',
@@ -1151,7 +1151,7 @@ GENERAL_TRANSLATIONS = {
         'step1_help': 'Net Business Profit:',
         'step1_help_desc': 'Total income minus main business expenses (6 categories)',
         'step2_help': 'Statutory Deductions:',
-        'step2_help_desc': 'Subtract statutory & legal contributions separately',
+        'step2_help_desc': 'Subtract statutory and legal contributions separately',
         'step3_help': 'Rent Relief:',
         'step3_help_desc': 'Apply rent relief (maximum ₦500,000 or 20% of rent)',
         'step4_help': 'Progressive Tax:',
@@ -1174,7 +1174,7 @@ GENERAL_TRANSLATIONS = {
         'step1_title': 'Net Business Profit',
         'step1_info': 'Income minus main business expenses (6 categories)',
         'step2_title': 'Statutory Deductions',
-        'step2_info': 'Subtract statutory & legal contributions separately',
+        'step2_info': 'Subtract statutory and legal contributions separately',
         'step3_title': 'Rent Relief',
         'step3_info': 'Apply rent relief (maximum ₦500,000 or 20% of rent)',
         'step4_title': 'Progressive Tax',
@@ -1561,7 +1561,7 @@ GENERAL_TRANSLATIONS = {
         'general_notes': 'Bayanan Kula',
         'general_category': 'Rukuni',
 
-        # General Navigation & UI
+        # General Navigation and UI
         'general_home': 'Gida',
         'general_dashboard': 'Allo',
         'general_breadcrumb_dashboard': 'Allon Duka',
@@ -1761,7 +1761,7 @@ GENERAL_TRANSLATIONS = {
         'general_who_we_serve_desc': 'Mafita na kuɗi da aka keɓance ga daidaikun mutane, yan kasuwa, da wakilai',
         'general_our_tools': 'Kayan Aikinmu',
         'general_tools_desc': 'Kayan aiki masu ƙarfi don sarrafa kuɗin ka cikin inganci',
-        'general_debtors_creditors': 'Masu Bashi & Masu Biyan Bashi',
+        'general_debtors_creditors': 'Masu Bashi and Masu Biyan Bashi',
         'general_debtors_creditors_desc': 'Bi diddigin abin da kake bashi da abin da ake bin ka',
         'general_secure': 'Amintacce kuma Abin Dogaro',
         'general_faq_roles': 'Waɗanne ayyuka ne ake samu a FiCore?',
@@ -1938,7 +1938,7 @@ GENERAL_TRANSLATIONS = {
         'general_database_connection_established': 'An kafa haɗin bayanan bayanai',
         'general_index_exists': 'Index yana wanzu',
 
-        # Settings & Profile
+        # Settings and Profile
         'settings_title': 'Saituna',
         'settings_first_name_placeholder': 'Shigar da sunan ka na farko',
         'settings_last_name_placeholder': 'Shigar da sunan ka na ƙarshe',
@@ -1992,14 +1992,14 @@ GENERAL_TRANSLATIONS = {
         'settings_90_days': 'Kwana 90',
         'settings_invalid_reminder_frequency': 'An zaɓi mitar tunatarwa mara inganci',
 
-        # Dashboard & Reports
+        # Dashboard and Reports
         'dashboard_title': 'Dashboard',
         'dashboard_load_error': 'An kasa loda bayanan dashboard. Da fatan za a sake gwadawa daga baya.',
         'dashboard_cashflow_analysis': 'Binciken Kuɗin Kuɗi',
         'dashboard_cashflow_desc': 'Bayanin kuɗin kuɗi',
         'business_reports': 'Rahotannin Kasuwanci',
         'business_reports_desc': 'Duba da nazarin ma\'aunin aikin kasuwancinku',
-        # Authentication & User Management
+        # Authentication and User Management
         'general_login_identifier': 'Sunan Mai Amfani ko Imel',
         'general_identifier_required': 'Sunan Mai Amfani ko Imel ake buƙata',
         'general_identifier_length': 'Sunan Mai Amfani ko Imel dole ne ya kasance aƙalla haruffa 4',
