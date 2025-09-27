@@ -64,6 +64,7 @@ def sync_form_deductions_to_cashflows(user_id, tax_year, deductions, db):
                 'tax_year': tax_year,
                 'expense_category': item['category'],
                 'amount': float(item['amount']),
+                'party_name': bleach.clean(item['name']) or 'Tax Deduction',
                 'description': bleach.clean(item['name']),
                 'note': bleach.clean(item['note']) if item['note'] else None,
                 'created_at': datetime.utcnow()
@@ -712,4 +713,5 @@ def history():
             calculations={},
             tool_title=trans('tax_history', default='Tax History')
         )
+
 
