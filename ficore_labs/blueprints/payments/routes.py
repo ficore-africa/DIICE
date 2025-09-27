@@ -1,3 +1,4 @@
+```python
 from flask import Blueprint, render_template, redirect, url_for, flash, request, Response
 from flask_login import login_required, current_user
 from flask_wtf import FlaskForm
@@ -91,8 +92,8 @@ class PaymentForm(FlaskForm):
 payments_bp = Blueprint('payments', __name__, url_prefix='/payments')
 
 def normalize_datetime(doc):
-    """Convert created_at to timezone-aware datetime if naive."""
-    if 'created_at' in doc and doc['created_at'].tzinfo is None:
+    """Convert created_at and updated_at to timezone-aware datetimes if naive."""
+    if 'created_at' in doc and doc['created_at'] and doc['created_at'].tzinfo is None:
         doc['created_at'] = doc['created_at'].replace(tzinfo=ZoneInfo("UTC"))
     if 'updated_at' in doc and doc['updated_at'] and doc['updated_at'].tzinfo is None:
         doc['updated_at'] = doc['updated_at'].replace(tzinfo=ZoneInfo("UTC"))
@@ -126,8 +127,7 @@ def index():
             expense_categories=expense_categories
         )
     except Exception as e:
-        error_message = str(e).replace('\\', '\\\\')
-        logger.error(f"Error fetching payments for user {current_user.id}: {error_message}")
+        logger.error(f"Error fetching payments for user {current_user.id}: {str(e)}", exc_info=True)
         flash(trans('payments_fetch_error', default='An error occurred while loading your payments. Please try again.'), 'danger')
         return redirect(url_for('dashboard.index'))
 
@@ -153,8 +153,7 @@ def manage():
             form=PaymentForm()
         )
     except Exception as e:
-        error_message = str(e).replace('\\', '\\\\')
-        logger.error(f"Error fetching payments for manage page for user {current_user.id}: {error_message}")
+        logger.error(f"Error fetching payments for manage page for user {current_user.id}: {str(e)}", exc_info=True)
         flash(trans('payments_fetch_error', default='An error occurred while loading your payments. Please try again.'), 'danger')
         return redirect(url_for('payments.index'))
 
@@ -181,8 +180,7 @@ def view(id):
         logger.error(f"Invalid payment ID {id} for user {current_user.id}")
         return utils.safe_json_response({'error': trans('payments_invalid_id', default='Invalid payment ID')}, 404)
     except Exception as e:
-        error_message = str(e).replace('\\', '\\\\')
-        logger.error(f"Error fetching payment {id} for user {current_user.id}: {error_message}")
+        logger.error(f"Error fetching payment {id} for user {current_user.id}: {str(e)}", exc_info=True)
         return utils.safe_json_response({'error': trans('payments_fetch_error', default='An error occurred')}, 500)
 
 @payments_bp.route('/generate_pdf/<id>')
@@ -264,8 +262,7 @@ def generate_pdf(id):
         flash(trans('payments_invalid_id', default='Invalid payment ID'), 'danger')
         return redirect(url_for('payments.index'))
     except Exception as e:
-        error_message = str(e).replace('\\', '\\\\')
-        logger.error(f"Error generating PDF for payment {id} for user {current_user.id}: {error_message}")
+        logger.error(f"Error generating PDF for payment {id} for user {current_user.id}: {str(e)}", exc_info=True)
         flash(trans('payments_pdf_generation_error', default='An error occurred'), 'danger')
         return redirect(url_for('payments.index'))
 
@@ -361,8 +358,7 @@ def add():
         flash(trans('payments_csrf_error', default='Invalid CSRF token. Please try again.'), 'danger')
         return redirect(url_for('payments.index')), 400
     except Exception as e:
-        error_message = str(e).replace('\\', '\\\\')
-        logger.error(f"Error adding payment for user {current_user.id}: {error_message}")
+        logger.error(f"Error adding payment for user {current_user.id}: {str(e)}", exc_info=True)
         flash(trans('payments_add_error', default='An error occurred'), 'danger')
         return redirect(url_for('payments.index'))
 
@@ -436,8 +432,7 @@ def edit(id):
         flash(trans('payments_csrf_error', default='Invalid CSRF token. Please try again.'), 'danger')
         return redirect(url_for('payments.index')), 400
     except Exception as e:
-        error_message = str(e).replace('\\', '\\\\')
-        logger.error(f"Error fetching payment {id} for user {current_user.id}: {error_message}")
+        logger.error(f"Error fetching payment {id} for user {current_user.id}: {str(e)}", exc_info=True)
         flash(trans('payments_record_not_found', default='Cashflow not found'), 'danger')
         return redirect(url_for('payments.index'))
 
@@ -471,8 +466,7 @@ def delete(id):
         flash(trans('payments_csrf_error', default='Invalid CSRF token. Please try again.'), 'danger')
         return redirect(url_for('payments.index')), 400
     except Exception as e:
-        error_message = str(e).replace('\\', '\\\\')
-        logger.error(f"Error deleting payment {id} for user {current_user.id}: {error_message}")
+        logger.error(f"Error deleting payment {id} for user {current_user.id}: {str(e)}", exc_info=True)
         flash(trans('payments_delete_error', default='An error occurred'), 'danger')
         return redirect(url_for('payments.index'))
 
@@ -542,9 +536,9 @@ def share():
             'message': trans('payments_csrf_error', default='Invalid CSRF token. Please try again.')
         }, 400)
     except Exception as e:
-        error_message = str(e).replace('\\', '\\\\')
-        logger.error(f"Error sharing payment {payment_id} for user {current_user.id}: {error_message}")
+        logger.error(f"Error sharing payment {payment_id} for user {current_user.id}: {str(e)}", exc_info=True)
         return utils.safe_json_response({
             'success': False,
             'message': trans('payments_share_error', default='Error sharing payment')
         }, 500)
+```
