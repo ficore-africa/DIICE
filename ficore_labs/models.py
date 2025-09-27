@@ -157,6 +157,70 @@ def get_db():
         logger.error(f"Error connecting to database: {str(e)}", exc_info=True)
         raise
 
+def convert_naive_to_aware_datetimes(db):
+    """
+    Convert naive datetimes to UTC-aware datetimes in all collections.
+    
+    Args:
+        db: MongoDB database instance
+    """
+    try:
+        # Check if migration has already been applied
+        if db.system_config.find_one({'_id': 'datetime_migration_applied'}):
+            logger.info("Naive datetime migration already applied, skipping.")
+            return
+        
+        datetime_fields = ['created_at', 'updated_at', 'timestamp', 'trial_start', 'trial_end', 
+                          'subscription_start', 'subscription_end', 'expires_at', 'redeemed_at', 
+                          'last_viewed', 'completed_at', 'payment_date', 'approved_at', 'rejected_at']
+        
+        for collection_name in db.list_collection_names():
+            collection = db[collection_name]
+            # Get a sample document to check for relevant fields
+            sample_doc = collection.find_one() or {}
+            # Filter fields that exist in the sample document
+            relevant_fields = [field for field in datetime_fields if field in sample_doc]
+            
+            if not relevant_fields:
+                continue
+                
+            # Find documents with naive datetimes
+            query = {
+                '$or': [
+                    {field: {'$type': 'date', '$not': {'$type': 'timestamp'}}}
+                    for field in relevant_fields
+                ]
+            }
+            
+            updated_count = 0
+            for doc in collection.find(query):
+                updates = {}
+                for field in relevant_fields:
+                    if field in doc and isinstance(doc[field], datetime) and doc[field].tzinfo is None:
+                        updates[field] = parse_and_normalize_datetime(doc[field])
+                
+                if updates:
+                    collection.update_one(
+                        {'_id': doc['_id']},
+                        {'$set': updates}
+                    )
+                    updated_count += 1
+            
+            if updated_count > 0:
+                logger.info(f"Converted {updated_count} naive datetimes to UTC-aware in {collection_name}")
+        
+        # Mark migration as complete
+        db.system_config.update_one(
+            {'_id': 'datetime_migration_applied'},
+            {'$set': {'value': True, 'migrated_at': datetime.now(timezone.utc)}},
+            upsert=True
+        )
+        logger.info("Naive datetime migration completed and marked in system_config")
+        
+    except Exception as e:
+        logger.error(f"Failed to convert naive datetimes: {str(e)}", exc_info=True)
+        raise
+
 def verify_no_naive_datetimes(db):
     """
     Verify no naive datetimes remain in any collection.
@@ -755,6 +819,12 @@ def initialize_app_data(app):
                     logger.error(f"Failed to fix user documents: {str(e)}", exc_info=True)
                     raise
             
+            try:
+                convert_naive_to_aware_datetimes(db_instance)
+            except Exception as e:
+                logger.error(f"Failed to convert naive datetimes during initialization: {str(e)}", exc_info=True)
+                raise
+                
             try:
                 verify_no_naive_datetimes(db_instance)
             except Exception as e:
