@@ -21,15 +21,15 @@ from reportlab.lib.styles import getSampleStyleSheet
 
 logger = logging.getLogger(__name__)
 
-# Define expense categories with pre-sanitized strings
+# Define expense categories with simplified names (no ampersands) and aligned with tracking blueprint
 expense_categories = {
     'office_admin': {
-        'name': utils.sanitize_input(trans('category_office_admin', default='Office & Admin'), max_length=100),
-        'description': utils.sanitize_input(trans('category_office_admin_desc', default='Office supplies, stationery, internet/data, utility bills'), max_length=1000),
+        'name': utils.sanitize_input(trans('category_office_admin', default='Office Admin'), max_length=100),
+        'description': utils.sanitize_input(trans('category_office_admin_desc', default='Office supplies, stationery, internet, utility bills'), max_length=1000),
         'examples': [
-            utils.sanitize_input(trans('example_office_supplies', default='Office supplies'), max_length=100),
+            utils.sanitize_input(trans('example_office_supplies', default='Office Supplies'), max_length=100),
             utils.sanitize_input(trans('example_stationery', default='Stationery'), max_length=100),
-            utils.sanitize_input(trans('example_internet', default='Internet/Data'), max_length=100),
+            utils.sanitize_input(trans('example_internet', default='Internet'), max_length=100),
             utils.sanitize_input(trans('example_electricity', default='Electricity'), max_length=100)
         ],
         'tax_deductible': True,
@@ -37,62 +37,62 @@ expense_categories = {
         'is_statutory': False
     },
     'staff_wages': {
-        'name': utils.sanitize_input(trans('category_staff_wages', default='Staff & Wages'), max_length=100),
-        'description': utils.sanitize_input(trans('category_staff_wages_desc', default='Employee salaries, wages, and related costs'), max_length=1000),
+        'name': utils.sanitize_input(trans('category_staff_wages', default='Staff Wages'), max_length=100),
+        'description': utils.sanitize_input(trans('category_staff_wages_desc', default='Employee salaries, wages, benefits'), max_length=1000),
         'examples': [
             utils.sanitize_input(trans('example_salaries', default='Salaries'), max_length=100),
             utils.sanitize_input(trans('example_wages', default='Wages'), max_length=100),
-            utils.sanitize_input(trans('example_staff_benefits', default='Staff benefits'), max_length=100),
-            utils.sanitize_input(trans('example_payroll', default='Payroll costs'), max_length=100)
+            utils.sanitize_input(trans('example_staff_benefits', default='Benefits'), max_length=100),
+            utils.sanitize_input(trans('example_payroll', default='Payroll'), max_length=100)
         ],
         'tax_deductible': True,
         'is_personal': False,
         'is_statutory': False
     },
     'business_travel': {
-        'name': utils.sanitize_input(trans('category_business_travel', default='Business Travel & Transport'), max_length=100),
-        'description': utils.sanitize_input(trans('category_business_travel_desc', default='Fuel, vehicle maintenance, and travel expenses for business'), max_length=1000),
+        'name': utils.sanitize_input(trans('category_business_travel', default='Business Travel'), max_length=100),
+        'description': utils.sanitize_input(trans('category_business_travel_desc', default='Fuel, vehicle maintenance, business travel expenses'), max_length=1000),
         'examples': [
             utils.sanitize_input(trans('example_fuel', default='Fuel'), max_length=100),
-            utils.sanitize_input(trans('example_vehicle_maintenance', default='Vehicle maintenance'), max_length=100),
-            utils.sanitize_input(trans('example_business_travel', default='Business travel'), max_length=100),
-            utils.sanitize_input(trans('example_transport', default='Transport costs'), max_length=100)
+            utils.sanitize_input(trans('example_vehicle_maintenance', default='Vehicle Maintenance'), max_length=100),
+            utils.sanitize_input(trans('example_business_travel', default='Travel'), max_length=100),
+            utils.sanitize_input(trans('example_transport', default='Transport'), max_length=100)
         ],
         'tax_deductible': True,
         'is_personal': False,
         'is_statutory': False
     },
     'rent_utilities': {
-        'name': utils.sanitize_input(trans('category_rent_utilities', default='Rent & Utilities'), max_length=100),
-        'description': utils.sanitize_input(trans('category_rent_utilities_desc', default='Rent for shop or business office'), max_length=1000),
+        'name': utils.sanitize_input(trans('category_rent_utilities', default='Rent Utilities'), max_length=100),
+        'description': utils.sanitize_input(trans('category_rent_utilities_desc', default='Rent for shop or business office, utilities'), max_length=1000),
         'examples': [
-            utils.sanitize_input(trans('example_shop_rent', default='Shop rent'), max_length=100),
-            utils.sanitize_input(trans('example_office_rent', default='Office rent'), max_length=100),
-            utils.sanitize_input(trans('example_business_premises', default='Business premises rent'), max_length=100)
+            utils.sanitize_input(trans('example_shop_rent', default='Shop Rent'), max_length=100),
+            utils.sanitize_input(trans('example_office_rent', default='Office Rent'), max_length=100),
+            utils.sanitize_input(trans('example_business_premises', default='Premises Rent'), max_length=100)
         ],
         'tax_deductible': True,
         'is_personal': False,
         'is_statutory': False
     },
     'marketing_sales': {
-        'name': utils.sanitize_input(trans('category_marketing_sales', default='Marketing & Sales'), max_length=100),
-        'description': utils.sanitize_input(trans('category_marketing_sales_desc', default='Advertising, social media promotion, business cards'), max_length=1000),
+        'name': utils.sanitize_input(trans('category_marketing_sales', default='Marketing Sales'), max_length=100),
+        'description': utils.sanitize_input(trans('category_marketing_sales_desc', default='Advertising, social media, business cards'), max_length=1000),
         'examples': [
             utils.sanitize_input(trans('example_advertising', default='Advertising'), max_length=100),
-            utils.sanitize_input(trans('example_social_media', default='Social media promotion'), max_length=100),
-            utils.sanitize_input(trans('example_business_cards', default='Business cards'), max_length=100)
+            utils.sanitize_input(trans('example_social_media', default='Social Media'), max_length=100),
+            utils.sanitize_input(trans('example_business_cards', default='Business Cards'), max_length=100)
         ],
         'tax_deductible': True,
         'is_personal': False,
         'is_statutory': False
     },
     'cogs': {
-        'name': utils.sanitize_input(trans('category_cogs', default='Cost of Goods Sold (COGS)'), max_length=100),
-        'description': utils.sanitize_input(trans('category_cogs_desc', default='Direct costs of producing goods or services'), max_length=1000),
+        'name': utils.sanitize_input(trans('category_cogs', default='Cost of Goods Sold'), max_length=100),
+        'description': utils.sanitize_input(trans('category_cogs_desc', default='Costs for producing goods or services'), max_length=1000),
         'examples': [
-            utils.sanitize_input(trans('example_raw_materials', default='Raw materials'), max_length=100),
-            utils.sanitize_input(trans('example_manufacturing', default='Manufacturing costs'), max_length=100),
-            utils.sanitize_input(trans('example_direct_labor', default='Direct labor'), max_length=100)
+            utils.sanitize_input(trans('example_raw_materials', default='Raw Materials'), max_length=100),
+            utils.sanitize_input(trans('example_manufacturing', default='Manufacturing'), max_length=100),
+            utils.sanitize_input(trans('example_direct_labor', default='Direct Labor'), max_length=100)
         ],
         'tax_deductible': True,
         'is_personal': False,
@@ -100,23 +100,23 @@ expense_categories = {
     },
     'personal_expenses': {
         'name': utils.sanitize_input(trans('category_personal_expenses', default='Personal Expenses'), max_length=100),
-        'description': utils.sanitize_input(trans('category_personal_expenses_desc', default='Personal expenses not related to business'), max_length=1000),
+        'description': utils.sanitize_input(trans('category_personal_expenses_desc', default='Non-business personal expenses'), max_length=1000),
         'examples': [
-            utils.sanitize_input(trans('example_personal_meals', default='Personal meals'), max_length=100),
-            utils.sanitize_input(trans('example_personal_shopping', default='Personal shopping'), max_length=100),
-            utils.sanitize_input(trans('example_family_expenses', default='Family expenses'), max_length=100)
+            utils.sanitize_input(trans('example_personal_meals', default='Meals'), max_length=100),
+            utils.sanitize_input(trans('example_personal_shopping', default='Shopping'), max_length=100),
+            utils.sanitize_input(trans('example_family_expenses', default='Family Expenses'), max_length=100)
         ],
         'tax_deductible': False,
         'is_personal': True,
         'is_statutory': False
     },
-    'statutory_legal': {
-        'name': utils.sanitize_input(trans('category_statutory_legal', default='Statutory & Legal Contributions'), max_length=100),
-        'description': utils.sanitize_input(trans('category_statutory_legal_desc', default='Accounting, legal, and consulting fees directly related to business'), max_length=1000),
+    'statutory_contributions': {
+        'name': utils.sanitize_input(trans('category_statutory_contributions', default='Statutory Contributions'), max_length=100),
+        'description': utils.sanitize_input(trans('category_statutory_contributions_desc', default='Accounting, legal, consulting fees'), max_length=1000),
         'examples': [
-            utils.sanitize_input(trans('example_accounting_fees', default='Accounting fees'), max_length=100),
-            utils.sanitize_input(trans('example_legal_fees', default='Legal fees'), max_length=100),
-            utils.sanitize_input(trans('example_consulting_fees', default='Consulting fees'), max_length=100)
+            utils.sanitize_input(trans('example_accounting_fees', default='Accounting Fees'), max_length=100),
+            utils.sanitize_input(trans('example_legal_fees', default='Legal Fees'), max_length=100),
+            utils.sanitize_input(trans('example_consulting_fees', default='Consulting Fees'), max_length=100)
         ],
         'tax_deductible': True,
         'is_personal': False,
@@ -149,11 +149,16 @@ class PaymentForm(FlaskForm):
             ]
         except Exception as e:
             logger.warning(f"Failed to load expense category choices: {str(e)}")
-            # Fallback to minimal categories
+            # Fallback to minimal categories aligned with tracking blueprint
             self.expense_category.choices = [
-                ('office_admin', trans('category_office_admin', default='Office & Admin')),
-                ('staff_wages', trans('category_staff_wages', default='Staff & Wages')),
-                ('personal_expenses', trans('category_personal_expenses', default='Personal Expenses'))
+                ('office_admin', trans('category_office_admin', default='Office Admin')),
+                ('staff_wages', trans('category_staff_wages', default='Staff Wages')),
+                ('business_travel', trans('category_business_travel', default='Business Travel')),
+                ('rent_utilities', trans('category_rent_utilities', default='Rent Utilities')),
+                ('marketing_sales', trans('category_marketing_sales', default='Marketing Sales')),
+                ('cogs', trans('category_cogs', default='Cost of Goods Sold')),
+                ('personal_expenses', trans('category_personal_expenses', default='Personal Expenses')),
+                ('statutory_contributions', trans('category_statutory_contributions', default='Statutory Contributions'))
             ]
 
 payments_bp = Blueprint('payments', __name__, url_prefix='/payments')
@@ -222,7 +227,7 @@ def normalize_datetime(doc):
 
 @payments_bp.route('/')
 @login_required
-@utils.requires_role(['trader', 'startup', 'admin'])
+@utils.requires_role(['trader', 'admin'])
 def index():
     """List all payment cashflows for the current user."""
     try:
@@ -234,11 +239,11 @@ def index():
         cleaned_payments = []
         for payment in payments:
             try:
-                # Log raw payment for debugging
                 logger.debug(f"Raw payment before serialization in index: {payment}")
-                # Sanitize all fields recursively
                 payment = sanitize_dict(payment.copy())
                 cleaned_payment = serialize_for_json(payment)
+                cleaned_payment['formatted_amount'] = utils.format_currency(payment['amount'], currency='₦')
+                cleaned_payment['formatted_date'] = utils.format_date(payment['created_at'], format_type='short')
                 cleaned_payments.append(cleaned_payment)
             except Exception as e:
                 logger.warning(f"Failed to serialize payment {payment.get('_id', 'unknown')} in index: {str(e)}")
@@ -258,8 +263,6 @@ def index():
             'payments/index.html',
             payments=cleaned_payments,
             category_stats=category_stats,
-            format_currency=utils.format_currency,
-            format_date=utils.format_date,
             title=trans('payments_title', default='Money Out', lang=session.get('lang', 'en')),
             can_interact=utils.can_user_interact(current_user),
             expense_categories=expense_categories
@@ -274,7 +277,7 @@ def index():
 
 @payments_bp.route('/manage')
 @login_required
-@utils.requires_role(['trader', 'startup', 'admin'])
+@utils.requires_role(['trader', 'admin'])
 def manage():
     """Manage all payment cashflows for the current user (edit/delete)."""
     try:
@@ -285,11 +288,11 @@ def manage():
         cleaned_payments = []
         for payment in payments:
             try:
-                # Log raw payment for debugging
                 logger.debug(f"Raw payment before serialization in manage: {payment}")
-                # Sanitize all fields recursively
                 payment = sanitize_dict(payment.copy())
                 cleaned_payment = serialize_for_json(payment)
+                cleaned_payment['formatted_amount'] = utils.format_currency(payment['amount'], currency='₦')
+                cleaned_payment['formatted_date'] = utils.format_date(payment['created_at'], format_type='short')
                 cleaned_payments.append(cleaned_payment)
             except Exception as e:
                 logger.warning(f"Failed to serialize payment {payment.get('_id', 'unknown')} in manage: {str(e)}")
@@ -309,8 +312,6 @@ def manage():
             'payments/manage.html',
             payments=cleaned_payments,
             category_stats=category_stats,
-            format_currency=utils.format_currency,
-            format_date=utils.format_date,
             title=trans('payments_manage', default='Manage Payments', lang=session.get('lang', 'en')),
             can_interact=utils.can_user_interact(current_user),
             expense_categories=expense_categories,
@@ -326,7 +327,7 @@ def manage():
 
 @payments_bp.route('/view/<id>')
 @login_required
-@utils.requires_role(['trader', 'startup', 'admin'])
+@utils.requires_role(['trader', 'admin'])
 @utils.limiter.limit('20 per minute')
 def view(id):
     """View detailed information about a specific payment."""
@@ -356,13 +357,13 @@ def view(id):
         payment.setdefault('contact', '')
         payment.setdefault('description', '')
         
-        # Log raw payment for debugging
         logger.debug(f"Raw payment before serialization in view: {payment}")
-        # Sanitize all fields recursively
         payment = sanitize_dict(payment.copy())
         
         from models import to_dict_cashflow
         payment = to_dict_cashflow(payment)
+        payment['formatted_amount'] = utils.format_currency(payment['amount'], currency='₦')
+        payment['formatted_date'] = utils.format_date(payment['created_at'], format_type='short')
         return safe_json_response(payment)
     except ValueError:
         logger.error(
@@ -379,7 +380,7 @@ def view(id):
 
 @payments_bp.route('/generate_pdf/<id>')
 @login_required
-@utils.requires_role(['trader', 'startup', 'admin'])
+@utils.requires_role(['trader', 'admin'])
 def generate_pdf(id):
     """Generate PDF receipt for a payment transaction."""
     try:
@@ -399,9 +400,7 @@ def generate_pdf(id):
             return redirect(url_for('payments.index'))
         
         payment = normalize_datetime(payment)
-        # Log raw payment for debugging
         logger.debug(f"Raw payment before serialization in generate_pdf: {payment}")
-        # Sanitize all fields recursively
         payment = sanitize_dict(payment.copy())
         
         from models import to_dict_cashflow
@@ -409,7 +408,7 @@ def generate_pdf(id):
         
         payment['party_name'] = utils.sanitize_input(payment['party_name'], max_length=100)
         category_display = payment.get('category_metadata', {}).get('category_display_name', 
-                                     payment.get('expense_category', 'No category provided'))
+                                     expense_categories.get(payment.get('expense_category', 'office_admin'), {}).get('name', 'No category'))
         payment['category_display'] = utils.sanitize_input(category_display, max_length=50)
         payment['contact'] = utils.sanitize_input(payment.get('contact', ''), max_length=100) if payment.get('contact') else ''
         payment['description'] = utils.sanitize_input(payment.get('description', ''), max_length=1000) if payment.get('description') else ''
@@ -427,10 +426,10 @@ def generate_pdf(id):
         y_position = height - inch - 0.5 * inch
         fields = [
             (trans('payments_recipient_name', default='Recipient'), payment['party_name']),
-            (trans('payments_amount', default='Amount Paid'), utils.format_currency(payment['amount'])),
+            (trans('payments_amount', default='Amount Paid'), utils.format_currency(payment['amount'], currency='₦')),
             (trans('general_payment_method', default='Payment Method'), payment.get('method', 'N/A')),
             (trans('general_category', default='Category'), payment['category_display']),
-            (trans('general_date', default='Date'), utils.format_date(payment['created_at'])),
+            (trans('general_date', default='Date'), utils.format_date(payment['created_at'], format_type='short')),
             (trans('payments_id', default='Payment ID'), payment['id'])
         ]
         for label, value in fields:
@@ -483,7 +482,7 @@ def generate_pdf(id):
 
 @payments_bp.route('/add', methods=['GET', 'POST'])
 @login_required
-@utils.requires_role(['trader', 'startup', 'admin'])
+@utils.requires_role(['trader', 'admin'])
 @utils.limiter.limit('10 per minute')
 def add():
     """Add a new payment cashflow."""
@@ -523,7 +522,7 @@ def add():
                 
                 db = utils.get_mongo_db()
                 payment_date = safe_parse_datetime(datetime.combine(form.date.data, datetime.min.time(), tzinfo=ZoneInfo('UTC')))
-                category_metadata = utils.get_category_metadata(form.expense_category.data)
+                category_metadata = expense_categories.get(form.expense_category.data, {})
                 
                 cashflow = {
                     'user_id': str(current_user.id),
@@ -532,7 +531,7 @@ def add():
                     'amount': form.amount.data,
                     'method': form.method.data,
                     'expense_category': form.expense_category.data,
-                    'is_tax_deductible': utils.is_category_tax_deductible(form.expense_category.data),
+                    'is_tax_deductible': category_metadata.get('tax_deductible', False),
                     'tax_year': utils.extract_tax_year_from_date(payment_date),
                     'category_metadata': sanitize_dict({
                         'category_display_name': category_metadata.get('name', ''),
@@ -574,7 +573,7 @@ def add():
 
 @payments_bp.route('/edit/<id>', methods=['GET', 'POST'])
 @login_required
-@utils.requires_role(['trader', 'startup', 'admin'])
+@utils.requires_role(['trader', 'admin'])
 @utils.limiter.limit('10 per minute')
 def edit(id):
     """Edit an existing payment cashflow."""
@@ -595,9 +594,7 @@ def edit(id):
             return redirect(url_for('payments.index'))
         
         payment = normalize_datetime(payment)
-        # Log raw payment for debugging
         logger.debug(f"Raw payment before serialization in edit: {payment}")
-        # Sanitize all fields recursively
         payment = sanitize_dict(payment.copy())
         
         from models import to_dict_cashflow
@@ -642,14 +639,14 @@ def edit(id):
                     )
                 
                 payment_date = safe_parse_datetime(datetime.combine(form.date.data, datetime.min.time(), tzinfo=ZoneInfo('UTC')))
-                category_metadata = utils.get_category_metadata(form.expense_category.data)
+                category_metadata = expense_categories.get(form.expense_category.data, {})
                 
                 updated_cashflow = {
                     'party_name': utils.sanitize_input(form.party_name.data, max_length=100),
                     'amount': form.amount.data,
                     'method': form.method.data,
                     'expense_category': form.expense_category.data,
-                    'is_tax_deductible': utils.is_category_tax_deductible(form.expense_category.data),
+                    'is_tax_deductible': category_metadata.get('tax_deductible', False),
                     'tax_year': utils.extract_tax_year_from_date(payment_date),
                     'category_metadata': sanitize_dict({
                         'category_display_name': category_metadata.get('name', ''),
@@ -706,7 +703,7 @@ def edit(id):
 
 @payments_bp.route('/delete/<id>', methods=['POST'])
 @login_required
-@utils.requires_role(['trader', 'startup', 'admin'])
+@utils.requires_role(['trader', 'admin'])
 @utils.limiter.limit('10 per minute')
 def delete(id):
     """Delete a payment cashflow."""
@@ -755,7 +752,7 @@ def delete(id):
 
 @payments_bp.route('/share', methods=['POST'])
 @login_required
-@utils.requires_role(['trader', 'startup', 'admin'])
+@utils.requires_role(['trader', 'admin'])
 @utils.limiter.limit('10 per minute')
 def share():
     """Share a payment receipt via SMS or WhatsApp."""
@@ -807,9 +804,7 @@ def share():
             }, 404)
         
         payment = normalize_datetime(payment)
-        # Log raw payment for debugging
         logger.debug(f"Raw payment before serialization in share: {payment}")
-        # Sanitize all fields recursively
         payment = sanitize_dict(payment.copy())
         
         success = utils.send_message(recipient=recipient, message=message, type=share_type)
