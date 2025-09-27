@@ -77,7 +77,8 @@ def manage_index(collection, keys, options=None, name=None):
         return True
         
     except Exception as e:
-        logger.error(f"Failed to create index on {collection.name}: {str(e).replace('\\', '\\\\')}", exc_info=True)
+        error_msg = str(e).replace('\\', '\\\\')
+        logger.error(f"Failed to create index on {collection.name}: {error_msg}", exc_info=True)
         raise
 
 def to_dict_record(record):
