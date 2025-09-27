@@ -380,6 +380,7 @@ def create_app():
     from blueprints.admin.routes import admin_bp
     from blueprints.dashboard.routes import dashboard_bp
     from blueprints.general.routes import general_bp
+    from notifications.routes import notifications
     from blueprints.business.routes import business
     from blueprints.subscribe.routes import subscribe_bp
     from blueprints.kyc.routes import kyc_bp
