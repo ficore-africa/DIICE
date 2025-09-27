@@ -19,7 +19,7 @@
 
     <div class="row">
         <!-- Calculate New Tax -->
-        <div class="col-lg-4 mb-4">
+        <div class="col-lg-3 mb-4">
             <div class="card shadow-sm h-100">
                 <div class="card-body text-center">
                     <i class="fas fa-calculator fa-3x mb-3 text-primary"></i>
@@ -31,7 +31,7 @@
         </div>
 
         <!-- Tax Dashboard -->
-        <div class="col-lg-4 mb-4">
+        <div class="col-lg-3 mb-4">
             <div class="card shadow-sm h-100">
                 <div class="card-body text-center">
                     <i class="fas fa-chart-pie fa-3x mb-3 text-info"></i>
@@ -43,13 +43,25 @@
         </div>
 
         <!-- Tax History -->
-        <div class="col-lg-4 mb-4">
+        <div class="col-lg-3 mb-4">
             <div class="card shadow-sm h-100">
                 <div class="card-body text-center">
                     <i class="fas fa-history fa-3x mb-3 text-secondary"></i>
                     <h5 class="card-title">{{ t('tax_history', default='Tax History') }}</h5>
                     <p class="card-text text-muted">{{ t('tax_history_description', default='Manage and review your past tax calculations') }}</p>
                     <a href="{{ url_for('tax.history') }}" class="btn btn-secondary">{{ t('general_manage', default='Manage') }}</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tax Learning Module -->
+        <div class="col-lg-3 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-book fa-3x mb-3 text-success"></i>
+                    <h5 class="card-title">{{ t('tax_learning_module', default='Tax Learning Module') }}</h5>
+                    <p class="card-text text-muted">{{ t('tax_learning_module_description', default='Learn about taxation before calculating your taxes') }}</p>
+                    <a href="{{ url_for('education.education_home') }}" class="btn btn-success">{{ t('general_learn', default='Learn') }}</a>
                 </div>
             </div>
         </div>
