@@ -150,7 +150,7 @@ TAX_TRANSLATIONS = {
         'tax_benefit_point4': 'Reduced risk of penalties and disputes with tax authorities',
         'tax_deductible': 'Tax Deductible',
         
-        # Keys from previous template
+        # Keys from previous templates
         'tax_calculate_new': 'Calculate Tax',
         'tax_calculate_description': 'Enter your income, rent expenses, and deductions to calculate your tax liability',
         'tax_income_help': 'Enter your total annual income before deductions',
@@ -223,8 +223,6 @@ TAX_TRANSLATIONS = {
         'tax_year_length': 'Tax year must be 4 digits',
         'tax_calculate': 'Calculate Tax',
         'tax_calculation_error': 'Error calculating tax.',
-        
-        # New keys from additional templates
         'tax_calculate_new_description': 'Enter your income and deductions to calculate your tax liability',
         'general_start': 'Start',
         'general_view': 'View',
@@ -247,7 +245,23 @@ TAX_TRANSLATIONS = {
         'tax_quick_actions': 'Quick Actions',
         'tax_view_history': 'View History',
         'tax_insights': 'Insights',
-        'general_recent_activity': 'Recent Activity'
+        'general_recent_activity': 'Recent Activity',
+        
+        # New keys from warnings
+        'category_staff_wages': 'Staff & Wages',
+        'category_business_travel': 'Business Travel & Transport',
+        'category_rent_utilities': 'Rent & Utilities',
+        'category_marketing_sales': 'Marketing & Sales',
+        'category_cogs': 'Cost of Goods Sold (COGS)',
+        'category_personal_expenses': 'Personal Expenses',
+        'category_statutory_contributions': 'Statutory & Legal Contributions',
+        'tax_item_category_required': 'Tax item category is required',
+        'rent_expenses': 'Rent Expenses',
+        'rent_expenses_max': 'Rent expenses exceed allowed maximum',
+        'entity_type': 'Entity Type',
+        'entity_type_required': 'Entity type is required',
+        'entity_type_length': 'Entity type must be a valid selection',
+        'vat_threshold_content': 'VAT registration is required for businesses with annual turnover above ₦25 million.'
     },
     'ha': {
         'tax_calculator_title': 'Mai kirga haraji mai wayo',
@@ -395,7 +409,7 @@ TAX_TRANSLATIONS = {
         'tax_benefit_point4': 'Rage haɗarin hukunci da rigima da hukumomin haraji',
         'tax_deductible': 'Ana iya Cire Haraji',
         
-        # Keys from previous template
+        # Keys from previous templates
         'tax_calculate_new': 'Kirga Haraji',
         'tax_calculate_description': 'Shigar da kudaden shiga, kudin haya, da ragi don kirga harajin da za ka biya',
         'tax_income_help': 'Shigar da jimillar kudaden shiga na shekara kafin ragi',
@@ -468,8 +482,6 @@ TAX_TRANSLATIONS = {
         'tax_year_length': 'Shekarar haraji dole ne ta kasance lambobi 4',
         'tax_calculate': 'Kirga Haraji',
         'tax_calculation_error': 'Kuskure wajen kirgar haraji.',
-        
-        # New keys from additional templates (Hausa)
         'tax_calculate_new_description': 'Shigar da kudaden shiga da ragi don kirga harajin da za ka biya',
         'general_start': 'Fara',
         'general_view': 'Duba',
@@ -492,6 +504,22 @@ TAX_TRANSLATIONS = {
         'tax_quick_actions': 'Ayyuka masu Sauri',
         'tax_view_history': 'Duba Tarihi',
         'tax_insights': 'Bayani',
-        'general_recent_activity': 'Ayyukan Kwanan nan'
+        'general_recent_activity': 'Ayyukan Kwanan nan',
+        
+        # New keys from warnings
+        'category_staff_wages': 'Ma\'aikata da Albashi',
+        'category_business_travel': 'Balaguro da Sufuri na Kasuwanci',
+        'category_rent_utilities': 'Kudin Haya da Kayayyaki',
+        'category_marketing_sales': 'Talla da Sayarwa',
+        'category_cogs': 'Kudin Kayayyakin da aka Sayar (COGS)',
+        'category_personal_expenses': 'Kudaden Kai',
+        'category_statutory_contributions': 'Gudummawa ta Dokoki da Shari\'a',
+        'tax_item_category_required': 'Rukunin abun haraji ana bukata',
+        'rent_expenses': 'Kudaden Haya',
+        'rent_expenses_max': 'Kudaden haya sun wuce iyaka da aka yarda',
+        'entity_type': 'Nau\'in Kasuwanci',
+        'entity_type_required': 'Nau\'in kasuwanci ana bukata',
+        'entity_type_length': 'Nau\'in kasuwanci dole ne ya zama zaɓi mai inganci',
+        'vat_threshold_content': 'Rijistar VAT ana bukata ga kasuwancin da ke da jimillar kudaden shiga na shekara sama da Naira miliyan 25.'
     }
 }
