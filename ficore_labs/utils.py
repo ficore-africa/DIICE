@@ -2938,6 +2938,38 @@ def ensure_json_serializable(data):
         # If not serializable, clean it
         return serialize_for_json(data)
 
+# In /opt/render/project/src/ficore_labs/utils.py
+def get_all_recent_activities(db, user_id, session_id=None, limit=10):
+    """
+    Fetch recent activities (cashflows) for a given user from the MongoDB database.
+    
+    Args:
+        db: MongoDB database connection
+        user_id: ID of the user
+        session_id: Optional session ID for filtering (default: None)
+        limit: Maximum number of records to return (default: 10)
+    
+    Returns:
+        List of recent cashflow records
+    """
+    try:
+        query = {'user_id': str(user_id)}
+        if session_id:
+            query['session_id'] = session_id
+        # Fetch cashflows with safe_find_cashflows for error handling and cleaning
+        cashflows = safe_find_cashflows(db, query, sort_field='created_at', sort_direction=-1)[:limit]
+        logger.info(
+            f"Fetched {len(cashflows)} recent activities for user {user_id}",
+            extra={'session_id': session_id or 'no-session-id', 'user_id': user_id}
+        )
+        return cashflows
+    except Exception as e:
+        logger.error(
+            f"Error fetching recent activities for user {user_id}: {str(e)}",
+            extra={'session_id': session_id or 'no-session-id', 'user_id': user_id}
+        )
+        return []
+
 def create_dashboard_safe_response(stats, recent_data, additional_data=None):
     """
     Create a dashboard response that's guaranteed to be JSON serializable.
@@ -2983,5 +3015,6 @@ def create_dashboard_safe_response(stats, recent_data, additional_data=None):
             'timestamp': datetime.now(timezone.utc).isoformat()
 
         }
+
 
 
