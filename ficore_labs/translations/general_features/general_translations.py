@@ -200,7 +200,7 @@ GENERAL_TRANSLATIONS = {
         'general_get_early_access': 'Get Early Access',
         'general_about_app': 'About Our App',
         'general_notification_tooltip': 'Notifications',
-        'profit_summary': 'Profit',
+        'profit_summary': 'Summaries',
         'general_javascript_required': 'JavaScript is required',
         'general_cashflow_overview': 'Cashflow Overview',
         'general_start_adding': 'Start Adding',
