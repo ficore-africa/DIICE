@@ -9,6 +9,15 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-realtime.css') }}">
 <script src="{{ url_for('static', filename='js/dashboard-notifications.js') }}" defer></script>
 <script src="{{ url_for('static', filename='js/dashboard-realtime.js') }}" defer></script>
+<style>
+    .table-responsive {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    .table-responsive table {
+        min-width: 600px; /* Adjust as needed */
+    }
+</style>
 {% endblock %}
 
 {% block content %}
@@ -216,24 +225,26 @@
                     <div class="card-body">
                         <h5 class="card-title">{{ trans('general_debtors', default='Debtors') | escape }}</h5>
                         {% if recent_debtors %}
-                        <table class="table table-sm table-hover">
-                            <thead>
-                                <tr>
-                                    <th>{{ trans('general_date', default='Date') | escape }}</th>
-                                    <th>{{ trans('general_name', default='Name') | escape }}</th>
-                                    <th>{{ trans('general_amount_owed', default='Amount Owed') | escape }}</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for debtor in recent_debtors %}
-                                <tr>
-                                    <td>{{ debtor.created_at | format_date | escape }}</td>
-                                    <td>{{ debtor.name | escape }}</td>
-                                    <td>{{ debtor.amount_owed | format_currency }}</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>{{ trans('general_date', default='Date') | escape }}</th>
+                                        <th>{{ trans('general_name', default='Name') | escape }}</th>
+                                        <th>{{ trans('general_amount_owed', default='Amount Owed') | escape }}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for debtor in recent_debtors %}
+                                    <tr>
+                                        <td>{{ debtor.created_at | format_date | escape }}</td>
+                                        <td>{{ debtor.name | escape }}</td>
+                                        <td>{{ debtor.amount_owed | format_currency }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
                         {% else %}
                         <p class="text-muted">{{ trans('no_recent_debtors', default='No recent debtors found.') | escape }}</p>
                         {% endif %}
@@ -247,24 +258,26 @@
                     <div class="card-body">
                         <h5 class="card-title">{{ trans('general_creditors', default='Creditors') | escape }}</h5>
                         {% if recent_creditors %}
-                        <table class="table table-sm table-hover">
-                            <thead>
-                                <tr>
-                                    <th>{{ trans('general_date', default='Date') | escape }}</th>
-                                    <th>{{ trans('general_name', default='Name') | escape }}</th>
-                                    <th>{{ trans('general_amount_owed', default='Amount Owed') | escape }}</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for creditor in recent_creditors %}
-                                <tr>
-                                    <td>{{ creditor.created_at | format_date | escape }}</td>
-                                    <td>{{ creditor.name | escape }}</td>
-                                    <td>{{ creditor.amount_owed | format_currency }}</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>{{ trans('general_date', default='Date') | escape }}</th>
+                                        <th>{{ trans('general_name', default='Name') | escape }}</th>
+                                        <th>{{ trans('general_amount_owed', default='Amount Owed') | escape }}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for creditor in recent_creditors %}
+                                    <tr>
+                                        <td>{{ creditor.created_at | format_date | escape }}</td>
+                                        <td>{{ creditor.name | escape }}</td>
+                                        <td>{{ creditor.amount_owed | format_currency }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
                         {% else %}
                         <p class="text-muted">{{ trans('no_recent_creditors', default='No recent creditors found.') | escape }}</p>
                         {% endif %}
@@ -278,24 +291,26 @@
                     <div class="card-body">
                         <h5 class="card-title">{{ trans('receipts_money_in', default='Income') | escape }}</h5>
                         {% if recent_receipts %}
-                        <table class="table table-sm table-hover">
-                            <thead>
-                                <tr>
-                                    <th>{{ trans('general_date', default='Date') | escape }}</th>
-                                    <th>{{ trans('general_party_name', default='Party Name') | escape }}</th>
-                                    <th>{{ trans('general_amount', default='Amount') | escape }}</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for receipt in recent_receipts %}
-                                <tr>
-                                    <td>{{ receipt.created_at | format_date | escape }}</td>
-                                    <td>{{ receipt.party_name | escape }}</td>
-                                    <td>{{ receipt.amount | format_currency }}</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>{{ trans('general_date', default='Date') | escape }}</th>
+                                        <th>{{ trans('general_party_name', default='Party Name') | escape }}</th>
+                                        <th>{{ trans('general_amount', default='Amount') | escape }}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for receipt in recent_receipts %}
+                                    <tr>
+                                        <td>{{ receipt.created_at | format_date | escape }}</td>
+                                        <td>{{ receipt.party_name | escape }}</td>
+                                        <td>{{ receipt.amount | format_currency }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
                         {% else %}
                         <p class="text-muted">{{ trans('no_recent_receipts', default='No recent receipts found.') | escape }}</p>
                         {% endif %}
@@ -309,24 +324,26 @@
                     <div class="card-body">
                         <h5 class="card-title">{{ trans('payments_money_out', default='Expenses') | escape }}</h5>
                         {% if recent_payments %}
-                        <table class="table table-sm table-hover">
-                            <thead>
-                                <tr>
-                                    <th>{{ trans('general_date', default='Date') | escape }}</th>
-                                    <th>{{ trans('general_party_name', default='Party Name') | escape }}</th>
-                                    <th>{{ trans('general_amount', default='Amount') | escape }}</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for payment in recent_payments %}
-                                <tr>
-                                    <td>{{ payment.created_at | format_date | escape }}</td>
-                                    <td>{{ payment.party_name | escape }}</td>
-                                    <td>{{ payment.amount | format_currency }}</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>{{ trans('general_date', default='Date') | escape }}</th>
+                                        <th>{{ trans('general_party_name', default='Party Name') | escape }}</th>
+                                        <th>{{ trans('general_amount', default='Amount') | escape }}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for payment in recent_payments %}
+                                    <tr>
+                                        <td>{{ payment.created_at | format_date | escape }}</td>
+                                        <td>{{ payment.party_name | escape }}</td>
+                                        <td>{{ payment.amount | format_currency }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
                         {% else %}
                         <p class="text-muted">{{ trans('no_recent_payments', default='No recent payments found.') | escape }}</p>
                         {% endif %}
@@ -340,24 +357,26 @@
                     <div class="card-body">
                         <h5 class="card-title">{{ trans('inventory_nav_label', default='Inventory') | escape }}</h5>
                         {% if recent_inventory %}
-                        <table class="table table-sm table-hover">
-                            <thead>
-                                <tr>
-                                    <th>{{ trans('general_date', default='Date') | escape }}</th>
-                                    <th>{{ trans('general_name', default='Name') | escape }}</th>
-                                    <th>{{ trans('general_cost', default='Cost') | escape }}</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for item in recent_inventory %}
-                                <tr>
-                                    <td>{{ item.created_at | format_date | escape }}</td>
-                                    <td>{{ item.name | escape }}</td>
-                                    <td>{{ item.cost | format_currency }}</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>{{ trans('general_date', default='Date') | escape }}</th>
+                                        <th>{{ trans('general_name', default='Name') | escape }}</th>
+                                        <th>{{ trans('general_cost', default='Cost') | escape }}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in recent_inventory %}
+                                    <tr>
+                                        <td>{{ item.created_at | format_date | escape }}</td>
+                                        <td>{{ item.name | escape }}</td>
+                                        <td>{{ item.cost | format_currency }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
                         {% else %}
                         <p class="text-muted">{{ trans('no_recent_inventory', default='No recent inventory items found.') | escape }}</p>
                         {% endif %}
