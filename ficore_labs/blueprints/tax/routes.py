@@ -152,14 +152,14 @@ class TaxForm(FlaskForm):
 
 @tax_bp.route('/', methods=['GET'])
 @custom_login_required
-@requires_role(['personal', 'admin'])
+@requires_role(['trader', 'admin'])
 def index():
     """Tax calculator landing page with navigation cards."""
     return render_template('tax/index.html')
 
 @tax_bp.route('/new', methods=['GET', 'POST'])
 @custom_login_required
-@requires_role(['personal', 'admin'])
+@requires_role(['trader', 'admin'])
 @limiter.limit("10 per minute")
 def new():
     session.permanent = False
@@ -453,7 +453,7 @@ def new():
 
 @tax_bp.route('/dashboard', methods=['GET'])
 @custom_login_required
-@requires_role(['personal', 'admin'])
+@requires_role(['trader', 'admin'])
 @limiter.limit("10 per minute")
 def dashboard():
     """Tax calculator dashboard page."""
@@ -563,7 +563,7 @@ def dashboard():
 
 @tax_bp.route('/history', methods=['GET', 'POST'])
 @custom_login_required
-@requires_role(['personal', 'admin'])
+@requires_role(['trader', 'admin'])
 @limiter.limit("10 per minute")
 def history():
     """Manage tax calculations page."""
@@ -649,6 +649,7 @@ def history():
             calculations={},
             tool_title=trans('tax_history', default='Tax History')
         )
+
 
 
 
