@@ -24,6 +24,15 @@
         {% endif %}
         <a href="{{ url_for('payments.manage') }}" class="btn btn-primary">{{ t('payments_manage', default='Manage Payments') }}</a>
     </div>
+    {% if payments_warning %}
+        <div class="alert alert-warning" role="alert">
+            {{ t('payments_skipped_warning', default='Some payment records could not be loaded due to data errors and were skipped.') }}
+            {% if payments_skipped > 0 %}
+                <br>
+                <small>{{ payments_skipped }} record(s) skipped. IDs: {{ payments_skipped_ids|join(', ') }}</small>
+            {% endif %}
+        </div>
+    {% endif %}
     
     {% if payments|length > 0 %}
         <!-- Category Filter and Summary Statistics -->
