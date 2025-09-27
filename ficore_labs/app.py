@@ -1,9 +1,9 @@
 import os
 import sys
 import logging
-import locale
 from datetime import datetime, timedelta, timezone
 import uuid
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from flask import (
     Flask, jsonify, request, render_template, redirect, url_for, flash,
@@ -492,12 +492,18 @@ def create_app():
     @app.before_request
     def handle_redirects():
         host = request.host
+
+        # Redirect onrender.com to custom domain
         if host.endswith("onrender.com"):
             new_url = request.url.replace("onrender.com", "business.ficoreafrica.com")
             return redirect(new_url, code=301)
+
+        # Redirect www to root domain
         if host.startswith("www."):
             new_url = request.url.replace("www.", "", 1)
             return redirect(new_url, code=301)
+
+        # Redirect ficoreafrica.com to business.ficoreafrica.com
         if host == 'ficoreafrica.com':
             new_url = request.url.replace('ficoreafrica.com', 'business.ficoreafrica.com')
             return redirect(new_url, code=301)
@@ -558,6 +564,7 @@ def create_app():
                 nav = build_nav(TRADER_NAV)
                 tools = build_nav(TRADER_TOOLS)
 
+            # Generate breadcrumb items
             try:
                 from helpers.breadcrumb_helper import get_breadcrumb_items
                 breadcrumb_items = get_breadcrumb_items()
