@@ -42,7 +42,7 @@
                         <!-- Tax Year -->
                         <div class="mb-3">
                             <label for="tax_year" class="form-label">{{ form.tax_year.label }}</label>
-                            <input type="text" class="form-control" id="tax_year" name="tax_year" placeholder="2025" value="{{ form.tax_year.data or datetime.now().year }}">
+                            <input type="text" class="form-control" id="tax_year" name="tax_year" placeholder="2025" value="{{ form.tax_year.data or current_year }}">
                             {% if form.tax_year.errors %}
                                 <div class="invalid-feedback d-block">
                                     {% for error in form.tax_year.errors %}
