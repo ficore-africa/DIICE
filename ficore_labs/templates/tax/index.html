@@ -1,79 +1,55 @@
-<script type="text/javascript">
-        var gk_isXlsx = false;
-        var gk_xlsxFileLookup = {};
-        var gk_fileData = {};
-        function filledCell(cell) {
-          return cell !== '' && cell != null;
-        }
-        function loadFileData(filename) {
-        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
-            try {
-                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
-                var firstSheetName = workbook.SheetNames[0];
-                var worksheet = workbook.Sheets[firstSheetName];
-
-                // Convert sheet to JSON to filter blank rows
-                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
-                // Filter out blank rows (rows where all cells are empty, null, or undefined)
-                var filteredData = jsonData.filter(row => row.some(filledCell));
-
-                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
-                var headerRowIndex = filteredData.findIndex((row, index) =>
-                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
-                );
-                // Fallback
-                if (headerRowIndex === -1 || headerRowIndex > 25) {
-                  headerRowIndex = 0;
-                }
-
-                // Convert filtered JSON back to CSV
-                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
-                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
-                return csv;
-            } catch (e) {
-                console.error(e);
-                return "";
-            }
-        }
-        return gk_fileData[filename] || "";
-        }
-        </script>{% extends "base.html" %}
+{% extends "base.html" %}
 {% block title %}{{ t('tax_calculator_title', default='Tax Calculator') }}{% endblock %}
 {% block content %}
+<!-- Add CSRF meta tag for potential AJAX interactions -->
+<meta name="csrf-token" content="{{ csrf_token() }}">
+
 <div class="container mt-4">
     {% set tool_name = 'tax_calculator_title' %}
     {% set tool_icon = 'fa-calculator' %}
     {% set subtitle = t('tax_calculator_description', default='Calculate your taxes and manage your tax records efficiently') %}
     {% include 'tool_header.html' %}
 
+    <!-- Navigation Breadcrumb -->
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item active" aria-current="page">{{ t('tax_calculator_title', default='Tax Calculator') }}</li>
+        </ol>
+    </nav>
+
     <div class="row">
-        <div class="col-md-4 mb-4">
-            <div class="card shadow-sm text-center">
-                <div class="card-body">
-                    <i class="fas fa-plus-circle fa-3x mb-3 text-primary"></i>
+        <!-- Calculate New Tax -->
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-calculator fa-3x mb-3 text-primary"></i>
                     <h5 class="card-title">{{ t('tax_calculate_new', default='Calculate New Tax') }}</h5>
-                    <p class="card-text">{{ t('tax_calculate_new_description', default='Enter your income and deductions to calculate your tax liability') }}</p>
+                    <p class="card-text text-muted">{{ t('tax_calculate_new_description', default='Enter your income and deductions to calculate your tax liability') }}</p>
                     <a href="{{ url_for('tax.new') }}" class="btn btn-primary">{{ t('general_start', default='Start') }}</a>
                 </div>
             </div>
         </div>
-        <div class="col-md-4 mb-4">
-            <div class="card shadow-sm text-center">
-                <div class="card-body">
-                    <i class="fas fa-chart-pie fa-3x mb-3 text-success"></i>
+
+        <!-- Tax Dashboard -->
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-chart-pie fa-3x mb-3 text-info"></i>
                     <h5 class="card-title">{{ t('tax_dashboard', default='Tax Dashboard') }}</h5>
-                    <p class="card-text">{{ t('tax_dashboard_description', default='View your latest tax calculation and insights') }}</p>
-                    <a href="{{ url_for('tax.dashboard') }}" class="btn btn-success">{{ t('general_view', default='View') }}</a>
+                    <p class="card-text text-muted">{{ t('tax_dashboard_description', default='View your latest tax calculation and insights') }}</p>
+                    <a href="{{ url_for('tax.dashboard') }}" class="btn btn-info">{{ t('general_view', default='View') }}</a>
                 </div>
             </div>
         </div>
-        <div class="col-md-4 mb-4">
-            <div class="card shadow-sm text-center">
-                <div class="card-body">
-                    <i class="fas fa-history fa-3x mb-3 text-info"></i>
+
+        <!-- Tax History -->
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-history fa-3x mb-3 text-secondary"></i>
                     <h5 class="card-title">{{ t('tax_history', default='Tax History') }}</h5>
-                    <p class="card-text">{{ t('tax_history_description', default='Manage and review your past tax calculations') }}</p>
-                    <a href="{{ url_for('tax.history') }}" class="btn btn-info">{{ t('general_manage', default='Manage') }}</a>
+                    <p class="card-text text-muted">{{ t('tax_history_description', default='Manage and review your past tax calculations') }}</p>
+                    <a href="{{ url_for('tax.history') }}" class="btn btn-secondary">{{ t('general_manage', default='Manage') }}</a>
                 </div>
             </div>
         </div>
