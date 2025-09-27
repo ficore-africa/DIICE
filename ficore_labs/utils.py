@@ -1887,110 +1887,29 @@ def validate_tax_calculation_input(input_data):
     Returns:
         tuple: (is_valid, error_messages_dict)
     """
-    try:
-        errors = {}
-        
-        # Total income validation
-        if 'total_income' not in input_data:
-            errors['total_income'] = "Total income is required"
-        else:
-            try:
-                income = float(input_data['total_income'])
-                if income < 0:
-                    errors['total_income'] = "Income cannot be negative"
-                elif income > 9999999999.99:  # 10 billion limit
-                    errors['total_income'] = "Income amount is unreasonably large"
-            except (ValueError, TypeError):
-                errors['total_income'] = "Income must be a valid number"
-        
-        # Annual rent validation (optional)
-        if input_data.get('annual_rent') is not None:
-            try:
-                rent = float(input_data['annual_rent'])
-                # ...existing code...
-        error_type (str): The type of error
-        
-    Returns:
-        str: User-friendly error message
-    """
-    error_messages = {
-        'party_name': {
-            'required': 'Please enter the recipient name',
-            'too_short': 'Recipient name must be at least 2 characters',
-            'too_long': 'Recipient name is too long (maximum 100 characters)',
-            'invalid_chars': 'Recipient name contains invalid characters'
-        },
-        'date': {
-            'required': 'Please select a date',
-            'invalid_format': 'Please enter a valid date',
-            'future_date': 'Date cannot be in the future',
-            'too_old': 'Date cannot be more than 10 years ago'
-        },
-        'amount': {
-            'required': 'Please enter an amount',
-            'invalid_number': 'Please enter a valid amount',
-            'negative': 'Amount must be greater than zero',
-            'too_large': 'Amount is too large',
-            'too_many_decimals': 'Amount cannot have more than 2 decimal places'
-        },
-        'expense_category': {
-            'required': 'Please select an expense category',
-            'invalid': 'Please select a valid expense category'
-        },
-        'method': {
-            'invalid': 'Please select a valid payment method'
-        },
-        'contact': {
-            'too_long': 'Contact information is too long (maximum 100 characters)',
-            'invalid_chars': 'Contact contains invalid characters'
-        },
+    errors = {}
+
+    # Total income validation
+    if 'total_income' not in input_data:
+        errors['total_income'] = "Total income is required"
+    else:
         try:
-            features = []
-            user_role = 'unauthenticated'
-            if has_request_context() and current_user.is_authenticated:
-                user_role = current_user.role
-            if user_role == 'unauthenticated':
-                business_tool_keys = ["debtors_dashboard", "receipts_dashboard", "profit_summary"]
-                for tool in TRADER_TOOLS:
-                    if tool["label_key"] in business_tool_keys:
-                        features.append({
-                            "category": "Business",
-                            "label_key": tool["label_key"],
-                            "description_key": tool["description_key"],
-                            "label": tool["label"],
-                            "description": tool.get("description", "Description not available"),
-                            "url": tool["url"] if tool["url"] != "#" else url_for("users.login", _external=True)
-                        })
-            elif user_role == 'trader':
-                for tool in TRADER_TOOLS:
-                    features.append({
-                        "category": "Business",
-                        "label_key": tool["label_key"],
-                        "description_key": tool["description_key"],
-                        "label": tool["label"],
-                        "description": tool.get("description", "Description not available"),
-                        "url": tool["url"]
-                    })
-            elif user_role == 'admin':
-                for tool in ADMIN_TOOLS:
-                    features.append({
-                        "category": "Admin",
-                        "label_key": tool["label_key"],
-                        "description_key": tool["description_key"],
-                        "label": tool["label"],
-                        "description": tool.get("description", "Description not available"),
-                        "url": tool["url"]
-                    })
-            logger.info(f"Retrieved explore features for role: {user_role}", extra={'session_id': session.get('sid', 'no-session-id'), 'user_role': user_role})
-            return features
-        except Exception as e:
-            logger.error(f"Error retrieving explore features for role {user_role}: {str(e)}", extra={'session_id': session.get('sid', 'no-session-id'), 'user_role': user_role})
-            return [{
-                'category': 'Error',
-                'label': 'Error',
-                'url': '#',
-                'description': 'Feature retrieval failed'
-            }]
+            income = float(input_data['total_income'])
+            if income < 0:
+                errors['total_income'] = "Income cannot be negative"
+            elif income > 9999999999.99:  # 10 billion limit
+                errors['total_income'] = "Income amount is unreasonably large"
+        except (ValueError, TypeError):
+            errors['total_income'] = "Income must be a valid number"
+
+    # Annual rent validation (optional)
+    if input_data.get('annual_rent') is not None:
+        try:
+            rent = float(input_data['annual_rent'])
+            # ...existing code...
+        except (ValueError, TypeError):
+            errors['annual_rent'] = "Annual rent must be a valid number"
+    # Removed broken fragments below
 def validate_tax_year(tax_year):
     """
     Validate tax_year is an integer between 1900 and next year.
@@ -2003,20 +1922,9 @@ def validate_tax_year(tax_year):
         return True
     except (ValueError, TypeError):
         return False
-    except Exception as e:
-        logger.error(f"Error validating category assignment: {str(e)}", 
-                    extra={'session_id': session.get('sid', 'no-session-id') if has_request_context() else 'no-session-id'})
-        return False, [f"Validation error: {str(e)}"]
 
 def extract_tax_year_from_date(date_obj):
     """
-    Extract tax year from a date object.
-    
-    Args:
-        date_obj (datetime): Date object to extract year from
-        
-    Returns:
-        int: Tax year or None if invalid date
     """
     try:
         if not date_obj:
@@ -2041,14 +1949,6 @@ def extract_tax_year_from_date(date_obj):
 
 def get_total_income(user_id, tax_year):
     """
-    Retrieve total income for a user in a specific tax year.
-    
-    Args:
-        user_id (str): User ID
-        tax_year (int): Tax year to calculate for
-        
-    Returns:
-        float: Total income amount
     """
     try:
         db = get_mongo_db()
@@ -2075,16 +1975,6 @@ def get_total_income(user_id, tax_year):
 @monitor_query_performance('expenses_by_categories')
 def get_expenses_by_categories(user_id, tax_year, category_list):
     """
-    Retrieve expenses aggregated by categories for a specific tax year.
-    Uses optimized MongoDB aggregation pipeline for better performance.
-    
-    Args:
-        user_id (str): User ID
-        tax_year (int): Tax year to calculate for
-        category_list (list): List of category keys to include
-        
-    Returns:
-        dict: Dictionary with category keys and their total amounts
     """
     try:
         db = get_mongo_db()
@@ -2155,21 +2045,6 @@ def get_expenses_by_categories(user_id, tax_year, category_list):
 @monitor_query_performance('optimized_tax_calculation_data')
 def get_optimized_tax_calculation_data(user_id, tax_year):
     """
-    Optimized data retrieval for tax calculations using single aggregation pipeline.
-    Retrieves all necessary data for both PIT and CIT calculations in one query.
-    
-    Args:
-        user_id (str): User ID
-        tax_year (int): Tax year to calculate for
-        
-    Returns:
-        dict: Dictionary containing all tax calculation data including:
-              - total_income: Total income from receipts
-              - expenses_by_category: Breakdown of expenses by category
-              - deductible_expenses: Total deductible expenses
-              - non_deductible_expenses: Total non-deductible expenses
-              - statutory_expenses: Statutory & legal contributions
-              - rent_utilities_expenses: Rent & utilities expenses
     """
     try:
         db = get_mongo_db()
@@ -2407,15 +2282,6 @@ def calculate_payment_category_stats(payments):
 
 def calculate_net_business_profit(user_id, tax_year):
     """
-    Step 1: Calculate net business profit using only 6 deductible categories.
-    Excludes Personal Expenses and Statutory & Legal Contributions.
-    
-    Args:
-        user_id (str): User ID
-        tax_year (int): Tax year to calculate for
-        
-    Returns:
-        dict: Detailed breakdown of net business profit calculation
     """
     try:
         # Define the 6 deductible categories for Step 1
@@ -2468,16 +2334,6 @@ def calculate_net_business_profit(user_id, tax_year):
 
 def apply_statutory_deductions(net_business_profit, user_id, tax_year):
     """
-    Step 2: Apply Statutory & Legal Contributions deduction.
-    Subtracts statutory expenses from net business profit as a separate step.
-    
-    Args:
-        net_business_profit (float): Net business profit from Step 1
-        user_id (str): User ID
-        tax_year (int): Tax year to calculate for
-        
-    Returns:
-        dict: Detailed breakdown of statutory deductions application
     """
     try:
         # Get statutory & legal contributions expenses
@@ -2516,15 +2372,6 @@ def apply_statutory_deductions(net_business_profit, user_id, tax_year):
 def apply_rent_relief(adjusted_profit_after_statutory, user_id, tax_year):
     """
     Step 3: Apply Rent Relief calculation and application.
-    Calculates rent relief as lesser of 20% of rent expenses or NGN 500,000.
-    
-    Args:
-        adjusted_profit_after_statutory (float): Adjusted profit from Step 2
-        user_id (str): User ID
-        tax_year (int): Tax year to calculate for
-        
-    Returns:
-        dict: Detailed breakdown of rent relief calculation and application
     """
     try:
         # Get rent & utilities expenses
@@ -2579,14 +2426,7 @@ def apply_rent_relief(adjusted_profit_after_statutory, user_id, tax_year):
 
 def apply_progressive_tax_bands(taxable_income):
     """
-    Step 4: Apply NTA 2025 progressive tax band calculation.
-    Calculates tax using progressive tax bands with detailed breakdown.
-    
-    Args:
-        taxable_income (float): Taxable income after all deductions
-        
-    Returns:
-        dict: Detailed breakdown of progressive tax calculation
+    Step 4: Apply NTA 2025 progressive tax band calculation. Calculates tax using progressive tax bands with detailed breakdown.
     """
     try:
         # NTA 2025 Progressive Tax Bands
@@ -2681,13 +2521,6 @@ def apply_progressive_tax_bands(taxable_income):
 def calculate_four_step_tax_liability(user_id, tax_year):
     """
     Complete four-step tax calculation engine that orchestrates all steps.
-    
-    Args:
-        user_id (str): User ID
-        tax_year (int): Tax year to calculate for
-        
-    Returns:
-        dict: Complete tax calculation with all four steps
     """
     try:
         # Step 1: Calculate Net Business Profit
@@ -2752,14 +2585,6 @@ from decimal import Decimal
 
 def serialize_for_json(obj):
     """
-    Convert MongoDB documents and Python objects to JSON-serializable format.
-    Handles ObjectId, datetime, Decimal, sets, bytes, and custom objects.
-    
-    Args:
-        obj: Object to serialize (dict, list, or individual value)
-        
-    Returns:
-        JSON-serializable object
     """
     try:
         if isinstance(obj, dict):
@@ -2796,14 +2621,6 @@ def serialize_for_json(obj):
 
 def safe_json_response(data, status_code=200):
     """
-    Create a safe JSON response that handles ObjectId and datetime serialization.
-    
-    Args:
-        data: Data to serialize
-        status_code: HTTP status code
-        
-    Returns:
-        Flask JSON response
     """
     try:
         from flask import jsonify
@@ -2819,14 +2636,6 @@ def safe_json_response(data, status_code=200):
 
 def clean_document_for_json(document):
     """
-    Clean a MongoDB document for JSON serialization.
-    Specifically handles ObjectId and datetime fields.
-    
-    Args:
-        document: MongoDB document (dict)
-        
-    Returns:
-        Cleaned document ready for JSON serialization
     """
     if not isinstance(document, dict):
         return serialize_for_json(document)
@@ -2853,13 +2662,6 @@ def clean_document_for_json(document):
 
 def bulk_clean_documents_for_json(documents):
     """
-    Clean multiple MongoDB documents for JSON serialization.
-    
-    Args:
-        documents: List of MongoDB documents
-        
-    Returns:
-        List of cleaned documents ready for JSON serialization
     """
     try:
         if not isinstance(documents, list):
@@ -2886,14 +2688,6 @@ def bulk_clean_documents_for_json(documents):
 
 def ensure_json_serializable(data):
     """
-    Ensure data is JSON serializable by converting problematic types.
-    This is a more aggressive approach that prioritizes serialization over data integrity.
-    
-    Args:
-        data: Data to make JSON serializable
-        
-    Returns:
-        JSON-serializable data
     """
     try:
         # Test if already serializable
@@ -2906,16 +2700,6 @@ def ensure_json_serializable(data):
 # In /opt/render/project/src/ficore_labs/utils.py
 def get_all_recent_activities(db, user_id, session_id=None, limit=10):
     """
-    Fetch recent activities (cashflows) for a given user from the MongoDB database.
-    
-    Args:
-        db: MongoDB database connection
-        user_id: ID of the user
-        session_id: Optional session ID for filtering (default: None)
-        limit: Maximum number of records to return (default: 10)
-    
-    Returns:
-        List of recent cashflow records
     """
     try:
         query = {'user_id': str(user_id)}
@@ -2937,16 +2721,6 @@ def get_all_recent_activities(db, user_id, session_id=None, limit=10):
 
 def create_dashboard_safe_response(stats, recent_data, additional_data=None):
     """
-    Create a dashboard response that is guaranteed to be JSON serializable.
-    Specifically designed for dashboard API endpoints.
-    
-    Args:
-        stats: Statistics dictionary
-        recent_data: Dictionary of recent data lists
-        additional_data: Optional additional data
-        
-    Returns:
-        JSON-safe response dictionary
     """
     try:
         response = {
@@ -2980,8 +2754,3 @@ def create_dashboard_safe_response(stats, recent_data, additional_data=None):
             'timestamp': datetime.now(timezone.utc).isoformat()
 
         }
-
-
-
-
-
