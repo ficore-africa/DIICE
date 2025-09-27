@@ -16,6 +16,24 @@ TAX_TRANSLATIONS = {
         'taxable_income_label': 'Taxable Income',
         'estimated_tax_label': 'Estimated Tax Liability',
         'expense_categories_title': 'Expense Categories',
+        'tax_invalid_item': 'Invalid deduction item format',
+        'tax_duplicate_item_names': 'Deduction item names must be unique',
+        'tax_invalid_category': 'Invalid deduction category',
+        'tax_validation_error': 'Error validating tax data.',
+        'tax_form_invalid': 'Invalid form data. Please check your inputs.',
+        'tax_entity_update_error': 'Error updating entity type.',
+        'tax_negative_taxable': 'Taxable income is negative. Please review your deductions.',
+        'tax_storage_error': 'Error saving tax calculation.',
+        'tax_dashboard_load_error': 'Error loading tax calculator.',
+        'tax_not_found': 'Tax calculation not found.',
+        'tax_rent_expenses_note': 'Annual rent expenses from form',
+        'tax_pension_note': 'Pension contribution from form or default 8%',
+        'tax_deduction_default_name': 'Tax Deduction',
+        'tax_invalid_entity_type': 'Entity type must be Sole Proprietor or Limited Liability',
+        'tax_pension_help': 'Enter your annual pension contribution. Defaults to 8% of income for employees if left blank.',
+        'tax_annual_income': 'Annual Income (NGN)',
+        'tax_annual_rent_expenses': 'Annual Rent Expenses (NGN)',
+        'tax_pension_contribution': 'Annual Pension Contribution (NGN)',
         
         # Expense Category Names
         'office_admin_cat': 'Office & Admin',
@@ -532,6 +550,24 @@ TAX_TRANSLATIONS = {
         'entity_type_required': 'Nau\'in kasuwanci ana bukata',
         'entity_type_length': 'Nau\'in kasuwanci dole ne ya zama zaɓi mai inganci',
         'vat_threshold_content': 'Rijistar VAT ana bukata ga kasuwancin da ke da jimillar kudaden shiga na shekara sama da Naira miliyan 25.',
+        'tax_invalid_item': 'Tsarin abun ragi ba daidai ba ne',
+        'tax_duplicate_item_names': 'Sunayen abubuwan ragi dole ne su zama na musamman',
+        'tax_invalid_category': 'Rukunin ragi ba daidai ba ne',
+        'tax_validation_error': 'Kuskure wajen tabbatar da bayanan haraji.',
+        'tax_form_invalid': 'Bayanai na fom ba daidai ba ne. Da fatan za a duba abubuwan da aka shigar.',
+        'tax_entity_update_error': 'Kuskure wajen sabunta nau\'in kasuwanci.',
+        'tax_negative_taxable': 'Kudaden da za a biya haraji suna da mara kyau. Da fatan za a duba raginku.',
+        'tax_storage_error': 'Kuskure wajen ajiye lissafin haraji.',
+        'tax_dashboard_load_error': 'Kuskure wajen lodin mai kirga haraji.',
+        'tax_not_found': 'Ba a sami lissafin haraji ba.',
+        'tax_rent_expenses_note': 'Kudaden haya na shekara daga fom',
+        'tax_pension_note': 'Gudummawar fansho daga fom ko tsoho 8%',
+        'tax_deduction_default_name': 'Ragi na Haraji',
+        'tax_invalid_entity_type': 'Nau\'in kasuwanci dole ne ya zama Mai Kasuwanci Shi Kaɗai ko Kamfani Mai Iyakacin Alhakki',
+        'tax_pension_help': 'Shigar da gudummawar fansho na shekara. Yana zuwa kashi 8% na kudin shiga ga ma\'aikata idan ba a shigar ba.',
+        'tax_annual_income': 'Kudaden Shiga na Shekara (NGN)',
+        'tax_annual_rent_expenses': 'Kudaden Haya na Shekara (NGN)',
+        'tax_pension_contribution': 'Gudummawar Fansho na Shekara (NGN)',
         
         # New keys from latest warnings
         'general_personal_finance_tools': 'Kayan Aikin Kuɗi na Kai',
@@ -549,3 +585,4 @@ TAX_TRANSLATIONS = {
         'tax_category_statutory_legal': 'Gudummawa ta Dokoki da Shari\'a'
     }
 }
+
