@@ -4,12 +4,12 @@ from flask_wtf.csrf import CSRFProtect, CSRFError
 from wtforms import FloatField, SubmitField, StringField, FieldList, FormField
 from wtforms.validators import DataRequired, NumberRange, Optional, Length
 from flask_login import current_user, login_required
-import utils
+from utils import clean_currency, get_mongo_db, get_all_recent_activities, is_admin, requires_role, limiter, trans, get_tax_calculations
 from datetime import datetime
 import uuid
 import bleach
 from bson import ObjectId
-from .tax_calculator import calculate_tax_liability, DataValidationError, TaxCalculationError, safe_float_conversion, validate_tax_year
+from .tax_calculation_engine import calculate_tax_liability, DataValidationError, TaxCalculationError, safe_float_conversion, validate_tax_year, update_user_entity_type
 
 tax_bp = Blueprint(
     'tax',
@@ -17,13 +17,6 @@ tax_bp = Blueprint(
     template_folder='templates/',
     url_prefix='/tax'
 )
-
-def clean_currency(value):
-    """Transform input into a float, using improved validation from utils."""
-    try:
-        return utils.clean_currency(value)
-    except Exception:
-        return 0.0
 
 def strip_commas(value):
     """Filter to remove commas and return a float."""
@@ -158,15 +151,15 @@ class TaxForm(FlaskForm):
 
 @tax_bp.route('/', methods=['GET'])
 @custom_login_required
-@utils.requires_role(['personal', 'admin'])
+@requires_role(['personal', 'admin'])
 def index():
     """Tax calculator landing page with navigation cards."""
     return render_template('tax/index.html')
 
 @tax_bp.route('/new', methods=['GET', 'POST'])
 @custom_login_required
-@utils.requires_role(['personal', 'admin'])
-@utils.limiter.limit("10 per minute")
+@requires_role(['personal', 'admin'])
+@limiter.limit("10 per minute")
 def new():
     session.permanent = False
     session_id = session.get('sid', str(uuid.uuid4()))
@@ -174,12 +167,12 @@ def new():
     current_app.logger.debug(f"Session data: {session}", extra={'session_id': session_id})
     
     form = TaxForm(formdata=request.form if request.method == 'POST' else None)
-    db = utils.get_mongo_db()
+    db = get_mongo_db()
 
     is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json
 
     try:
-        activities = utils.get_all_recent_activities(
+        activities = get_all_recent_activities(
             db=db,
             user_id=current_user.id,
             session_id=None,
@@ -191,7 +184,7 @@ def new():
         activities = []
 
     try:
-        filter_criteria = {} if utils.is_admin() else {'user_id': current_user.id}
+        filter_criteria = {} if is_admin() else {'user_id': current_user.id}
         if request.method == 'POST':
             current_app.logger.debug(f"POST request.form: {dict(request.form)}", extra={'session_id': session_id})
             if not form.validate_on_submit():
@@ -242,8 +235,6 @@ def new():
                 tax_year = int(form.tax_year.data)
                 entity_type = form.entity_type.data
 
-                # Update user entity type in the database
-                from .tax_calculator import update_user_entity_type
                 if not update_user_entity_type(current_user.id, entity_type, db):
                     current_app.logger.error(f"Failed to update entity type for user {current_user.id}", extra={'session_id': session_id})
                     error_message = trans('tax_entity_update_error', default='Error updating entity type.')
@@ -252,7 +243,6 @@ def new():
                     flash(error_message, 'danger')
                     return redirect(url_for('tax.new'))
 
-                # Calculate tax liability using the new tax_calculator
                 tax_result = calculate_tax_liability(current_user.id, tax_year, db)
                 taxable_income = tax_result.get('summary', {}).get('taxable_income', max(0, income - total_deductions))
                 total_tax = tax_result.get('final_tax_liability', 0.0)
@@ -283,13 +273,12 @@ def new():
                         caching_ext = current_app.extensions.get('caching')
                         if caching_ext:
                             cache = list(caching_ext.values())[0]
-                            cache.delete_memoized(utils.get_tax_calculations)
+                            cache.delete_memoized(get_tax_calculations)
                             current_app.logger.debug(f"Cleared cache for get_tax_calculations", extra={'session_id': session_id})
                         else:
                             current_app.logger.warning(f"Caching extension not found; skipping cache clear", extra={'session_id': session_id})
                     except Exception as e:
                         current_app.logger.warning(f"Failed to clear cache for get_tax_calculations: {str(e)}", extra={'session_id': session_id})
-
                     success_message = trans("tax_calculated_success", default='Tax calculated successfully!')
                     if is_ajax:
                         return jsonify({'success': True, 'tax_id': str(tax_id), 'message': success_message}), 200
@@ -463,8 +452,8 @@ def new():
 
 @tax_bp.route('/dashboard', methods=['GET'])
 @custom_login_required
-@utils.requires_role(['personal', 'admin'])
-@utils.limiter.limit("10 per minute")
+@requires_role(['personal', 'admin'])
+@limiter.limit("10 per minute")
 def dashboard():
     """Tax calculator dashboard page."""
     if 'sid' not in session:
@@ -472,10 +461,10 @@ def dashboard():
         current_app.logger.debug(f"New session created with sid: {session['sid']}", extra={'session_id': session['sid']})
     session.permanent = False
     session.modified = True
-    db = utils.get_mongo_db()
+    db = get_mongo_db()
 
     try:
-        activities = utils.get_all_recent_activities(
+        activities = get_all_recent_activities(
             db=db,
             user_id=current_user.id,
             session_id=None,
@@ -486,7 +475,7 @@ def dashboard():
         activities = []
 
     try:
-        filter_criteria = {} if utils.is_admin() else {'user_id': current_user.id}
+        filter_criteria = {} if is_admin() else {'user_id': current_user.id}
         calculations = list(db.tax_calculations.find(filter_criteria).sort('created_at', -1).limit(10))
         
         calculations_dict = {}
@@ -573,8 +562,8 @@ def dashboard():
 
 @tax_bp.route('/history', methods=['GET', 'POST'])
 @custom_login_required
-@utils.requires_role(['personal', 'admin'])
-@utils.limiter.limit("10 per minute")
+@requires_role(['personal', 'admin'])
+@limiter.limit("10 per minute")
 def history():
     """Manage tax calculations page."""
     if 'sid' not in session:
@@ -582,9 +571,9 @@ def history():
         current_app.logger.debug(f"New session created with sid: {session['sid']}", extra={'session_id': session['sid']})
     session.permanent = False
     session.modified = True
-    db = utils.get_mongo_db()
+    db = get_mongo_db()
 
-    filter_criteria = {} if utils.is_admin() else {'user_id': current_user.id}
+    filter_criteria = {} if is_admin() else {'user_id': current_user.id}
 
     if request.method == 'POST':
         action = request.form.get('action')
@@ -610,7 +599,7 @@ def history():
                     caching_ext = current_app.extensions.get('caching')
                     if caching_ext:
                         cache = list(caching_ext.values())[0]
-                        cache.delete_memoized(utils.get_tax_calculations)
+                        cache.delete_memoized(get_tax_calculations)
                         current_app.logger.debug(f"Cleared cache for get_tax_calculations", extra={'session_id': session.get('sid', 'unknown')})
                     else:
                         current_app.logger.warning(f"Caching extension not found; skipping cache clear", extra={'session_id': session.get('sid', 'unknown')})
