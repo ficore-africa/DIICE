@@ -619,10 +619,19 @@ def format_date(date_obj, lang=None, format_type='short'):
         logger.warning(f"Error formatting date {date_obj}: {str(e)}", extra={'session_id': session.get('sid', 'no-session-id')})
         return str(date_obj) if date_obj else ''
 
-def sanitize_input(input_string, max_length=None):
+def sanitize_input(input_string, max_length=None, allow_backslash=False):
     """
     Sanitize input string by removing potentially dangerous characters.
     Enhanced to handle backslashes and other problematic characters that can cause parsing errors.
+    Allows controlled backslash preservation for specific fields.
+    
+    Args:
+        input_string: Input to sanitize
+        max_length: Maximum length of the sanitized string
+        allow_backslash: Whether to preserve escaped backslashes (e.g., \\ -> \)
+    
+    Returns:
+        str: Sanitized string
     """
     if not input_string:
         return ''
@@ -631,23 +640,24 @@ def sanitize_input(input_string, max_length=None):
         # Convert to string and strip whitespace
         sanitized = str(input_string).strip()
         
-        # Remove ALL backslashes first - this is the main cause of the parsing error
-        sanitized = sanitized.replace('\\', '')
+        if allow_backslash:
+            # Preserve escaped backslashes (e.g., \\ becomes \)
+            sanitized = sanitized.replace('\\\\', '\\')
+        else:
+            # Remove ALL backslashes
+            sanitized = sanitized.replace('\\', '')
         
-        # Remove newlines, carriage returns, and tabs that can cause issues
+        # Remove newlines, carriage returns, and tabs
         sanitized = sanitized.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ')
         
         # Remove dangerous characters including quotes and angle brackets
         sanitized = re.sub(r'[<>"\'`]', '', sanitized)
         
-        # Remove any control characters and non-printable characters
+        # Remove control characters and non-printable characters
         sanitized = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', sanitized)
         
-        # Remove curly braces that can cause JSON parsing issues
-        sanitized = sanitized.replace('{', '').replace('}', '')
-        
-        # Remove square brackets that can cause issues
-        sanitized = sanitized.replace('[', '').replace(']', '')
+        # Remove curly braces and square brackets to prevent JSON injection
+        sanitized = sanitized.replace('{', '').replace('}', '').replace('[', '').replace(']', '')
         
         # Clean up multiple spaces
         sanitized = re.sub(r'\s+', ' ', sanitized).strip()
@@ -655,7 +665,7 @@ def sanitize_input(input_string, max_length=None):
         # Check for potential XSS patterns after cleaning
         if re.search(r'[<>]', sanitized):
             logger.warning(f"Potential malicious input detected after sanitization: {sanitized}", 
-                         extra={'session_id': session.get('sid', 'no-session-id')})
+                          extra={'session_id': session.get('sid', 'no-session-id')})
         
         # Truncate if max_length is specified
         if max_length and len(sanitized) > max_length:
@@ -665,13 +675,53 @@ def sanitize_input(input_string, max_length=None):
         
     except Exception as e:
         logger.error(f"Error sanitizing input '{input_string}': {str(e)}", 
-                   extra={'session_id': session.get('sid', 'no-session-id')})
+                    extra={'session_id': session.get('sid', 'no-session-id')})
         return ''
 
+def validate_and_insert_cashflow(db, record):
+    """
+    Validate and insert a cashflow record into MongoDB.
+    Ensures data is clean and valid before insertion to prevent JSON parsing issues.
+    
+    Args:
+        db: MongoDB database instance
+        record: Cashflow record to insert (dict)
+        
+    Raises:
+        ValidationError: If the record is invalid
+    """
+    try:
+        # Clean the record first
+        cleaned_record = clean_cashflow_record(record)
+        
+        # Validate required fields and format
+        is_valid, errors = validate_payment_form_data(cleaned_record)
+        if not is_valid:
+            logger.error(f"Invalid cashflow data: {errors}", 
+                        extra={'session_id': session.get('sid', 'no-session-id') if has_request_context() else 'no-session-id'})
+            raise ValidationError(f"Invalid data: {errors}")
+        
+        # Insert the cleaned and validated record
+        result = db.cashflows.insert_one(cleaned_record)
+        logger.info(f"Inserted cleaned cashflow record: {result.inserted_id}", 
+                   extra={'session_id': session.get('sid', 'no-session-id') if has_request_context() else 'no-session-id'})
+        
+        return result.inserted_id
+    except Exception as e:
+        logger.error(f"Error inserting cashflow record: {str(e)}", 
+                    extra={'session_id': session.get('sid', 'no-session-id') if has_request_context() else 'no-session-id'})
+        raise
+        
 def clean_cashflow_record(record):
     """
     Clean and sanitize a cashflow record to prevent parsing errors.
-    This function handles problematic characters in existing database records.
+    Handles nested data structures and problematic characters in existing database records.
+    
+    Args:
+        record: MongoDB document (dict)
+        
+    Returns:
+        Cleaned record
     """
     if not record or not isinstance(record, dict):
         return record
@@ -680,14 +730,33 @@ def clean_cashflow_record(record):
         # Create a copy to avoid modifying the original
         cleaned_record = record.copy()
         
-        # Clean string fields that might contain problematic characters
-        string_fields = ['party_name', 'description', 'contact', 'method', 'expense_category', 
-                        'business_name', 'customer_name', 'supplier_name', 'notes', 'reference']
+        def recursive_clean(obj, max_length=None, allow_backslash=False):
+            if isinstance(obj, dict):
+                return {k: recursive_clean(v, max_length, allow_backslash) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [recursive_clean(item, max_length, allow_backslash) for item in obj]
+            elif isinstance(obj, str):
+                return sanitize_input(obj, max_length=max_length, allow_backslash=allow_backslash)
+            return obj
         
-        for field in string_fields:
+        # Define fields with their sanitization rules
+        string_fields = [
+            ('party_name', 100, False),
+            ('description', 1000, True),  # Allow backslashes in descriptions
+            ('contact', 100, False),
+            ('method', 100, False),
+            ('expense_category', 100, False),
+            ('business_name', 100, False),
+            ('customer_name', 100, False),
+            ('supplier_name', 100, False),
+            ('notes', 1000, True),  # Allow backslashes in notes
+            ('reference', 100, False)
+        ]
+        
+        for field, max_length, allow_backslash in string_fields:
             if field in cleaned_record and cleaned_record[field] is not None:
                 original_value = cleaned_record[field]
-                cleaned_value = sanitize_input(original_value, max_length=1000 if field == 'description' else 100)
+                cleaned_value = recursive_clean(original_value, max_length, allow_backslash)
                 cleaned_record[field] = cleaned_value
                 
                 # Log if we cleaned something significant
@@ -704,7 +773,8 @@ def clean_cashflow_record(record):
         return cleaned_record
         
     except Exception as e:
-        logger.error(f"Error cleaning cashflow record: {str(e)}", extra={'session_id': session.get('sid', 'no-session-id')})
+        logger.error(f"Error cleaning cashflow record: {str(e)}", 
+                    extra={'session_id': session.get('sid', 'no-session-id')})
         return record
 
 def clean_record(record):
@@ -1227,18 +1297,22 @@ def audit_datetime_fields(db, collection_name='cashflows'):
 def bulk_clean_cashflow_data(db, user_id=None):
     """
     Bulk clean cashflow data for a specific user or all users.
-    This function can be called to proactively clean data.
+    Uses bulk write operations for performance and tracks changes.
+    
+    Args:
+        db: MongoDB database instance
+        user_id: Optional user ID to clean data for specific user
+        
+    Returns:
+        int: Number of records cleaned
     """
     try:
-        query = {}
-        if user_id:
-            query['user_id'] = str(user_id)
-        
-        # Get count for progress tracking
+        query = {'user_id': str(user_id)} if user_id else {}
         total_count = db.cashflows.count_documents(query)
         logger.info(f"Starting bulk cleanup of {total_count} cashflow records for user {user_id or 'all users'}", 
                    extra={'session_id': session.get('sid', 'no-session-id') if has_request_context() else 'no-session-id'})
         
+        bulk_ops = []
         cleaned_count = 0
         cursor = db.cashflows.find(query)
         
@@ -1247,18 +1321,26 @@ def bulk_clean_cashflow_data(db, user_id=None):
                 cleaned_record, changes_made = clean_cashflow_document_advanced(record)
                 
                 if changes_made:
-                    cleaned_record['updated_at'] = datetime.now(timezone.utc)
-                    db.cashflows.replace_one({'_id': record['_id']}, cleaned_record)
+                    cleaned_record['updated_at'] = datetime.now(ZoneInfo("UTC"))
+                    bulk_ops.append(pymongo.UpdateOne(
+                        {'_id': record['_id']},
+                        {'$set': cleaned_record}
+                    ))
                     cleaned_count += 1
                     
-                    if cleaned_count % 100 == 0:
-                        logger.info(f"Cleaned {cleaned_count} records so far...", 
-                                   extra={'session_id': session.get('sid', 'no-session-id') if has_request_context() else 'no-session-id'})
+                if len(bulk_ops) >= 1000:  # Process in batches of 1000
+                    db.cashflows.bulk_write(bulk_ops, ordered=False)
+                    bulk_ops = []
+                    logger.info(f"Processed {cleaned_count} records so far...", 
+                               extra={'session_id': session.get('sid', 'no-session-id') if has_request_context() else 'no-session-id'})
                         
             except Exception as record_error:
                 logger.error(f"Error cleaning record {record.get('_id', 'unknown')}: {str(record_error)}", 
                            extra={'session_id': session.get('sid', 'no-session-id') if has_request_context() else 'no-session-id'})
                 continue
+        
+        if bulk_ops:
+            db.cashflows.bulk_write(bulk_ops, ordered=False)
         
         logger.info(f"Bulk cleanup completed. Cleaned {cleaned_count} out of {total_count} records for user {user_id or 'all users'}", 
                    extra={'session_id': session.get('sid', 'no-session-id') if has_request_context() else 'no-session-id'})
@@ -2706,7 +2788,7 @@ from decimal import Decimal
 def serialize_for_json(obj):
     """
     Convert MongoDB documents and Python objects to JSON-serializable format.
-    Handles ObjectId, datetime, and other non-serializable types.
+    Handles ObjectId, datetime, Decimal, sets, bytes, and custom objects.
     
     Args:
         obj: Object to serialize (dict, list, or individual value)
@@ -2719,10 +2801,13 @@ def serialize_for_json(obj):
             return {key: serialize_for_json(value) for key, value in obj.items()}
         elif isinstance(obj, list):
             return [serialize_for_json(item) for item in obj]
+        elif isinstance(obj, set):
+            return [serialize_for_json(item) for item in sorted(obj)]  # Convert set to sorted list
+        elif isinstance(obj, bytes):
+            return obj.decode('utf-8', errors='ignore')  # Decode bytes to string
         elif isinstance(obj, ObjectId):
             return str(obj)
         elif isinstance(obj, datetime):
-            # Convert datetime to ISO string with timezone info
             if obj.tzinfo is None:
                 obj = obj.replace(tzinfo=ZoneInfo("UTC"))
             return obj.isoformat()
@@ -2731,12 +2816,17 @@ def serialize_for_json(obj):
         elif isinstance(obj, Decimal):
             return float(obj)
         elif hasattr(obj, '__dict__'):
-            # Handle custom objects by converting to dict
             return serialize_for_json(obj.__dict__)
         else:
-            return obj
+            try:
+                json.dumps(obj)  # Test if serializable
+                return obj
+            except (TypeError, ValueError):
+                logger.warning(f"Non-serializable object {type(obj)}: {str(obj)}")
+                return str(obj)  # Fallback for unknown types
     except Exception as e:
-        logger.warning(f"Error serializing object {type(obj)}: {str(e)}")
+        logger.error(f"Error serializing object {type(obj)}: {str(e)}", 
+                    extra={'session_id': session.get('sid', 'no-session-id')})
         return str(obj)
 
 def safe_json_response(data, status_code=200):
@@ -2893,4 +2983,5 @@ def create_dashboard_safe_response(stats, recent_data, additional_data=None):
             'timestamp': datetime.now(timezone.utc).isoformat()
 
         }
+
 
