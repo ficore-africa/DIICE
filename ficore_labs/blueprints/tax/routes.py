@@ -1,7 +1,7 @@
 from flask import Blueprint, request, session, redirect, url_for, render_template, flash, current_app, jsonify
 from flask_wtf import FlaskForm
 from flask_wtf.csrf import CSRFProtect, CSRFError
-from wtforms import FloatField, SubmitField, StringField, FieldList, FormField
+from wtforms import FloatField, SubmitField, StringField, FieldList, FormField, SelectField
 from wtforms.validators import DataRequired, NumberRange, Optional, Length
 from flask_login import current_user, login_required
 from utils import get_all_recent_activities, clean_currency, get_mongo_db, is_admin, requires_role, limiter, get_optimized_tax_calculation_data
@@ -18,6 +18,17 @@ tax_bp = Blueprint(
     template_folder='templates/',
     url_prefix='/tax'
 )
+
+# Define valid deduction categories
+DEDUCTION_CATEGORIES = [
+    ('office_admin', 'Office Administration'),
+    ('staff_wages', 'Staff Wages'),
+    ('business_travel', 'Business Travel'),
+    ('rent_utilities', 'Rent and Utilities'),
+    ('marketing_sales', 'Marketing and Sales'),
+    ('cogs', 'Cost of Goods Sold'),
+    ('statutory_legal', 'Statutory and Legal Contributions')
+]
 
 def strip_commas(value):
     """Filter to remove commas and return a float."""
@@ -43,6 +54,25 @@ def custom_login_required(f):
         return redirect(url_for('users.login', next=request.url))
     return decorated_function
 
+def sync_form_deductions_to_cashflows(user_id, tax_year, deductions, db):
+    """Sync form deductions to the cashflows collection with proper categories."""
+    try:
+        for item in deductions:
+            db.cashflows.insert_one({
+                'user_id': user_id,
+                'type': 'payment',
+                'tax_year': tax_year,
+                'expense_category': item['category'],
+                'amount': float(item['amount']),
+                'description': bleach.clean(item['name']),
+                'note': bleach.clean(item['note']) if item['note'] else None,
+                'created_at': datetime.utcnow()
+            })
+        current_app.logger.info(f"Synced {len(deductions)} deductions to cashflows for user {user_id} in tax year {tax_year}")
+    except Exception as e:
+        current_app.logger.error(f"Failed to sync deductions to cashflows for user {user_id}: {str(e)}")
+        raise TaxCalculationError(f"Failed to sync deductions: {str(e)}")
+
 class TaxItemForm(FlaskForm):
     name = StringField(
         trans('tax_item_name', default='Item Name'),
@@ -57,6 +87,13 @@ class TaxItemForm(FlaskForm):
         validators=[
             DataRequired(message=trans('tax_item_amount_required', default='Amount is required')),
             NumberRange(min=0.01, max=10000000000, message=trans('tax_amount_max', default='Amount must be between 0.01 and 10 billion'))
+        ]
+    )
+    category = SelectField(
+        trans('tax_item_category', default='Category'),
+        choices=DEDUCTION_CATEGORIES,
+        validators=[
+            DataRequired(message=trans('tax_item_category_required', default='Category is required'))
         ]
     )
     note = StringField(
@@ -77,6 +114,14 @@ class TaxForm(FlaskForm):
         validators=[
             DataRequired(message=trans('tax_income_required', default='Annual income is required')),
             NumberRange(min=0, max=10000000000, message=trans('tax_income_max', default='Income must be between 0 and 10 billion'))
+        ]
+    )
+    rent_expenses = FloatField(
+        trans('rent_expenses', default='Annual Rent Expenses'),
+        filters=[strip_commas],
+        validators=[
+            Optional(),
+            NumberRange(min=0, max=10000000000, message=trans('rent_expenses_max', default='Rent expenses must be between 0 and 10 billion'))
         ]
     )
     deductions = FieldList(
@@ -105,6 +150,7 @@ class TaxForm(FlaskForm):
         super().__init__(*args, **kwargs)
         lang = session.get('lang', 'en')
         self.income.label.text = trans('tax_income', lang) or 'Annual Income'
+        self.rent_expenses.label.text = trans('rent_expenses', lang) or 'Annual Rent Expenses'
         self.tax_year.label.text = trans('tax_year', lang) or 'Tax Year'
         self.entity_type.label.text = trans('entity_type', lang) or 'Entity Type'
         self.submit.label.text = trans('tax_calculate', lang) or 'Calculate Tax'
@@ -125,6 +171,11 @@ class TaxForm(FlaskForm):
                     return False
                 if item.form.name.data and item.form.amount.data:
                     item_names.append(item.form.name.data.lower())
+                if item.form.category.data not in [cat[0] for cat in DEDUCTION_CATEGORIES]:
+                    self.deductions.errors.append(
+                        trans('tax_invalid_category', default='Invalid deduction category')
+                    )
+                    return False
                 
                 if len(item_names) != len(set(item_names)):
                     self.deductions.errors.append(
@@ -169,7 +220,7 @@ def new():
     
     form = TaxForm(formdata=request.form if request.method == 'POST' else None)
     db = get_mongo_db()
-    current_year = datetime.now().year  # Compute current year for template
+    current_year = datetime.now().year
 
     is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json
 
@@ -225,20 +276,35 @@ def new():
 
             try:
                 income = float(form.income.data)
+                rent_expenses = float(form.rent_expenses.data or 0.0)
                 deductions = []
                 total_deductions = 0.0
                 for item in form.deductions.entries:
-                    if item.form.name.data and item.form.amount.data:
+                    if item.form.name.data and item.form.amount.data and item.form.category.data:
                         deduction_item = {
                             'name': bleach.clean(item.form.name.data),
                             'amount': float(item.form.amount.data),
+                            'category': item.form.category.data,
                             'note': bleach.clean(item.form.note.data) if item.form.note.data else None
                         }
                         deductions.append(deduction_item)
                         total_deductions += deduction_item['amount']
 
+                # Add rent expenses as a deduction if provided
+                if rent_expenses > 0:
+                    deductions.append({
+                        'name': 'Rent Expenses',
+                        'amount': rent_expenses,
+                        'category': 'rent_utilities',
+                        'note': 'Annual rent expenses from form'
+                    })
+                    total_deductions += rent_expenses
+
                 tax_year = int(form.tax_year.data)
                 entity_type = form.entity_type.data
+
+                # Sync deductions to cashflows
+                sync_form_deductions_to_cashflows(current_user.id, tax_year, deductions, db)
 
                 if not update_user_entity_type(current_user.id, entity_type, db):
                     current_app.logger.error(f"Failed to update entity type for user {current_user.id}", extra={'session_id': session_id})
@@ -248,9 +314,24 @@ def new():
                     flash(error_message, 'danger')
                     return redirect(url_for('tax.new'))
 
+                # Log deductions for debugging
+                current_app.logger.info(f"Deductions for user {current_user.id}: {deductions}", extra={'session_id': session_id})
+
                 tax_result = calculate_tax_liability(current_user.id, tax_year, db)
-                taxable_income = tax_result.get('summary', {}).get('taxable_income', max(0, income - total_deductions))
+                if 'error' in tax_result:
+                    raise TaxCalculationError(tax_result['error'])
+                
+                taxable_income = tax_result.get('summary', {}).get('taxable_income', 0.0)
                 total_tax = tax_result.get('final_tax_liability', 0.0)
+
+                # Validate taxable income
+                if taxable_income < 0:
+                    current_app.logger.warning(f"Negative taxable income ({taxable_income}) for user {current_user.id} in tax year {tax_year}", 
+                                             extra={'session_id': session_id})
+                    error_message = trans('tax_negative_taxable', default='Taxable income is negative. Please review your deductions.')
+                    if is_ajax:
+                        return jsonify({'success': False, 'message': error_message, 'details': {'taxable_income': taxable_income}}), 400
+                    flash(error_message, 'warning')
 
                 tax_id = ObjectId()
                 tax_data = {
