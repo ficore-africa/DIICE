@@ -1,43 +1,4 @@
-<script type="text/javascript">
-        var gk_isXlsx = false;
-        var gk_xlsxFileLookup = {};
-        var gk_fileData = {};
-        function filledCell(cell) {
-          return cell !== '' && cell != null;
-        }
-        function loadFileData(filename) {
-        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
-            try {
-                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
-                var firstSheetName = workbook.SheetNames[0];
-                var worksheet = workbook.Sheets[firstSheetName];
-
-                // Convert sheet to JSON to filter blank rows
-                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
-                // Filter out blank rows (rows where all cells are empty, null, or undefined)
-                var filteredData = jsonData.filter(row => row.some(filledCell));
-
-                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
-                var headerRowIndex = filteredData.findIndex((row, index) =>
-                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
-                );
-                // Fallback
-                if (headerRowIndex === -1 || headerRowIndex > 25) {
-                  headerRowIndex = 0;
-                }
-
-                // Convert filtered JSON back to CSV
-                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
-                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
-                return csv;
-            } catch (e) {
-                console.error(e);
-                return "";
-            }
-        }
-        return gk_fileData[filename] || "";
-        }
-        </script>{% extends "base.html" %}
+{% extends "base.html" %}
 {% block title %}{{ t('tax_calculate_new', default='Calculate Tax') }}{% endblock %}
 {% block content %}
 <!-- Add CSRF meta tag for AJAX submissions -->
@@ -59,19 +20,15 @@
 
     <div class="row">
         <div class="col-lg-8">
-            <form method="POST" action="{{ url_for('tax.new') }}" id="taxForm" class="validate-form">
-                {{ form.csrf_token }}
-                <input type="hidden" name="action" value="calculate_tax">
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <form id="tax-form" method="POST" action="{{ url_for('tax.new') }}">
+                        {{ form.csrf_token }}
 
-                <!-- Income -->
-                <div class="card mb-4">
-                    <div class="card-header bg-primary text-white">
-                        <h5><i class="fas fa-money-bill-wave me-2"></i>{{ t('tax_income', default='Annual Income') }}</h5>
-                    </div>
-                    <div class="card-body">
+                        <!-- Annual Income -->
                         <div class="mb-3">
-                            <label for="{{ form.income.id }}" class="form-label">{{ t('tax_income', default='Annual Income') }}</label>
-                            {{ form.income(class="form-control income-input", type="number", min="0", max="10000000000", step="0.01", placeholder="500000.00", value=form.income.data or '') }}
+                            <label for="income" class="form-label">{{ form.income.label }}</label>
+                            <input type="number" class="form-control income-input" id="income" name="income" min="0" max="10000000000" step="0.01" placeholder="500000.00" value="{{ form.income.data or '' }}">
                             {% if form.income.errors %}
                                 <div class="invalid-feedback d-block">
                                     {% for error in form.income.errors %}
@@ -81,195 +38,291 @@
                             {% endif %}
                             <small class="form-text text-muted">{{ t('tax_income_help', default='Enter your total annual income before deductions') }}</small>
                         </div>
-                    </div>
-                </div>
 
-                <!-- Deductions -->
-                <div class="card mb-4">
-                    <div class="card-header bg-warning text-white d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0"><i class="fas fa-receipt me-2"></i>{{ t('tax_deductions', default='Deductions') }}</h5>
-                        <button type="button" class="btn btn-light btn-sm add-deduction-item">
-                            <i class="fas fa-plus me-1"></i>{{ t('tax_add_deduction', default='Add Deduction') }}
-                        </button>
-                    </div>
-                    <div class="card-body">
-                        <div id="deduction-items-container">
-                            {% for item in form.deductions.entries %}
-                                <div class="deduction-item-entry row mb-3 border-bottom pb-3" data-index="{{ loop.index0 }}">
-                                    <div class="col-md-4">
-                                        <label for="{{ item.form.name.id }}" class="form-label">{{ t('tax_item_name', default='Deduction Name') }}</label>
-                                        {{ item.form.name(class="form-control", type="text", maxlength="100", placeholder=t('tax_deduction_placeholder', default='e.g., Pension, Charity'), value=item.form.name.data or '') }}
-                                        {% if item.form.name.errors %}
-                                            <div class="invalid-feedback d-block">
-                                                {% for error in item.form.name.errors %}
-                                                    {{ t(error, default=error) }}
-                                                {% endfor %}
-                                            </div>
-                                        {% endif %}
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label for="{{ item.form.amount.id }}" class="form-label">{{ t('tax_amount', default='Amount') }}</label>
-                                        {{ item.form.amount(class="form-control deduction-input", type="number", min="0", max="10000000000", step="0.01", placeholder="50000.00", value=item.form.amount.data or '') }}
-                                        {% if item.form.amount.errors %}
-                                            <div class="invalid-feedback d-block">
-                                                {% for error in item.form.amount.errors %}
-                                                    {{ t(error, default=error) }}
-                                                {% endfor %}
-                                            </div>
-                                        {% endif %}
-                                    </div>
-                                    <div class="col-md-3">
-                                        <label for="{{ item.form.note.id }}" class="form-label">{{ t('tax_note', default='Note') }} {{ t('tax_optional', default='(Optional)') }}</label>
-                                        {{ item.form.note(class="form-control", type="text", maxlength="200", placeholder=t('tax_note_placeholder', default='Additional details'), value=item.form.note.data or '') }}
-                                        {% if item.form.note.errors %}
-                                            <div class="invalid-feedback d-block">
-                                                {% for error in item.form.note.errors %}
-                                                    {{ t(error, default=error) }}
-                                                {% endfor %}
-                                            </div>
-                                        {% endif %}
-                                    </div>
-                                    <div class="col-md-1 d-flex align-items-end">
-                                        <button type="button" class="btn btn-danger btn-sm remove-deduction-item">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                    </div>
+                        <!-- Tax Year -->
+                        <div class="mb-3">
+                            <label for="tax_year" class="form-label">{{ form.tax_year.label }}</label>
+                            <input type="text" class="form-control" id="tax_year" name="tax_year" placeholder="2025" value="{{ form.tax_year.data or datetime.now().year }}">
+                            {% if form.tax_year.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.tax_year.errors %}
+                                        {{ t(error, default=error) }}
+                                    {% endfor %}
                                 </div>
-                            {% endfor %}
+                            {% endif %}
+                            <small class="form-text text-muted">{{ t('tax_year_help', default='Enter the tax year for this calculation (e.g., 2025)') }}</small>
                         </div>
-                        {% if not form.deductions.entries %}
-                            <div class="text-muted text-center py-3">
-                                <i class="fas fa-plus-circle fa-2x mb-2"></i>
-                                <p>{{ t('tax_no_deductions', default='No deductions added yet. Click "Add Deduction" to get started.') }}</p>
-                            </div>
-                        {% endif %}
-                        {% if form.deductions.errors %}
-                            <div class="invalid-feedback d-block">
-                                {% for error in form.deductions.errors %}
-                                    {{ t(error, default=error) }}
+
+                        <!-- Entity Type -->
+                        <div class="mb-3">
+                            <label for="entity_type" class="form-label">{{ form.entity_type.label }}</label>
+                            <select class="form-select" id="entity_type" name="entity_type">
+                                <option value="sole_proprietor" {% if form.entity_type.data == 'sole_proprietor' %}selected{% endif %}>{{ t('tax_entity_sole_proprietor', default='Sole Proprietor') }}</option>
+                                <option value="limited_liability" {% if form.entity_type.data == 'limited_liability' %}selected{% endif %}>{{ t('tax_entity_limited_liability', default='Limited Liability') }}</option>
+                            </select>
+                            {% if form.entity_type.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.entity_type.errors %}
+                                        {{ t(error, default=error) }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <small class="form-text text-muted">{{ t('tax_entity_type_help', default='Select your business entity type') }}</small>
+                        </div>
+
+                        <!-- Deductions -->
+                        <div class="mb-3">
+                            <label class="form-label">{{ t('tax_deductions', default='Deductions') }}</label>
+                            <button type="button" class="btn btn-outline-primary btn-sm mb-2" onclick="addDeduction()">{{ t('tax_add_deduction', default='Add Deduction') }}</button>
+                            <div id="deductions-container">
+                                {% for item in form.deductions.entries %}
+                                    <div class="deduction-entry card p-3 mb-2">
+                                        <div class="row">
+                                            <div class="col-md-4">
+                                                <label class="form-label">{{ t('tax_item_name', default='Deduction Name') }}</label>
+                                                {{ item.form.name(class="form-control", type="text", maxlength="50", placeholder=t('tax_deduction_placeholder', default='e.g., Pension, Charity'), value=item.form.name.data or '') }}
+                                                {% if item.form.name.errors %}
+                                                    <div class="invalid-feedback d-block">
+                                                        {% for error in item.form.name.errors %}
+                                                            {{ t(error, default=error) }}
+                                                        {% endfor %}
+                                                    </div>
+                                                {% endif %}
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">{{ t('tax_amount', default='Amount') }}</label>
+                                                {{ item.form.amount(class="form-control deduction-input", type="number", min="0", max="10000000000", step="0.01", placeholder="50000.00", value=item.form.amount.data or '') }}
+                                                {% if item.form.amount.errors %}
+                                                    <div class="invalid-feedback d-block">
+                                                        {% for error in item.form.amount.errors %}
+                                                            {{ t(error, default=error) }}
+                                                        {% endfor %}
+                                                    </div>
+                                                {% endif %}
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label">{{ t('tax_note', default='Note') }} {{ t('tax_optional', default='(Optional)') }}</label>
+                                                {{ item.form.note(class="form-control", type="text", maxlength="200", placeholder=t('tax_note_placeholder', default='Additional details'), value=item.form.note.data or '') }}
+                                                {% if item.form.note.errors %}
+                                                    <div class="invalid-feedback d-block">
+                                                        {% for error in item.form.note.errors %}
+                                                            {{ t(error, default=error) }}
+                                                        {% endfor %}
+                                                    </div>
+                                                {% endif %}
+                                            </div>
+                                            <div class="col-md-1 d-flex align-items-end">
+                                                <button type="button" class="btn btn-danger btn-sm" onclick="removeDeduction(this)">{{ t('general_remove', default='Remove') }}</button>
+                                            </div>
+                                        </div>
+                                    </div>
                                 {% endfor %}
                             </div>
-                        {% endif %}
-                    </div>
-                </div>
+                            {% if not form.deductions.entries %}
+                                <p class="text-muted">{{ t('tax_no_deductions', default='No deductions added yet. Click "Add Deduction" to get started.') }}</p>
+                            {% endif %}
+                            {% if form.deductions.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.deductions.errors %}
+                                        {{ t(error, default=error) }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
 
-                <!-- Real-Time Tax Calculation -->
-                <div class="card mb-4">
-                    <div class="card-body">
-                        <h6>{{ t('tax_summary', default='Tax Summary') }}</h6>
-                        <div class="row">
-                            <div class="col-md-4">
-                                <p><strong>{{ t('tax_income', default='Income') }}:</strong></p>
-                                <p class="text-primary fs-5" id="total-income">0.00</p>
-                            </div>
-                            <div class="col-md-4">
-                                <p><strong>{{ t('tax_total_deductions', default='Total Deductions') }}:</strong></p>
-                                <p class="text-warning fs-5" id="total-deductions">0.00</p>
-                            </div>
-                            <div class="col-md-4">
-                                <p><strong>{{ t('tax_taxable_income', default='Taxable Income') }}:</strong></p>
-                                <p class="text-info fs-5" id="taxable-income">0.00</p>
-                            </div>
-                            <div class="col-md-4">
-                                <p><strong>{{ t('tax_total_tax', default='Total Tax') }}:</strong></p>
-                                <p class="fs-4 fw-bold text-danger" id="total-tax">0.00</p>
+                        <!-- Form Buttons -->
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('tax.index') }}" class="btn btn-secondary">{{ t('general_back', default='Back') }}</a>
+                            <div>
+                                <button type="button" class="btn btn-info" data-bs-toggle="modal" data-bs-target="#taxBreakdownModal">{{ t('tax_view_breakdown', default='View Breakdown') }}</button>
+                                <button type="submit" class="btn btn-primary">{{ t('tax_calculate', default='Calculate Tax') }}</button>
                             </div>
                         </div>
-                    </div>
+                    </form>
                 </div>
-
-                <!-- Tax Breakdown Modal -->
-                <div class="modal fade" id="taxBreakdownModal" tabindex="-1" aria-labelledby="taxBreakdownModalLabel" aria-hidden="true">
-                    <div class="modal-dialog">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h5 class="modal-title" id="taxBreakdownModalLabel">{{ t('tax_breakdown', default='Tax Breakdown') }}</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                            </div>
-                            <div class="modal-body">
-                                <div id="tax-breakdown-content"></div>
-                            </div>
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ t('general_close', default='Close') }}</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="d-flex justify-content-between">
-                    <a href="{{ url_for('tax.index') }}" class="btn btn-secondary">
-                        <i class="fas fa-arrow-left me-2"></i>{{ t('general_back', default='Back') }}
-                    </a>
-                    <div>
-                        <button type="button" class="btn btn-info me-2" id="showBreakdownButton" disabled>
-                            <i class="fas fa-eye me-2"></i>{{ t('tax_view_breakdown', default='View Breakdown') }}
-                        </button>
-                        <button type="submit" class="btn btn-primary btn-lg">
-                            <i class="fas fa-calculator me-2"></i>{{ t('tax_calculate', default='Calculate Tax') }}
-                        </button>
-                    </div>
-                </div>
-            </form>
+            </div>
         </div>
 
+        <!-- Summary and Insights -->
         <div class="col-lg-4">
-            <!-- Tips Sidebar -->
-            <div class="card shadow-sm">
-                <div class="card-header bg-light">
-                    <h6 class="mb-0"><i class="fas fa-lightbulb me-2"></i>{{ t('tax_tips', default='Tips') }}</h6>
+            <!-- Tax Summary -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">{{ t('tax_summary', default='Tax Summary') }}</h5>
                 </div>
                 <div class="card-body">
-                    {% if tips %}
-                        <ul class="list-unstyled">
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>{{ t('tax_income', default='Income') }}:</span>
+                            <span id="summary-income">{{ latest_calculation.income or '0.00' }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>{{ t('tax_total_deductions', default='Total Deductions') }}:</span>
+                            <span id="summary-deductions">{{ latest_calculation.deductions | sum(attribute='amount') | format_currency if latest_calculation.deductions else '0.00' }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>{{ t('tax_taxable_income', default='Taxable Income') }}:</span>
+                            <span id="summary-taxable-income">{{ latest_calculation.taxable_income or '0.00' }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>{{ t('tax_total_tax', default='Total Tax') }}:</span>
+                            <span id="summary-total-tax">{{ latest_calculation.total_tax or '0.00' }}</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Tips -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">{{ t('tax_tips', default='Tips') }}</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group list-group-flush">
+                        {% if tips %}
                             {% for tip in tips %}
-                                <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i>{{ t(tip, default=tip) }}</li>
+                                <li class="list-group-item">{{ t(tip, default=tip) }}</li>
                             {% endfor %}
-                        </ul>
-                    {% else %}
-                        <ul class="list-unstyled">
-                            <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i>{{ t('tax_tip_review_deductions', default='Review all possible deductions to reduce taxable income') }}</li>
-                            <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i>{{ t('tax_tip_file_early', default='File your taxes early to avoid penalties') }}</li>
-                            <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i>{{ t('tax_tip_keep_records', default='Keep detailed records of all deductible expenses') }}</li>
-                            <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i>{{ t('tax_tip_consult_expert', default='Consult a tax professional for complex situations') }}</li>
-                        </ul>
-                    {% endif %}
+                        {% else %}
+                            <li class="list-group-item">{{ t('tax_tip_review_deductions', default='Review all possible deductions to reduce taxable income') }}</li>
+                            <li class="list-group-item">{{ t('tax_tip_file_early', default='File your taxes early to avoid penalties') }}</li>
+                            <li class="list-group-item">{{ t('tax_tip_keep_records', default='Keep detailed records of all deductible expenses') }}</li>
+                            <li class="list-group-item">{{ t('tax_tip_consult_expert', default='Consult a tax professional for complex situations') }}</li>
+                        {% endif %}
+                    </ul>
                 </div>
             </div>
 
             <!-- Recent Activity -->
             {% if activities %}
-                <div class="card shadow-sm mt-4">
-                    <div class="card-header bg-light">
-                        <h6 class="mb-0"><i class="fas fa-clock me-2"></i>{{ t('general_recent_activity', default='Recent Activity') }}</h6>
+                <div class="card shadow-sm">
+                    <div class="card-header">
+                        <h5 class="mb-0">{{ t('general_recent_activity', default='Recent Activity') }}</h5>
                     </div>
                     <div class="card-body">
-                        <div class="list-group list-group-flush">
+                        <ul class="list-group list-group-flush">
                             {% for activity in activities[:5] %}
-                                <div class="list-group-item border-0 px-0">
-                                    <small class="text-muted">{{ activity.timestamp | format_datetime }}</small>
-                                    <div>{{ activity.description }}</div>
-                                </div>
+                                <li class="list-group-item">
+                                    <small class="text-muted">{{ activity.timestamp | format_datetime }}</small><br>
+                                    {{ activity.description }}
+                                </li>
                             {% endfor %}
-                        </div>
+                        </ul>
                     </div>
                 </div>
             {% endif %}
+        </div>
+    </div>
+
+    <!-- Tax Breakdown Modal -->
+    <div class="modal fade" id="taxBreakdownModal" tabindex="-1" aria-labelledby="taxBreakdownModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="taxBreakdownModalLabel">{{ t('tax_breakdown', default='Tax Breakdown') }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>{{ t('tax_breakdown_unavailable', default='Calculate your tax to see the detailed breakdown.') }}</p>
+                    {% if latest_calculation.calculation_details %}
+                        {% if latest_calculation.entity_type == 'sole_proprietor' %}
+                            <h6>{{ t('tax_step1_net_business_profit', default='Step 1: Net Business Profit') }}</h6>
+                            <p>{{ t('tax_total_income', default='Total Income') }}: {{ latest_calculation.calculation_details.step1_net_business_profit.total_income | format_currency }}</p>
+                            <p>{{ t('tax_total_deductible_expenses', default='Total Deductible Expenses') }}: {{ latest_calculation.calculation_details.step1_net_business_profit.total_deductible_expenses | format_currency }}</p>
+                            <p>{{ t('tax_net_business_profit', default='Net Business Profit') }}: {{ latest_calculation.calculation_details.step1_net_business_profit.net_business_profit | format_currency }}</p>
+                            <h6>{{ t('tax_step2_statutory_deductions', default='Step 2: Statutory Deductions') }}</h6>
+                            <p>{{ t('tax_statutory_expenses', default='Statutory Expenses') }}: {{ latest_calculation.calculation_details.step2_statutory_deductions.statutory_legal_expenses | format_currency }}</p>
+                            <p>{{ t('tax_adjusted_profit', default='Adjusted Profit') }}: {{ latest_calculation.calculation_details.step2_statutory_deductions.adjusted_profit_after_statutory | format_currency }}</p>
+                            <h6>{{ t('tax_step3_rent_relief', default='Step 3: Rent Relief') }}</h6>
+                            <p>{{ t('tax_rent_relief', default='Rent Relief') }}: {{ latest_calculation.calculation_details.step3_rent_relief.calculated_rent_relief | format_currency }}</p>
+                            <p>{{ t('tax_taxable_income', default='Taxable Income') }}: {{ latest_calculation.calculation_details.step3_rent_relief.taxable_income_after_rent_relief | format_currency }}</p>
+                            <h6>{{ t('tax_step4_progressive_tax', default='Step 4: Progressive Tax') }}</h6>
+                            {% for band in latest_calculation.calculation_details.step4_progressive_tax.tax_band_breakdown %}
+                                <p>{{ band.band_description }}: {{ band.tax_in_band | format_currency }}</p>
+                            {% endfor %}
+                            <p>{{ t('tax_total_tax_liability', default='Total Tax Liability') }}: {{ latest_calculation.calculation_details.step4_progressive_tax.total_tax_liability | format_currency }}</p>
+                        {% else %}
+                            <h6>{{ t('tax_cit_calculation', default='CIT Calculation') }}</h6>
+                            <p>{{ t('tax_total_revenue', default='Total Revenue') }}: {{ latest_calculation.calculation_details.total_revenue | format_currency }}</p>
+                            <p>{{ t('tax_taxable_income', default='Taxable Income') }}: {{ latest_calculation.calculation_details.taxable_income | format_currency }}</p>
+                            <p>{{ t('tax_tax_rate', default='Tax Rate') }}: {{ latest_calculation.calculation_details.tax_rate | float * 100 }}%</p>
+                            <p>{{ t('tax_total_tax_liability', default='Total Tax Liability') }}: {{ latest_calculation.calculation_details.tax_liability | format_currency }}</p>
+                            {% if latest_calculation.calculation_details.exemption_applied %}
+                                <p>{{ t('tax_exemption_note', default='Exemption Applied') }}: {{ latest_calculation.calculation_details.exemption_reason }}</p>
+                            {% endif %}
+                        {% endif %}
+                    {% endif %}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ t('general_close', default='Close') }}</button>
+                </div>
+            </div>
         </div>
     </div>
 </div>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize Bootstrap modal
-    const breakdownModal = new bootstrap.Modal(document.getElementById('taxBreakdownModal'), { keyboard: true });
-    const showBreakdownButton = document.getElementById('showBreakdownButton');
-    let latestBreakdown = null;
+    let deductionIndex = {{ form.deductions.entries|length }};
 
-    // Helper functions
-    function formatCurrency(value) {
-        return value.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    // Add new deduction field
+    window.addDeduction = function() {
+        if (deductionIndex >= 20) {
+            showAlert('warning', '{{ t("tax_max_deductions", default="Maximum of 20 deductions allowed.") | e }}');
+            return;
+        }
+        const container = document.getElementById('deductions-container');
+        const newEntry = document.createElement('div');
+        newEntry.className = 'deduction-entry card p-3 mb-2';
+        newEntry.innerHTML = `
+            <div class="row">
+                <div class="col-md-4">
+                    <label class="form-label">{{ t('tax_item_name', default='Deduction Name') }}</label>
+                    <input type="text" class="form-control" name="deductions-${deductionIndex}-name" maxlength="50" placeholder="{{ t('tax_deduction_placeholder', default='e.g., Pension, Charity') | e }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">{{ t('tax_amount', default='Amount') }}</label>
+                    <input type="number" class="form-control deduction-input" name="deductions-${deductionIndex}-amount" min="0" max="10000000000" step="0.01" placeholder="50000.00">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">{{ t('tax_note', default='Note') }} {{ t('tax_optional', default='(Optional)') }}</label>
+                    <input type="text" class="form-control" name="deductions-${deductionIndex}-note" maxlength="200" placeholder="{{ t('tax_note_placeholder', default='Additional details') | e }}">
+                </div>
+                <div class="col-md-1 d-flex align-items-end">
+                    <button type="button" class="btn btn-danger btn-sm" onclick="removeDeduction(this)">{{ t('general_remove', default='Remove') }}</button>
+                </div>
+            </div>
+        `;
+        container.appendChild(newEntry);
+        deductionIndex++;
+        updateSummary();
+    };
+
+    // Remove deduction field
+    window.removeDeduction = function(button) {
+        button.closest('.deduction-entry').remove();
+        updateSummary();
+    };
+
+    // Update tax summary dynamically
+    function updateSummary() {
+        const incomeInput = document.getElementById('income').value || 0;
+        const deductionInputs = document.querySelectorAll('.deduction-input');
+        let totalDeductions = 0;
+        deductionInputs.forEach(input => {
+            const value = parseFloat(input.value) || 0;
+            totalDeductions += value;
+        });
+        const taxableIncome = Math.max(0, incomeInput - totalDeductions);
+
+        document.getElementById('summary-income').textContent = parseFloat(incomeInput).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        document.getElementById('summary-deductions').textContent = totalDeductions.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        document.getElementById('summary-taxable-income').textContent = taxableIncome.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        // Total tax remains 0 until calculation is performed
+        document.getElementById('summary-total-tax').textContent = '0.00';
     }
 
+    // Show alert messages
     function showAlert(type, message) {
         const alertContainer = document.createElement('div');
         alertContainer.className = `alert alert-${type} alert-dismissible fade show`;
@@ -281,223 +334,39 @@ document.addEventListener('DOMContentLoaded', function() {
         setTimeout(() => alertContainer.remove(), 5000);
     }
 
-    function announceToScreenReader(message) {
-        const announcement = document.createElement('div');
-        announcement.setAttribute('aria-live', 'polite');
-        announcement.setAttribute('class', 'visually-hidden');
-        announcement.textContent = message;
-        document.body.appendChild(announcement);
-        setTimeout(() => announcement.remove(), 1000);
-    }
+    // Handle form submission via AJAX
+    document.getElementById('tax-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
 
-    // Deduction item management
-    let deductionIndex = {{ form.deductions.entries|length }};
-
-    function createDeductionItemTemplate(index) {
-        return `
-            <div class="deduction-item-entry row mb-3 border-bottom pb-3" data-index="${index}">
-                <div class="col-md-4">
-                    <label for="deductions-${index}-name" class="form-label">{{ t('tax_item_name', default='Deduction Name') }}</label>
-                    <input type="text" class="form-control" name="deductions-${index}-name" id="deductions-${index}-name" maxlength="100" placeholder="{{ t('tax_deduction_placeholder', default='e.g., Pension, Charity') }}">
-                </div>
-                <div class="col-md-4">
-                    <label for="deductions-${index}-amount" class="form-label">{{ t('tax_amount', default='Amount') }}</label>
-                    <input type="number" class="form-control deduction-input" name="deductions-${index}-amount" id="deductions-${index}-amount" min="0" max="10000000000" step="0.01" placeholder="50000.00">
-                </div>
-                <div class="col-md-3">
-                    <label for="deductions-${index}-note" class="form-label">{{ t('tax_note', default='Note') }} {{ t('tax_optional', default='(Optional)') }}</label>
-                    <input type="text" class="form-control" name="deductions-${index}-note" id="deductions-${index}-note" maxlength="200" placeholder="{{ t('tax_note_placeholder', default='Additional details') }}">
-                </div>
-                <div class="col-md-1 d-flex align-items-end">
-                    <button type="button" class="btn btn-danger btn-sm remove-deduction-item">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
-            </div>
-        `;
-    }
-
-    document.querySelector('.add-deduction-item').addEventListener('click', function() {
-        if (deductionIndex < 20) {
-            document.getElementById('deduction-items-container').insertAdjacentHTML('beforeend', createDeductionItemTemplate(deductionIndex));
-            deductionIndex++;
-            attachEventListeners();
-            updateTaxCalculation();
-        } else {
-            alert('{{ t('tax_max_items', default='Maximum of 20 deductions allowed') }}');
-        }
+        fetch('{{ url_for("tax.new") }}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrfToken,
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: formData
+        })
+        .then(response => response.json().then(data => ({ status: response.status, data })))
+        .then(({ status, data }) => {
+            if (status === 200 && data.success) {
+                showAlert('success', data.message);
+                window.location.href = '{{ url_for("tax.dashboard") }}';
+            } else {
+                showAlert('danger', data.message || '{{ t("tax_calculation_error", default="Error calculating tax.") | e }}');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showAlert('danger', '{{ t("tax_calculation_error", default="Error calculating tax.") | e }}');
+        });
     });
 
-    function attachEventListeners() {
-        document.querySelectorAll('.remove-deduction-item').forEach(button => {
-            button.removeEventListener('click', removeItemHandler);
-            button.addEventListener('click', removeItemHandler);
-        });
-
-        document.querySelectorAll('.income-input, .deduction-input').forEach(input => {
-            input.removeEventListener('input', debouncedUpdateTaxCalculation);
-            input.addEventListener('input', debouncedUpdateTaxCalculation);
-        });
-    }
-
-    function removeItemHandler() {
-        this.closest('.deduction-item-entry').remove();
-        updateTaxCalculation();
-    }
-
-    // Real-time tax calculation
-    const debouncedUpdateTaxCalculation = debounce(function() {
-        updateTaxCalculation();
-    }, 100);
-
-    function updateTaxCalculation() {
-        let income = parseFloat(document.querySelector('.income-input').value) || 0;
-        let totalDeductions = 0;
-        document.querySelectorAll('.deduction-input').forEach(input => {
-            totalDeductions += parseFloat(input.value) || 0;
-        });
-
-        const taxableIncome = Math.max(0, income - totalDeductions);
-        const totalTax = calculateTax(taxableIncome);
-
-        document.getElementById('total-income').textContent = formatCurrency(income);
-        document.getElementById('total-deductions').textContent = formatCurrency(totalDeductions);
-        document.getElementById('taxable-income').textContent = formatCurrency(taxableIncome);
-        document.getElementById('total-tax').textContent = formatCurrency(totalTax);
-
-        latestBreakdown = generateTaxBreakdown(taxableIncome, totalTax);
-        updateTaxBreakdownModal(latestBreakdown);
-        showBreakdownButton.disabled = !latestBreakdown;
-    }
-
-    function calculateTax(taxableIncome) {
-        const taxBrackets = [
-            [300000, 0.07],
-            [600000, 0.11],
-            [1100000, 0.15],
-            [1600000, 0.19],
-            [3200000, 0.21],
-            [Number.MAX_VALUE, 0.24]
-        ];
-        let tax = 0;
-        let previousBracket = 0;
-        for (const [bracket, rate] of taxBrackets) {
-            if (taxableIncome > previousBracket) {
-                const taxableInBracket = Math.min(taxableIncome, bracket) - previousBracket;
-                tax += taxableInBracket * rate;
-                previousBracket = bracket;
-            } else {
-                break;
-            }
-        }
-        return tax;
-    }
-
-    function generateTaxBreakdown(taxableIncome, totalTax) {
-        if (taxableIncome <= 0) return null;
-        const taxBrackets = [
-            [300000, 0.07, '7%'],
-            [600000, 0.11, '11%'],
-            [1100000, 0.15, '15%'],
-            [1600000, 0.19, '19%'],
-            [3200000, 0.21, '21%'],
-            [Number.MAX_VALUE, 0.24, '24%']
-        ];
-        let breakdown = '<h6>Tax Breakdown by Bracket</h6><ul>';
-        let previousBracket = 0;
-        let runningTax = 0;
-        for (const [bracket, rate, label] of taxBrackets) {
-            if (taxableIncome > previousBracket) {
-                const taxableInBracket = Math.min(taxableIncome, bracket) - previousBracket;
-                const taxInBracket = taxableInBracket * rate;
-                runningTax += taxInBracket;
-                breakdown += `<li>${label} on ${formatCurrency(taxableInBracket)}: ${formatCurrency(taxInBracket)}</li>`;
-                previousBracket = bracket;
-            } else {
-                break;
-            }
-        }
-        breakdown += `</ul><p><strong>Total Tax: ${formatCurrency(totalTax)}</strong></p>`;
-        return breakdown;
-    }
-
-    function updateTaxBreakdownModal(breakdown) {
-        const modalContent = document.getElementById('tax-breakdown-content');
-        modalContent.innerHTML = breakdown || '{{ t("tax_no_breakdown", default="No tax breakdown available. Please calculate your tax first.") | e }}';
-    }
-
-    function debounce(func, wait) {
-        let timeout;
-        return function executedFunction(...args) {
-            const later = () => {
-                clearTimeout(timeout);
-                func(...args);
-            };
-            clearTimeout(timeout);
-            timeout = setTimeout(later, wait);
-        };
-    }
-
-    // Show breakdown modal with feedback
-    showBreakdownButton.addEventListener('click', function(e) {
-        if (latestBreakdown) {
-            breakdownModal.show();
-            const modalTitle = document.querySelector('#taxBreakdownModal .modal-title');
-            if (modalTitle) {
-                modalTitle.focus();
-            }
-        } else {
-            showAlert('warning', '{{ t("tax_no_calculation_available", default="Please calculate your tax first to view the detailed breakdown.") | e }}');
-            this.disabled = true;
-            announceToScreenReader('{{ t("tax_no_calculation_available", default="Please calculate your tax first to view the detailed breakdown.") | e }}');
-        }
+    // Update summary on input change
+    document.querySelectorAll('.income-input, .deduction-input').forEach(input => {
+        input.addEventListener('input', updateSummary);
     });
-
-    // Form submission with AJAX support
-    const form = document.getElementById('taxForm');
-    if (form) {
-        form.addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            if (!form.checkValidity()) {
-                form.classList.add('was-validated');
-                const firstInvalid = form.querySelector(':invalid');
-                if (firstInvalid) {
-                    firstInvalid.focus();
-                    firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }
-                return;
-            }
-
-            const formData = new FormData(form);
-            const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
-
-            fetch('{{ url_for("tax.new") }}', {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': csrfToken,
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
-                body: formData
-            })
-            .then(response => response.json().then(data => ({ status: response.status, data })))
-            .then(({ status, data }) => {
-                if (status === 200 && data.success) {
-                    window.location.href = '{{ url_for("tax.dashboard") }}';
-                } else {
-                    showAlert('danger', data.message || '{{ t("tax_form_invalid", default="Invalid form data. Please check your inputs.") }}');
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                showAlert('danger', '{{ t("tax_submission_error", default="Error submitting tax calculation. Please try again.") }}');
-            });
-        });
-    }
-
-    // Initial setup
-    attachEventListeners();
-    updateTaxCalculation();
 });
 </script>
 {% endblock %}
