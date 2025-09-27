@@ -414,13 +414,25 @@ def create_app():
     logger.info('Registered all blueprints including KYC, Settings, Rewards, Tax Calculator, Education, and API', extra={'session_id': 'none', 'user_role': 'none', 'ip_address': 'none'})
 
     # Define format_currency filter
-    def format_currency(value, currency='NGN'):
-        try:
-            locale.setlocale(locale.LC_ALL, 'en_NG.UTF-8')
-            return locale.currency(float(value), symbol=True, grouping=True, international=False)
-        except (ValueError, TypeError, locale.Error) as e:
-            logger.warning(f'Error formatting currency {value}: {str(e)}', extra={'session_id': session.get('sid', 'no-session-id'), 'ip_address': request.remote_addr})
-            return f"₦{float(value):,.2f}" if value else str(value)
+    def format_currency(amount, currency='₦', lang=None, include_symbol=True):
+    try:
+        with current_app.app_context():
+            if lang is None:
+                lang = session.get('lang', 'en') if has_request_context() else 'en'
+            if amount is None or amount == '':
+                amount = 0
+            if isinstance(amount, str):
+                amount = clean_currency(amount)
+            else:
+                amount = float(amount)
+            if amount.is_integer():
+                formatted = f"{int(amount):,}"
+            else:
+                formatted = f"{amount:,.2f}"
+            return f"{currency}{formatted}" if include_symbol else formatted
+    except Exception as e:
+        logger.warning(f"Error formatting currency {amount}: {str(e)}", extra={'session_id': session.get('sid', 'no-session-id')})
+        return f"{currency}0" if include_symbol else "0"
 
     # Define format_percentage filter
     def format_percentage(value):
