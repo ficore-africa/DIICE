@@ -387,7 +387,7 @@ def create_app():
     from blueprints.settings.routes import settings_bp
     from blueprints.inventory.routes import inventory_bp
     from blueprints.rewards.routes import rewards_bp
-    from blueprints.tax import tax_bp
+    from blueprints.tax.routes import tax_bp
     from blueprints.education import education_bp
     from blueprints.api.routes import api_bp
 
