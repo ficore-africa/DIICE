@@ -12,7 +12,7 @@
 <div class="container mt-4">
     {% set tool_name = 'tax_calculate_new' %}
     {% set tool_icon = 'fa-calculator' %}
-    {% set subtitle = t('tax_calculate_description', default='Enter your income, rent expenses, and deductions to calculate your tax liability') %}
+    {% set subtitle = t('tax_calculate_description', default='Enter your annual income, rent expenses, pension contributions, and deductions to calculate your tax liability') %}
     {% include 'tool_header.html' %}
 
     <!-- Navigation Breadcrumb -->
@@ -41,7 +41,7 @@
                                     {% endfor %}
                                 </div>
                             {% endif %}
-                            <small class="form-text text-muted">{{ t('tax_income_help', default='Enter your total annual income before deductions') }}</small>
+                            <small class="form-text text-muted">{{ t('tax_annual_income_help', default='Enter your total annual income before deductions (NGN)') }}</small>
                         </div>
 
                         <!-- Annual Rent Expenses -->
@@ -55,13 +55,27 @@
                                     {% endfor %}
                                 </div>
                             {% endif %}
-                            <small class="form-text text-muted">{{ t('rent_relief_help', default='Enter your annual rent expenses. Relief is calculated as the lower of ₦500,000 or 20% of rent.') }}</small>
+                            <small class="form-text text-muted">{{ t('tax_rent_relief_help', default='Enter your annual rent expenses. Relief is calculated as the lower of ₦500,000 or 20% of annual rent.') }}</small>
+                        </div>
+
+                        <!-- Annual Pension Contribution -->
+                        <div class="mb-3">
+                            <label for="pension_contribution" class="form-label">{{ form.pension_contribution.label }}</label>
+                            <input type="number" class="form-control income-input" id="pension_contribution" name="pension_contribution" min="0" max="10000000000" step="0.01" placeholder="40000.00" value="{{ form.pension_contribution.data or '' }}">
+                            {% if form.pension_contribution.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.pension_contribution.errors %}
+                                        {{ t(error, default=error) }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <small class="form-text text-muted">{{ t('tax_pension_help', default='Enter your annual pension contribution. Defaults to 8% of income for employees if left blank.') }}</small>
                         </div>
 
                         <!-- Tax Year -->
                         <div class="mb-3">
                             <label for="tax_year" class="form-label">{{ form.tax_year.label }}</label>
-                            <input type="text" class="form-control" id="tax_year" name="tax_year" placeholder="2025" value="{{ form.tax_year.data or current_year }}">
+                            <input type="text" class="form-control" id="tax_year" name="tax_year" placeholder="2026" value="{{ form.tax_year.data or current_year }}">
                             {% if form.tax_year.errors %}
                                 <div class="invalid-feedback d-block">
                                     {% for error in form.tax_year.errors %}
@@ -69,7 +83,7 @@
                                     {% endfor %}
                                 </div>
                             {% endif %}
-                            <small class="form-text text-muted">{{ t('tax_year_help', default='Enter the tax year for this calculation (e.g., 2025)') }}</small>
+                            <small class="form-text text-muted">{{ t('tax_year_help', default='Enter the tax year for this calculation (e.g., 2026)') }}</small>
                         </div>
 
                         <!-- Entity Type -->
@@ -99,7 +113,7 @@
                                         <div class="row">
                                             <div class="col-md-3">
                                                 <label class="form-label">{{ t('tax_item_name', default='Deduction Name') }}</label>
-                                                {{ item.form.name(class="form-control", type="text", maxlength="50", placeholder=t('tax_deduction_placeholder', default='e.g., Pension, Charity'), value=item.form.name.data or '') }}
+                                                {{ item.form.name(class="form-control", type="text", maxlength="50", placeholder=t('tax_deduction_placeholder', default='e.g., Charity Donation'), value=item.form.name.data or '') }}
                                                 {% if item.form.name.errors %}
                                                     <div class="invalid-feedback d-block">
                                                         {% for error in item.form.name.errors %}
@@ -109,7 +123,7 @@
                                                 {% endif %}
                                             </div>
                                             <div class="col-md-3">
-                                                <label class="form-label">{{ t('tax_amount', default='Amount') }}</label>
+                                                <label class="form-label">{{ t('tax_item_amount', default='Amount (NGN)') }}</label>
                                                 {{ item.form.amount(class="form-control deduction-input", type="number", min="0", max="10000000000", step="0.01", placeholder="50000.00", value=item.form.amount.data or '') }}
                                                 {% if item.form.amount.errors %}
                                                     <div class="invalid-feedback d-block">
@@ -131,7 +145,7 @@
                                                 {% endif %}
                                             </div>
                                             <div class="col-md-2">
-                                                <label class="form-label">{{ t('tax_note', default='Note') }} {{ t('tax_optional', default='(Optional)') }}</label>
+                                                <label class="form-label">{{ t('tax_item_note', default='Note') }} {{ t('tax_optional', default='(Optional)') }}</label>
                                                 {{ item.form.note(class="form-control", type="text", maxlength="200", placeholder=t('tax_note_placeholder', default='Additional details'), value=item.form.note.data or '') }}
                                                 {% if item.form.note.errors %}
                                                     <div class="invalid-feedback d-block">
@@ -183,7 +197,7 @@
                 <div class="card-body">
                     <ul class="list-group list-group-flush">
                         <li class="list-group-item d-flex justify-content-between">
-                            <span>{{ t('tax_income', default='Income') }}:</span>
+                            <span>{{ t('tax_annual_income', default='Annual Income') }}:</span>
                             <span id="summary-income">{{ latest_calculation.income or '0.00' }}</span>
                         </li>
                         <li class="list-group-item d-flex justify-content-between">
@@ -231,25 +245,25 @@
                 <div class="card-body">
                     {% if latest_calculation.entity_type == 'limited_liability' %}
                         <!-- CIT Information -->
-                        <h6>{{ t('cit_rates_title', default='Companies Income Tax (CIT) Rates') }}</h6>
+                        <h6>{{ t('tax_cit_rates_title', default='Companies Income Tax (CIT) Rates') }}</h6>
                         <div class="alert alert-success">
-                            <h6 class="mb-2">{{ t('small_company_exemption', default='Small Company Exemption') }}</h6>
+                            <h6 class="mb-2">{{ t('tax_small_company_exemption', default='Small Company Exemption') }}</h6>
                             <p class="mb-1"><strong>₦0 - ₦50,000,000:</strong> 0% {{ t('tax_rate', default='tax rate') }}</p>
-                            <small class="text-muted">{{ t('small_company_note', default='Companies with annual revenue of ₦50 million or less are exempt from CIT') }}</small>
+                            <small class="text-muted">{{ t('tax_small_company_note', default='Companies with annual revenue of ₦50 million or less are exempt from CIT') }}</small>
                         </div>
                         <div class="alert alert-warning">
-                            <h6 class="mb-2">{{ t('large_company_rate', default='Large Company Rate') }}</h6>
+                            <h6 class="mb-2">{{ t('tax_large_company_rate', default='Large Company Rate') }}</h6>
                             <p class="mb-1"><strong>Above ₦50,000,000:</strong> 30% {{ t('tax_rate', default='tax rate') }}</p>
-                            <small class="text-muted">{{ t('large_company_note', default='Companies with annual revenue above ₦50 million pay 30% tax on taxable income') }}</small>
+                            <small class="text-muted">{{ t('tax_large_company_note', default='Companies with annual revenue above ₦50 million pay 30% tax on taxable income') }}</small>
                         </div>
                         <hr>
-                        <h6>{{ t('cit_deductions_title', default='CIT Deductions') }}</h6>
+                        <h6>{{ t('tax_cit_deductions_title', default='CIT Deductions') }}</h6>
                         <p class="small text-muted">
-                            {{ t('cit_deductions_description', default='For CIT purposes, all legitimate business expenses are generally deductible from revenue to determine taxable income.') }}
+                            {{ t('tax_cit_deductions_description', default='For CIT purposes, all legitimate business expenses are generally deductible from revenue to determine taxable income.') }}
                         </p>
                     {% else %}
                         <!-- PIT Information -->
-                        <h6>{{ t('progressive_tax_rates_title', default='Progressive Tax Rates (NTA 2025)') }}</h6>
+                        <h6>{{ t('tax_progressive_tax_rates_title', default='Progressive Tax Rates (NTA 2026)') }}</h6>
                         <ul class="list-unstyled">
                             <li><strong>₦0 - ₦800,000:</strong> 0%</li>
                             <li><strong>₦800,001 - ₦3,000,000:</strong> 15%</li>
@@ -259,39 +273,39 @@
                             <li><strong>Above ₦50,000,000:</strong> 25%</li>
                         </ul>
                         <hr>
-                        <h6>{{ t('rent_relief_title', default='Rent Relief') }}</h6>
+                        <h6>{{ t('tax_rent_relief_title', default='Rent Relief') }}</h6>
                         <p class="small text-muted">
-                            {{ t('rent_relief_description', default='You can claim rent relief equal to the lower of ₦500,000 or 20% of your annual rent.') }}
+                            {{ t('tax_rent_relief_description', default='You can claim rent relief equal to the lower of ₦500,000 or 20% of your annual rent.') }}
                         </p>
                         <hr>
-                        <h6>{{ t('four_step_process_title', default='Four-Step Tax Calculation') }}</h6>
+                        <h6>{{ t('tax_four_step_process_title', default='Four-Step Tax Calculation') }}</h6>
                         <div class="step-info mb-3">
                             <div class="d-flex align-items-center mb-2">
                                 <span class="badge bg-success me-2">1</span>
-                                <strong>{{ t('step1_title', default='Net Business Profit') }}</strong>
+                                <strong>{{ t('tax_step1_title', default='Net Business Profit') }}</strong>
                             </div>
-                            <p class="small text-muted mb-0">{{ t('step1_info', default='Income minus main business expenses (e.g., office admin, staff wages)') }}</p>
+                            <p class="small text-muted mb-0">{{ t('tax_step1_info', default='Income minus main business expenses (e.g., office admin, staff wages)') }}</p>
                         </div>
                         <div class="step-info mb-3">
                             <div class="d-flex align-items-center mb-2">
                                 <span class="badge bg-info me-2">2</span>
-                                <strong>{{ t('step2_title', default='Statutory Deductions') }}</strong>
+                                <strong>{{ t('tax_step2_title', default='Statutory Deductions') }}</strong>
                             </div>
-                            <p class="small text-muted mb-0">{{ t('step2_info', default='Subtract statutory & legal contributions (e.g., pension)') }}</p>
+                            <p class="small text-muted mb-0">{{ t('tax_step2_info', default='Subtract statutory contributions (e.g., pension)') }}</p>
                         </div>
                         <div class="step-info mb-3">
                             <div class="d-flex align-items-center mb-2">
                                 <span class="badge bg-warning me-2">3</span>
-                                <strong>{{ t('step3_title', default='Rent Relief') }}</strong>
+                                <strong>{{ t('tax_step3_title', default='Rent Relief') }}</strong>
                             </div>
-                            <p class="small text-muted mb-0">{{ t('step3_info', default='Apply rent relief (max ₦500,000 or 20% of rent)') }}</p>
+                            <p class="small text-muted mb-0">{{ t('tax_step3_info', default='Apply rent relief (max ₦500,000 or 20% of annual rent)') }}</p>
                         </div>
                         <div class="step-info mb-3">
                             <div class="d-flex align-items-center mb-2">
                                 <span class="badge bg-primary me-2">4</span>
-                                <strong>{{ t('step4_title', default='Progressive Tax') }}</strong>
+                                <strong>{{ t('tax_step4_title', default='Progressive Tax') }}</strong>
                             </div>
-                            <p class="small text-muted mb-0">{{ t('step4_info', default='Apply NTA 2025 progressive tax bands') }}</p>
+                            <p class="small text-muted mb-0">{{ t('tax_step4_info', default='Apply NTA 2026 progressive tax bands') }}</p>
                         </div>
                     {% endif %}
                 </div>
@@ -308,15 +322,16 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <p>{{ t('tax_breakdown_unavailable', default='Calculate your tax to see the detailed breakdown.') }}</p>
-                    {% if latest_calculation.calculation_details %}
+                    {% if not latest_calculation.calculation_details %}
+                        <p>{{ t('tax_breakdown_unavailable', default='Calculate your tax to see the detailed breakdown.') }}</p>
+                    {% else %}
                         {% if latest_calculation.entity_type == 'sole_proprietor' %}
                             <h6>{{ t('tax_step1_net_business_profit', default='Step 1: Net Business Profit') }}</h6>
                             <p>{{ t('tax_total_income', default='Total Income') }}: {{ latest_calculation.calculation_details.step1_net_business_profit.total_income | format_currency }}</p>
                             <p>{{ t('tax_total_deductible_expenses', default='Total Deductible Expenses') }}: {{ latest_calculation.calculation_details.step1_net_business_profit.total_deductible_expenses | format_currency }}</p>
                             <p>{{ t('tax_net_business_profit', default='Net Business Profit') }}: {{ latest_calculation.calculation_details.step1_net_business_profit.net_business_profit | format_currency }}</p>
                             <h6>{{ t('tax_step2_statutory_deductions', default='Step 2: Statutory Deductions') }}</h6>
-                            <p>{{ t('tax_statutory_expenses', default='Statutory Expenses') }}: {{ latest_calculation.calculation_details.step2_statutory_deductions.statutory_legal_expenses | format_currency }}</p>
+                            <p>{{ t('tax_statutory_expenses', default='Statutory Contributions') }}: {{ latest_calculation.calculation_details.step2_statutory_deductions.statutory_contributions_expenses | format_currency }}</p>
                             <p>{{ t('tax_adjusted_profit', default='Adjusted Profit') }}: {{ latest_calculation.calculation_details.step2_statutory_deductions.adjusted_profit_after_statutory | format_currency }}</p>
                             <h6>{{ t('tax_step3_rent_relief', default='Step 3: Rent Relief') }}</h6>
                             <p>{{ t('tax_rent_relief', default='Rent Relief') }}: {{ latest_calculation.calculation_details.step3_rent_relief.calculated_rent_relief | format_currency }}</p>
@@ -352,13 +367,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Deduction category options
     const deductionCategories = [
-        {value: 'office_admin', label: '{{ t("tax_category_office_admin", default="Office Administration") }}'},
-        {value: 'staff_wages', label: '{{ t("tax_category_staff_wages", default="Staff Wages") }}'},
-        {value: 'business_travel', label: '{{ t("tax_category_business_travel", default="Business Travel") }}'},
-        {value: 'rent_utilities', label: '{{ t("tax_category_rent_utilities", default="Rent and Utilities") }}'},
-        {value: 'marketing_sales', label: '{{ t("tax_category_marketing_sales", default="Marketing and Sales") }}'},
-        {value: 'cogs', label: '{{ t("tax_category_cogs", default="Cost of Goods Sold") }}'},
-        {value: 'statutory_legal', label: '{{ t("tax_category_statutory_legal", default="Statutory and Legal Contributions") }}'}
+        {value: 'office_admin', label: '{{ t("tax_category_office_admin", default="Office Administration") | e }}'},
+        {value: 'staff_wages', label: '{{ t("tax_category_staff_wages", default="Staff Wages") | e }}'},
+        {value: 'business_travel', label: '{{ t("tax_category_business_travel", default="Business Travel") | e }}'},
+        {value: 'rent_utilities', label: '{{ t("tax_category_rent_utilities", default="Rent and Utilities") | e }}'},
+        {value: 'marketing_sales', label: '{{ t("tax_category_marketing_sales", default="Marketing and Sales") | e }}'},
+        {value: 'cogs', label: '{{ t("tax_category_cogs", default="Cost of Goods Sold") | e }}'},
+        {value: 'statutory_contributions', label: '{{ t("tax_category_statutory_contributions", default="Statutory Contributions") | e }}'}
     ];
 
     // Add new deduction field
@@ -374,10 +389,10 @@ document.addEventListener('DOMContentLoaded', function() {
             <div class="row">
                 <div class="col-md-3">
                     <label class="form-label">{{ t('tax_item_name', default='Deduction Name') }}</label>
-                    <input type="text" class="form-control" name="deductions-${deductionIndex}-name" maxlength="50" placeholder="{{ t('tax_deduction_placeholder', default='e.g., Pension, Charity') | e }}">
+                    <input type="text" class="form-control" name="deductions-${deductionIndex}-name" maxlength="50" placeholder="{{ t('tax_deduction_placeholder', default='e.g., Charity Donation') | e }}">
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label">{{ t('tax_amount', default='Amount') }}</label>
+                    <label class="form-label">{{ t('tax_item_amount', default='Amount (NGN)') }}</label>
                     <input type="number" class="form-control deduction-input" name="deductions-${deductionIndex}-amount" min="0" max="10000000000" step="0.01" placeholder="50000.00">
                 </div>
                 <div class="col-md-3">
@@ -387,7 +402,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     </select>
                 </div>
                 <div class="col-md-2">
-                    <label class="form-label">{{ t('tax_note', default='Note') }} {{ t('tax_optional', default='(Optional)') }}</label>
+                    <label class="form-label">{{ t('tax_item_note', default='Note') }} {{ t('tax_optional', default='(Optional)') }}</label>
                     <input type="text" class="form-control" name="deductions-${deductionIndex}-note" maxlength="200" placeholder="{{ t('tax_note_placeholder', default='Additional details') | e }}">
                 </div>
                 <div class="col-md-1 d-flex align-items-end">
@@ -408,20 +423,21 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Update tax summary dynamically
     function updateSummary() {
-        const incomeInput = document.getElementById('income').value || 0;
-        const rentInput = document.getElementById('rent_expenses').value || 0;
+        const incomeInput = parseFloat(document.getElementById('income').value) || 0;
+        const rentInput = parseFloat(document.getElementById('rent_expenses').value) || 0;
+        const pensionInput = parseFloat(document.getElementById('pension_contribution').value) || (incomeInput * 0.08); // Default 8% for employees
         const deductionInputs = document.querySelectorAll('.deduction-input[type="number"]');
-        let totalDeductions = parseFloat(rentInput);
+        let totalDeductions = rentInput + pensionInput;
         deductionInputs.forEach(input => {
             const value = parseFloat(input.value) || 0;
             totalDeductions += value;
         });
         const taxableIncome = Math.max(0, incomeInput - totalDeductions);
 
-        document.getElementById('summary-income').textContent = parseFloat(incomeInput).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        document.getElementById('summary-income').textContent = incomeInput.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         document.getElementById('summary-deductions').textContent = totalDeductions.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         document.getElementById('summary-taxable-income').textContent = taxableIncome.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        document.getElementById('summary-total-tax').textContent = '0.00';
+        document.getElementById('summary-total-tax').textContent = '0.00'; // Tax calculated on submission
     }
 
     // Show alert messages
@@ -457,6 +473,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 window.location.href = '{{ url_for("tax.dashboard") }}';
             } else {
                 showAlert('danger', data.message || '{{ t("tax_calculation_error", default="Error calculating tax.") | e }}');
+                if (data.errors) {
+                    Object.keys(data.errors).forEach(field => {
+                        const fieldElement = document.querySelector(`[name="${field}"]`);
+                        if (fieldElement) {
+                            fieldElement.classList.add('is-invalid');
+                            const errorDiv = document.createElement('div');
+                            errorDiv.className = 'invalid-feedback d-block';
+                            errorDiv.textContent = data.errors[field].join(', ');
+                            fieldElement.parentNode.appendChild(errorDiv);
+                        }
+                    });
+                }
             }
         })
         .catch(error => {
@@ -477,10 +505,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
 {% block styles %}
 <style>
-    .expense-category .card {
+    .deduction-entry .card {
         transition: all 0.2s ease;
     }
-    .expense-category .card:hover {
+    .deduction-entry .card:hover {
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     .border-success {
