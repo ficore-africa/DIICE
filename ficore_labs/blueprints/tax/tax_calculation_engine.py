@@ -524,8 +524,8 @@ def apply_statutory_deductions(net_business_profit, user_id, tax_year, db):
     """
     try:
         # Get statutory & legal contributions expenses
-        statutory_expenses = get_expenses_by_categories(user_id, tax_year, ['statutory_legal'], db)
-        statutory_amount = statutory_expenses.get('statutory_legal', 0.0)
+        statutory_expenses = get_expenses_by_categories(user_id, tax_year, ['statutory_contributions'], db)
+        statutory_amount = statutory_expenses.get('statutory_contributions', 0.0)
         
         # Apply statutory deduction
         adjusted_profit = net_business_profit - statutory_amount
@@ -535,7 +535,7 @@ def apply_statutory_deductions(net_business_profit, user_id, tax_year, db):
             'step': 2,
             'step_name': 'Statutory & Legal Contributions Deduction',
             'net_business_profit_input': net_business_profit,
-            'statutory_legal_expenses': statutory_amount,
+            'statutory_contributions_expenses': statutory_amount,
             'adjusted_profit_after_statutory': adjusted_profit,
             'calculation_formula': 'Net Business Profit - Statutory & Legal Contributions'
         }
@@ -549,7 +549,7 @@ def apply_statutory_deductions(net_business_profit, user_id, tax_year, db):
             'step': 2,
             'step_name': 'Statutory & Legal Contributions Deduction',
             'net_business_profit_input': net_business_profit,
-            'statutory_legal_expenses': 0.0,
+            'statutory_contributions_expenses': 0.0,
             'adjusted_profit_after_statutory': net_business_profit,
             'error': str(e)
         }
@@ -736,7 +736,7 @@ def calculate_cit_taxable_income(user_id, tax_year, db):
         # For CIT, all business expense categories are deductible
         all_business_categories = [
             'office_admin', 'staff_wages', 'business_travel', 
-            'rent_utilities', 'marketing_sales', 'cogs', 'statutory_legal'
+            'rent_utilities', 'marketing_sales', 'cogs', 'statutory_contributions'
         ]
         
         # Get all business expenses
@@ -1023,7 +1023,7 @@ def calculate_pit_liability(user_id, tax_year, db):
             'summary': {
                 'total_income': step1_result.get('total_income', 0.0),
                 'total_deductible_expenses': step1_result.get('total_deductible_expenses', 0.0),
-                'statutory_expenses': step2_result.get('statutory_legal_expenses', 0.0),
+                'statutory_expenses': step2_result.get('statutory_contributions_expenses', 0.0),
                 'rent_relief': step3_result.get('calculated_rent_relief', 0.0),
                 'taxable_income': taxable_income,
                 'final_tax_liability': final_tax_liability
@@ -1141,3 +1141,4 @@ def calculate_four_step_tax_liability(user_id, tax_year, db):
         dict: Complete tax calculation
     """
     return calculate_tax_liability(user_id, tax_year, db)
+
