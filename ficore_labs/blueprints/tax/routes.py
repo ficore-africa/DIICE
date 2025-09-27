@@ -4,8 +4,9 @@ from flask_wtf.csrf import CSRFProtect, CSRFError
 from wtforms import FloatField, SubmitField, StringField, FieldList, FormField
 from wtforms.validators import DataRequired, NumberRange, Optional, Length
 from flask_login import current_user, login_required
-from utils import get_all_recent_activities, clean_currency, get_mongo_db, is_admin, requires_role, limiter, trans, get_tax_calculations
+from utils import get_all_recent_activities, clean_currency, get_mongo_db, is_admin, requires_role, limiter, get_tax_calculations
 from datetime import datetime
+from translations import trans
 import uuid
 import bleach
 from bson import ObjectId
@@ -648,4 +649,5 @@ def history():
             calculations={},
             tool_title=trans('tax_history', default='Tax History')
         )
+
 
