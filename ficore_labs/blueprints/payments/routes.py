@@ -21,102 +21,102 @@ from reportlab.lib.styles import getSampleStyleSheet
 
 logger = logging.getLogger(__name__)
 
-# Define expense categories (consistent with templates)
+# Define expense categories with pre-sanitized strings
 expense_categories = {
     'office_admin': {
-        'name': trans('category_office_admin', default='Office & Admin'),
-        'description': trans('category_office_admin_desc', default='Office supplies, stationery, internet/data, utility bills'),
+        'name': utils.sanitize_input(trans('category_office_admin', default='Office & Admin'), max_length=100),
+        'description': utils.sanitize_input(trans('category_office_admin_desc', default='Office supplies, stationery, internet/data, utility bills'), max_length=1000),
         'examples': [
-            trans('example_office_supplies', default='Office supplies'),
-            trans('example_stationery', default='Stationery'),
-            trans('example_internet', default='Internet/Data'),
-            trans('example_electricity', default='Electricity')
+            utils.sanitize_input(trans('example_office_supplies', default='Office supplies'), max_length=100),
+            utils.sanitize_input(trans('example_stationery', default='Stationery'), max_length=100),
+            utils.sanitize_input(trans('example_internet', default='Internet/Data'), max_length=100),
+            utils.sanitize_input(trans('example_electricity', default='Electricity'), max_length=100)
         ],
         'tax_deductible': True,
         'is_personal': False,
         'is_statutory': False
     },
     'staff_wages': {
-        'name': trans('category_staff_wages', default='Staff & Wages'),
-        'description': trans('category_staff_wages_desc', default='Employee salaries, wages, and related costs'),
+        'name': utils.sanitize_input(trans('category_staff_wages', default='Staff & Wages'), max_length=100),
+        'description': utils.sanitize_input(trans('category_staff_wages_desc', default='Employee salaries, wages, and related costs'), max_length=1000),
         'examples': [
-            trans('example_salaries', default='Salaries'),
-            trans('example_wages', default='Wages'),
-            trans('example_staff_benefits', default='Staff benefits'),
-            trans('example_payroll', default='Payroll costs')
+            utils.sanitize_input(trans('example_salaries', default='Salaries'), max_length=100),
+            utils.sanitize_input(trans('example_wages', default='Wages'), max_length=100),
+            utils.sanitize_input(trans('example_staff_benefits', default='Staff benefits'), max_length=100),
+            utils.sanitize_input(trans('example_payroll', default='Payroll costs'), max_length=100)
         ],
         'tax_deductible': True,
         'is_personal': False,
         'is_statutory': False
     },
     'business_travel': {
-        'name': trans('category_business_travel', default='Business Travel & Transport'),
-        'description': trans('category_business_travel_desc', default='Fuel, vehicle maintenance, and travel expenses for business'),
+        'name': utils.sanitize_input(trans('category_business_travel', default='Business Travel & Transport'), max_length=100),
+        'description': utils.sanitize_input(trans('category_business_travel_desc', default='Fuel, vehicle maintenance, and travel expenses for business'), max_length=1000),
         'examples': [
-            trans('example_fuel', default='Fuel'),
-            trans('example_vehicle_maintenance', default='Vehicle maintenance'),
-            trans('example_business_travel', default='Business travel'),
-            trans('example_transport', default='Transport costs')
+            utils.sanitize_input(trans('example_fuel', default='Fuel'), max_length=100),
+            utils.sanitize_input(trans('example_vehicle_maintenance', default='Vehicle maintenance'), max_length=100),
+            utils.sanitize_input(trans('example_business_travel', default='Business travel'), max_length=100),
+            utils.sanitize_input(trans('example_transport', default='Transport costs'), max_length=100)
         ],
         'tax_deductible': True,
         'is_personal': False,
         'is_statutory': False
     },
     'rent_utilities': {
-        'name': trans('category_rent_utilities', default='Rent & Utilities'),
-        'description': trans('category_rent_utilities_desc', default='Rent for shop or business office'),
+        'name': utils.sanitize_input(trans('category_rent_utilities', default='Rent & Utilities'), max_length=100),
+        'description': utils.sanitize_input(trans('category_rent_utilities_desc', default='Rent for shop or business office'), max_length=1000),
         'examples': [
-            trans('example_shop_rent', default='Shop rent'),
-            trans('example_office_rent', default='Office rent'),
-            trans('example_business_premises', default='Business premises rent')
+            utils.sanitize_input(trans('example_shop_rent', default='Shop rent'), max_length=100),
+            utils.sanitize_input(trans('example_office_rent', default='Office rent'), max_length=100),
+            utils.sanitize_input(trans('example_business_premises', default='Business premises rent'), max_length=100)
         ],
         'tax_deductible': True,
         'is_personal': False,
         'is_statutory': False
     },
     'marketing_sales': {
-        'name': trans('category_marketing_sales', default='Marketing & Sales'),
-        'description': trans('category_marketing_sales_desc', default='Advertising, social media promotion, business cards'),
+        'name': utils.sanitize_input(trans('category_marketing_sales', default='Marketing & Sales'), max_length=100),
+        'description': utils.sanitize_input(trans('category_marketing_sales_desc', default='Advertising, social media promotion, business cards'), max_length=1000),
         'examples': [
-            trans('example_advertising', default='Advertising'),
-            trans('example_social_media', default='Social media promotion'),
-            trans('example_business_cards', default='Business cards')
+            utils.sanitize_input(trans('example_advertising', default='Advertising'), max_length=100),
+            utils.sanitize_input(trans('example_social_media', default='Social media promotion'), max_length=100),
+            utils.sanitize_input(trans('example_business_cards', default='Business cards'), max_length=100)
         ],
         'tax_deductible': True,
         'is_personal': False,
         'is_statutory': False
     },
     'cogs': {
-        'name': trans('category_cogs', default='Cost of Goods Sold (COGS)'),
-        'description': trans('category_cogs_desc', default='Direct costs of producing goods or services'),
+        'name': utils.sanitize_input(trans('category_cogs', default='Cost of Goods Sold (COGS)'), max_length=100),
+        'description': utils.sanitize_input(trans('category_cogs_desc', default='Direct costs of producing goods or services'), max_length=1000),
         'examples': [
-            trans('example_raw_materials', default='Raw materials'),
-            trans('example_manufacturing', default='Manufacturing costs'),
-            trans('example_direct_labor', default='Direct labor')
+            utils.sanitize_input(trans('example_raw_materials', default='Raw materials'), max_length=100),
+            utils.sanitize_input(trans('example_manufacturing', default='Manufacturing costs'), max_length=100),
+            utils.sanitize_input(trans('example_direct_labor', default='Direct labor'), max_length=100)
         ],
         'tax_deductible': True,
         'is_personal': False,
         'is_statutory': False
     },
     'personal_expenses': {
-        'name': trans('category_personal_expenses', default='Personal Expenses'),
-        'description': trans('category_personal_expenses_desc', default='Personal expenses not related to business'),
+        'name': utils.sanitize_input(trans('category_personal_expenses', default='Personal Expenses'), max_length=100),
+        'description': utils.sanitize_input(trans('category_personal_expenses_desc', default='Personal expenses not related to business'), max_length=1000),
         'examples': [
-            trans('example_personal_meals', default='Personal meals'),
-            trans('example_personal_shopping', default='Personal shopping'),
-            trans('example_family_expenses', default='Family expenses')
+            utils.sanitize_input(trans('example_personal_meals', default='Personal meals'), max_length=100),
+            utils.sanitize_input(trans('example_personal_shopping', default='Personal shopping'), max_length=100),
+            utils.sanitize_input(trans('example_family_expenses', default='Family expenses'), max_length=100)
         ],
         'tax_deductible': False,
         'is_personal': True,
         'is_statutory': False
     },
     'statutory_legal': {
-        'name': trans('category_statutory_legal', default='Statutory & Legal Contributions'),
-        'description': trans('category_statutory_legal_desc', default='Accounting, legal, and consulting fees directly related to business'),
+        'name': utils.sanitize_input(trans('category_statutory_legal', default='Statutory & Legal Contributions'), max_length=100),
+        'description': utils.sanitize_input(trans('category_statutory_legal_desc', default='Accounting, legal, and consulting fees directly related to business'), max_length=1000),
         'examples': [
-            trans('example_accounting_fees', default='Accounting fees'),
-            trans('example_legal_fees', default='Legal fees'),
-            trans('example_consulting_fees', default='Consulting fees')
+            utils.sanitize_input(trans('example_accounting_fees', default='Accounting fees'), max_length=100),
+            utils.sanitize_input(trans('example_legal_fees', default='Legal fees'), max_length=100),
+            utils.sanitize_input(trans('example_consulting_fees', default='Consulting fees'), max_length=100)
         ],
         'tax_deductible': True,
         'is_personal': False,
@@ -158,9 +158,22 @@ class PaymentForm(FlaskForm):
 
 payments_bp = Blueprint('payments', __name__, url_prefix='/payments')
 
+def sanitize_dict(d, max_length=1000):
+    """Recursively sanitize all string fields in a dictionary."""
+    for key, value in d.items():
+        if isinstance(value, str):
+            d[key] = utils.sanitize_input(value, max_length=max_length)
+        elif isinstance(value, dict):
+            sanitize_dict(value, max_length)
+        elif isinstance(value, list):
+            d[key] = [utils.sanitize_input(item, max_length=max_length) if isinstance(item, str) else item for item in value]
+    return d
+
 def fetch_payments_with_fallback(db, query, sort_field='created_at', sort_direction=-1, limit=50):
     """Fetch payments with fallback logic and enhanced sanitization for robustness."""
     payments = utils.safe_find_cashflows(db, query, sort_field=sort_field, sort_direction=sort_direction)
+    # Sanitize all payments, even from primary query
+    payments = [sanitize_dict(payment) for payment in payments]
     if not payments:
         try:
             test_count = db.cashflows.count_documents(query, hint=[('user_id', 1), ('type', 1)])
@@ -173,10 +186,8 @@ def fetch_payments_with_fallback(db, query, sort_field='created_at', sort_direct
                 payments = []
                 for payment in raw_payments:
                     try:
-                        # Sanitize string fields to remove problematic characters
-                        for field in ['party_name', 'contact', 'description']:
-                            if field in payment and isinstance(payment[field], str):
-                                payment[field] = sanitize_input(payment[field], max_length=1000)
+                        # Sanitize all fields recursively
+                        payment = sanitize_dict(payment)
                         from models import to_dict_cashflow
                         cleaned_payment = to_dict_cashflow(payment)
                         if cleaned_payment:
@@ -207,17 +218,17 @@ def index():
     """List all payment cashflows for the current user."""
     try:
         db = utils.get_mongo_db()
-        utils.audit_datetime_fields(db, 'cashflows')  # Run audit
+        utils.audit_datetime_fields(db, 'cashflows')
         query = {'user_id': str(current_user.id), 'type': 'payment'}
         
         payments = [normalize_datetime(doc) for doc in fetch_payments_with_fallback(db, query)]
-        # Ensure all payments are serialized safely for template rendering
         cleaned_payments = []
         for payment in payments:
             try:
-                for field in ['party_name', 'contact', 'description']:
-                    if field in payment and isinstance(payment[field], str):
-                        payment[field] = utils.sanitize_input(payment[field], max_length=1000)
+                # Log raw payment for debugging
+                logger.debug(f"Raw payment before serialization: {payment}")
+                # Sanitize all fields recursively
+                payment = sanitize_dict(payment)
                 cleaned_payment = serialize_for_json(payment)
                 cleaned_payments.append(cleaned_payment)
             except Exception as e:
@@ -254,13 +265,13 @@ def manage():
         query = {'user_id': str(current_user.id), 'type': 'payment'}
         
         payments = [normalize_datetime(doc) for doc in fetch_payments_with_fallback(db, query)]
-        # Serialize payments safely
         cleaned_payments = []
         for payment in payments:
             try:
-                for field in ['party_name', 'contact', 'description']:
-                    if field in payment and isinstance(payment[field], str):
-                        payment[field] = utils.sanitize_input(payment[field], max_length=1000)
+                # Log raw payment for debugging
+                logger.debug(f"Raw payment before serialization: {payment}")
+                # Sanitize all fields recursively
+                payment = sanitize_dict(payment)
                 cleaned_payment = serialize_for_json(payment)
                 cleaned_payments.append(cleaned_payment)
             except Exception as e:
@@ -278,7 +289,7 @@ def manage():
             title=trans('payments_manage', default='Manage Payments', lang=session.get('lang', 'en')),
             can_interact=utils.can_user_interact(current_user),
             expense_categories=expense_categories,
-            form=PaymentForm()  # For delete form CSRF token
+            form=PaymentForm()
         )
     except Exception as e:
         logger.error(
@@ -320,6 +331,11 @@ def view(id):
         payment.setdefault('contact', '')
         payment.setdefault('description', '')
         
+        # Log raw payment for debugging
+        logger.debug(f"Raw payment before serialization: {payment}")
+        # Sanitize all fields recursively
+        payment = sanitize_dict(payment)
+        
         from models import to_dict_cashflow
         payment = to_dict_cashflow(payment)
         return safe_json_response(payment)
@@ -358,6 +374,11 @@ def generate_pdf(id):
             return redirect(url_for('payments.index'))
         
         payment = normalize_datetime(payment)
+        # Log raw payment for debugging
+        logger.debug(f"Raw payment before serialization: {payment}")
+        # Sanitize all fields recursively
+        payment = sanitize_dict(payment)
+        
         from models import to_dict_cashflow
         payment = to_dict_cashflow(payment)
         
@@ -488,11 +509,11 @@ def add():
                     'expense_category': form.expense_category.data,
                     'is_tax_deductible': utils.is_category_tax_deductible(form.expense_category.data),
                     'tax_year': utils.extract_tax_year_from_date(payment_date),
-                    'category_metadata': {
+                    'category_metadata': sanitize_dict({
                         'category_display_name': category_metadata.get('name', ''),
                         'is_personal': category_metadata.get('is_personal', False),
                         'is_statutory': category_metadata.get('is_statutory', False)
-                    },
+                    }, max_length=100),
                     'contact': utils.sanitize_input(form.contact.data, max_length=100) if form.contact.data else None,
                     'description': utils.sanitize_input(form.description.data, max_length=1000) if form.description.data else None,
                     'created_at': payment_date,
@@ -549,6 +570,11 @@ def edit(id):
             return redirect(url_for('payments.index'))
         
         payment = normalize_datetime(payment)
+        # Log raw payment for debugging
+        logger.debug(f"Raw payment before serialization: {payment}")
+        # Sanitize all fields recursively
+        payment = sanitize_dict(payment)
+        
         from models import to_dict_cashflow
         payment = to_dict_cashflow(payment)
         
@@ -600,11 +626,11 @@ def edit(id):
                     'expense_category': form.expense_category.data,
                     'is_tax_deductible': utils.is_category_tax_deductible(form.expense_category.data),
                     'tax_year': utils.extract_tax_year_from_date(payment_date),
-                    'category_metadata': {
+                    'category_metadata': sanitize_dict({
                         'category_display_name': category_metadata.get('name', ''),
                         'is_personal': category_metadata.get('is_personal', False),
                         'is_statutory': category_metadata.get('is_statutory', False)
-                    },
+                    }, max_length=100),
                     'contact': utils.sanitize_input(form.contact.data, max_length=100) if form.contact.data else None,
                     'description': utils.sanitize_input(form.description.data, max_length=1000) if form.description.data else None,
                     'created_at': payment_date,
@@ -756,6 +782,11 @@ def share():
             }, 404)
         
         payment = normalize_datetime(payment)
+        # Log raw payment for debugging
+        logger.debug(f"Raw payment before serialization: {payment}")
+        # Sanitize all fields recursively
+        payment = sanitize_dict(payment)
+        
         success = utils.send_message(recipient=recipient, message=message, type=share_type)
         if success:
             logger.info(
