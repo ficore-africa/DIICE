@@ -167,15 +167,20 @@ def verify_no_naive_datetimes(db):
     for collection_name in db.list_collection_names():
         collection = db[collection_name]
         datetime_fields = ['created_at', 'updated_at', 'timestamp']
-        naive_count = collection.count_documents({
-            '$or': [
-                {field: {'$type': 'date', '$not': {'$type': 'timestamp'}}}
-                for field in datetime_fields
-                if field in (collection.find_one() or {})
-            ]
-        })
-        if naive_count > 0:
-            logger.warning(f"Found {naive_count} naive datetimes in {collection_name}")
+        # Get a sample document to check for relevant fields
+        sample_doc = collection.find_one() or {}
+        # Filter fields that exist in the sample document
+        relevant_fields = [field for field in datetime_fields if field in sample_doc]
+        # Only query if there are relevant fields to avoid empty $or
+        if relevant_fields:
+            naive_count = collection.count_documents({
+                '$or': [
+                    {field: {'$type': 'date', '$not': {'$type': 'timestamp'}}}
+                    for field in relevant_fields
+                ]
+            })
+            if naive_count > 0:
+                logger.warning(f"Found {naive_count} naive datetimes in {collection_name}")
 
 def initialize_app_data(app):
     """
