@@ -5,13 +5,11 @@ from wtforms import FloatField, SubmitField, StringField, FieldList, FormField
 from wtforms.validators import DataRequired, NumberRange, Optional, Length
 from flask_login import current_user, login_required
 import utils
-from utils import logger
 from datetime import datetime
 import uuid
 import bleach
 from bson import ObjectId
-from models import log_tool_usage, create_tax_calculation
-from helpers.transaction_helpers import create_tax_allocation_transaction
+from .tax_calculator import calculate_tax_liability, DataValidationError, TaxCalculationError, safe_float_conversion, validate_tax_year
 
 tax_bp = Blueprint(
     'tax',
@@ -50,107 +48,6 @@ def custom_login_required(f):
         flash(trans('general_login_required', default='Please log in to access this page.'), 'warning')
         return redirect(url_for('users.login', next=request.url))
     return decorated_function
-
-def deduct_ficore_credits(db, user_id, amount, action, tax_id=None):
-    """
-    Deduct Ficore Credits from user balance with enhanced error logging and transaction handling.
-    
-    Args:
-        db: MongoDB database instance
-        user_id: User ID (must match _id field in users collection)
-        amount: Amount to deduct
-        action: Action description for logging
-        tax_id: Optional tax calculation ID for reference
-    
-    Returns:
-        bool: True if successful, False otherwise
-    """
-    session_id = session.get('sid', 'unknown')
-    
-    try:
-        if not user_id:
-            logger.error(f"No user_id provided for credit deduction, action: {action}",
-                        extra={'session_id': session_id})
-            return False
-        
-        if amount <= 0:
-            logger.error(f"Invalid deduction amount {amount} for user {user_id}, action: {action}. Must be positive.",
-                        extra={'session_id': session_id, 'user_id': user_id})
-            return False
-        
-        user = db.users.find_one({'_id': user_id})
-        if not user:
-            logger.error(f"User {user_id} not found in database for credit deduction, action: {action}.",
-                        extra={'session_id': session_id, 'user_id': user_id})
-            return False
-        
-        current_balance = float(user.get('ficore_credit_balance', 0))
-        logger.debug(f"Current balance for user {user_id}: {current_balance}, attempting to deduct: {amount}",
-                    extra={'session_id': session_id, 'user_id': user_id})
-        
-        if current_balance < amount:
-            logger.warning(f"Insufficient credits for user {user_id}: required {amount}, available {current_balance}, action: {action}",
-                         extra={'session_id': session_id, 'user_id': user_id})
-            return False
-        
-        with db.client.start_session() as mongo_session:
-            with mongo_session.start_transaction():
-                result = db.users.update_one(
-                    {'_id': user_id},
-                    {'$inc': {'ficore_credit_balance': -amount}},
-                    session=mongo_session
-                )
-                
-                if result.modified_count == 0:
-                    error_msg = f"Failed to deduct {amount} credits for user {user_id}, action: {action}: No documents modified."
-                    logger.error(error_msg, extra={'session_id': session_id, 'user_id': user_id})
-                    db.ficore_credit_transactions.insert_one({
-                        '_id': ObjectId(),
-                        'user_id': user_id,
-                        'action': action,
-                        'amount': float(-amount),
-                        'tax_id': str(tax_id) if tax_id else None,
-                        'timestamp': datetime.utcnow(),
-                        'session_id': session_id,
-                        'status': 'failed'
-                    }, session=mongo_session)
-                    raise ValueError(error_msg)
-                
-                transaction = {
-                    '_id': ObjectId(),
-                    'user_id': user_id,
-                    'action': action,
-                    'amount': float(-amount),
-                    'tax_id': str(tax_id) if tax_id else None,
-                    'timestamp': datetime.utcnow(),
-                    'session_id': session_id,
-                    'status': 'completed'
-                }
-                db.ficore_credit_transactions.insert_one(transaction, session=mongo_session)
-                
-                db.audit_logs.insert_one({
-                    'admin_id': 'system',
-                    'action': f'deduct_ficore_credits_{action}',
-                    'details': {
-                        'user_id': user_id,
-                        'amount': amount,
-                        'tax_id': str(tax_id) if tax_id else None,
-                        'previous_balance': current_balance,
-                        'new_balance': current_balance - amount
-                    },
-                    'timestamp': datetime.utcnow()
-                }, session=mongo_session)
-                
-                mongo_session.commit_transaction()
-                
-        logger.info(f"Successfully deducted {amount} Ficore Credits for {action} by user {user_id}. New balance: {current_balance - amount}",
-                   extra={'session_id': session_id, 'user_id': user_id})
-        return True
-        
-    except Exception as e:
-        logger.error(f"Error deducting {amount} Ficore Credits for {action} by user {user_id}: {str(e)}",
-                    exc_info=True, extra={'session_id': session_id, 'user_id': user_id})
-        return False
 
 class TaxItemForm(FlaskForm):
     name = StringField(
@@ -194,23 +91,39 @@ class TaxForm(FlaskForm):
         max_entries=20,
         validators=[Optional()]
     )
+    tax_year = StringField(
+        trans('tax_year', default='Tax Year'),
+        validators=[
+            DataRequired(message=trans('tax_year_required', default='Tax year is required')),
+            Length(min=4, max=4, message=trans('tax_year_length', default='Tax year must be a 4-digit year'))
+        ]
+    )
+    entity_type = StringField(
+        trans('entity_type', default='Entity Type'),
+        validators=[
+            DataRequired(message=trans('entity_type_required', default='Entity type is required')),
+            Length(max=50, message=trans('entity_type_length', default='Entity type must be less than 50 characters'))
+        ]
+    )
     submit = SubmitField(trans('tax_calculate', default='Calculate Tax'))
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         lang = session.get('lang', 'en')
         self.income.label.text = trans('tax_income', lang) or 'Annual Income'
+        self.tax_year.label.text = trans('tax_year', lang) or 'Tax Year'
+        self.entity_type.label.text = trans('entity_type', lang) or 'Entity Type'
         self.submit.label.text = trans('tax_calculate', lang) or 'Calculate Tax'
 
     def validate(self, extra_validators=None):
         if not super().validate(extra_validators):
-            logger.debug(f"Form validation failed: {self.errors}", extra={'session_id': session.get('sid', 'unknown')})
+            current_app.logger.debug(f"Form validation failed: {self.errors}", extra={'session_id': session.get('sid', 'unknown')})
             return False
         try:
             item_names = []
             for item in self.deductions.entries:
                 if not isinstance(item.form, TaxItemForm):
-                    logger.warning(f"Invalid entry in deductions: {item.__dict__}",
+                    current_app.logger.warning(f"Invalid entry in deductions: {item.__dict__}",
                                   extra={'session_id': session.get('sid', 'unknown')})
                     self.deductions.errors.append(
                         trans('tax_invalid_item', default='Invalid deduction item format')
@@ -224,9 +137,19 @@ class TaxForm(FlaskForm):
                         trans('tax_duplicate_item_names', default='Deduction item names must be unique')
                     )
                     return False
+            try:
+                validate_tax_year(self.tax_year.data)
+            except DataValidationError as e:
+                self.tax_year.errors.append(str(e))
+                return False
+            if self.entity_type.data not in ['sole_proprietor', 'limited_liability']:
+                self.entity_type.errors.append(
+                    trans('tax_invalid_entity_type', default='Entity type must be Sole Proprietor or Limited Liability')
+                )
+                return False
             return True
         except Exception as e:
-            logger.error(f"Error in TaxForm.validate: {str(e)}",
+            current_app.logger.error(f"Error in TaxForm.validate: {str(e)}",
                         exc_info=True, extra={'session_id': session.get('sid', 'unknown')})
             self.deductions.errors.append(
                 trans('tax_validation_error', default='Error validating tax data.')
@@ -254,18 +177,6 @@ def new():
     db = utils.get_mongo_db()
 
     is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json
-
-    try:
-        log_tool_usage(
-            tool_name='tax',
-            db=db,
-            user_id=current_user.id,
-            session_id=session_id,
-            action='main_view'
-        )
-    except Exception as e:
-        current_app.logger.error(f"Failed to log tool usage: {str(e)}", extra={'session_id': session_id})
-        flash(trans('tax_log_error', default='Error logging tax calculator activity. Please try again.'), 'warning')
 
     try:
         activities = utils.get_all_recent_activities(
@@ -314,88 +225,112 @@ def new():
                     active_tab='calculate-tax'
                 ), 400
 
-            if current_user.is_authenticated and not utils.is_admin():
-                if not utils.check_ficore_credit_balance(required_amount=1, user_id=current_user.id):
-                    current_app.logger.warning(f"Insufficient Ficore Credits for calculating tax by user {current_user.id}", extra={'session_id': session_id})
-                    error_message = trans('tax_insufficient_credits', default='Insufficient Ficore Credits to calculate tax. Please purchase more credits.')
+            try:
+                income = float(form.income.data)
+                deductions = []
+                total_deductions = 0.0
+                for item in form.deductions.entries:
+                    if item.form.name.data and item.form.amount.data:
+                        deduction_item = {
+                            'name': bleach.clean(item.form.name.data),
+                            'amount': float(item.form.amount.data),
+                            'note': bleach.clean(item.form.note.data) if item.form.note.data else None
+                        }
+                        deductions.append(deduction_item)
+                        total_deductions += deduction_item['amount']
+
+                tax_year = int(form.tax_year.data)
+                entity_type = form.entity_type.data
+
+                # Update user entity type in the database
+                from .tax_calculator import update_user_entity_type
+                if not update_user_entity_type(current_user.id, entity_type, db):
+                    current_app.logger.error(f"Failed to update entity type for user {current_user.id}", extra={'session_id': session_id})
+                    error_message = trans('tax_entity_update_error', default='Error updating entity type.')
                     if is_ajax:
-                        return jsonify({'success': False, 'message': error_message}), 400
+                        return jsonify({'success': False, 'message': error_message}), 500
                     flash(error_message, 'danger')
-                    return redirect(url_for('dashboard.index'))
+                    return redirect(url_for('tax.new'))
 
-            try:
-                log_tool_usage(
-                    tool_name='tax',
-                    db=db,
-                    user_id=current_user.id,
-                    session_id=session_id,
-                    action='calculate_tax'
-                )
-            except Exception as e:
-                current_app.logger.error(f"Failed to log tax calculation: {str(e)}", extra={'session_id': session_id})
-                flash(trans('tax_log_error', default='Error logging tax calculation. Continuing with submission.'), 'warning')
+                # Calculate tax liability using the new tax_calculator
+                tax_result = calculate_tax_liability(current_user.id, tax_year, db)
+                taxable_income = tax_result.get('summary', {}).get('taxable_income', max(0, income - total_deductions))
+                total_tax = tax_result.get('final_tax_liability', 0.0)
 
-            income = float(form.income.data)
-            deductions = []
-            total_deductions = 0.0
-            for item in form.deductions.entries:
-                if item.form.name.data and item.form.amount.data:
-                    deduction_item = {
-                        'name': bleach.clean(item.form.name.data),
-                        'amount': float(item.form.amount.data),
-                        'note': bleach.clean(item.form.note.data) if item.form.note.data else None
-                    }
-                    deductions.append(deduction_item)
-                    total_deductions += deduction_item['amount']
-
-            taxable_income = max(0, income - total_deductions)
-            total_tax = calculate_tax(taxable_income)  # Assume this function exists in utils
-
-            tax_id = ObjectId()
-            tax_data = {
-                '_id': tax_id,
-                'user_id': current_user.id,
-                'session_id': session_id,
-                'income': income,
-                'deductions': deductions,
-                'taxable_income': taxable_income,
-                'total_tax': total_tax,
-                'created_at': datetime.utcnow()
-            }
-            current_app.logger.debug(f"Saving tax calculation: {tax_data}", extra={'session_id': session_id})
-            try:
-                with db.client.start_session() as mongo_session:
-                    with mongo_session.start_transaction():
-                        created_tax_id = create_tax_calculation(db, tax_data)
-                        create_tax_allocation_transaction(db, tax_data, 'tax_calculation', total_tax, 'Tax Calculation', session_id)
-                        if current_user.is_authenticated and not utils.is_admin():
-                            if not deduct_ficore_credits(db, current_user.id, 1, 'calculate_tax', tax_id):
-                                db.tax_calculations.delete_one({'_id': tax_id}, session=mongo_session)
-                                raise ValueError("Credit deduction failed")
-                        mongo_session.commit_transaction()
-                current_app.logger.info(f"Tax calculation {created_tax_id} saved successfully to MongoDB for session {session_id}", extra={'session_id': session_id})
+                tax_id = ObjectId()
+                tax_data = {
+                    '_id': tax_id,
+                    'user_id': current_user.id,
+                    'session_id': session_id,
+                    'income': income,
+                    'deductions': deductions,
+                    'taxable_income': taxable_income,
+                    'total_tax': total_tax,
+                    'tax_year': tax_year,
+                    'entity_type': entity_type,
+                    'calculation_type': tax_result.get('calculation_type', 'Unknown'),
+                    'calculation_details': tax_result,
+                    'created_at': datetime.utcnow()
+                }
+                current_app.logger.debug(f"Saving tax calculation: {tax_data}", extra={'session_id': session_id})
                 try:
-                    caching_ext = current_app.extensions.get('caching')
-                    if caching_ext:
-                        cache = list(caching_ext.values())[0]
-                        cache.delete_memoized(utils.get_tax_calculations)
-                        current_app.logger.debug(f"Cleared cache for get_tax_calculations", extra={'session_id': session_id})
-                    else:
-                        current_app.logger.warning(f"Caching extension not found; skipping cache clear", extra={'session_id': session_id})
-                except Exception as e:
-                    current_app.logger.warning(f"Failed to clear cache for get_tax_calculations: {str(e)}", extra={'session_id': session_id})
+                    with db.client.start_session() as mongo_session:
+                        with mongo_session.start_transaction():
+                            db.tax_calculations.insert_one(tax_data, session=mongo_session)
+                            mongo_session.commit_transaction()
+                    current_app.logger.info(f"Tax calculation {tax_id} saved successfully to MongoDB for session {session_id}", extra={'session_id': session_id})
+                    try:
+                        caching_ext = current_app.extensions.get('caching')
+                        if caching_ext:
+                            cache = list(caching_ext.values())[0]
+                            cache.delete_memoized(utils.get_tax_calculations)
+                            current_app.logger.debug(f"Cleared cache for get_tax_calculations", extra={'session_id': session_id})
+                        else:
+                            current_app.logger.warning(f"Caching extension not found; skipping cache clear", extra={'session_id': session_id})
+                    except Exception as e:
+                        current_app.logger.warning(f"Failed to clear cache for get_tax_calculations: {str(e)}", extra={'session_id': session_id})
 
-                success_message = trans("tax_calculated_success", default='Tax calculated successfully!')
+                    success_message = trans("tax_calculated_success", default='Tax calculated successfully!')
+                    if is_ajax:
+                        return jsonify({'success': True, 'tax_id': str(tax_id), 'message': success_message}), 200
+                    flash(success_message, "success")
+                    return redirect(url_for('tax.dashboard'))
+                except Exception as e:
+                    current_app.logger.error(f"Failed to save tax calculation {tax_id} to MongoDB for session {session_id}: {str(e)}", extra={'session_id': session_id})
+                    error_message = trans("tax_storage_error", default='Error saving tax calculation.')
+                    if is_ajax:
+                        return jsonify({'success': False, 'message': error_message}), 500
+                    flash(error_message, "danger")
+                    return render_template(
+                        'tax/new.html',
+                        form=form,
+                        calculations={},
+                        latest_calculation={
+                            'id': None,
+                            'user_id': None,
+                            'session_id': session_id,
+                            'user_email': current_user.email,
+                            'income': format_currency(0.0),
+                            'income_raw': 0.0,
+                            'deductions': [],
+                            'taxable_income': format_currency(0.0),
+                            'taxable_income_raw': 0.0,
+                            'total_tax': format_currency(0.0),
+                            'total_tax_raw': 0.0,
+                            'created_at': 'N/A'
+                        },
+                        tips=[],
+                        insights=[],
+                        activities=activities,
+                        tool_title=trans('tax_calculator_title', default='Tax Calculator'),
+                        active_tab='calculate-tax'
+                    )
+            except TaxCalculationError as e:
+                current_app.logger.error(f"Tax calculation error for user {current_user.id}: {str(e)}", extra={'session_id': session_id})
+                error_message = trans('tax_calculation_error', default=e.message)
                 if is_ajax:
-                    return jsonify({'success': True, 'tax_id': str(created_tax_id), 'message': success_message}), 200
-                flash(success_message, "success")
-                return redirect(url_for('tax.dashboard'))
-            except Exception as e:
-                current_app.logger.error(f"Failed to save tax calculation {tax_id} to MongoDB for session {session_id}: {str(e)}", extra={'session_id': session_id})
-                error_message = trans("tax_storage_error", default='Error saving tax calculation.')
-                if is_ajax:
-                    return jsonify({'success': False, 'message': error_message}), 500
-                flash(error_message, "danger")
+                    return jsonify({'success': False, 'message': error_message, 'details': e.details}), 400
+                flash(error_message, 'danger')
                 return render_template(
                     'tax/new.html',
                     form=form,
@@ -419,7 +354,7 @@ def new():
                     activities=activities,
                     tool_title=trans('tax_calculator_title', default='Tax Calculator'),
                     active_tab='calculate-tax'
-                )
+                ), 400
 
         calculations = list(db.tax_calculations.find(filter_criteria).sort('created_at', -1).limit(10))
         calculations_dict = {}
@@ -437,6 +372,8 @@ def new():
                 'taxable_income_raw': float(calc.get('taxable_income', 0.0)),
                 'total_tax': format_currency(calc.get('total_tax', 0.0)),
                 'total_tax_raw': float(calc.get('total_tax', 0.0)),
+                'tax_year': calc.get('tax_year', datetime.now().year),
+                'entity_type': calc.get('entity_type', 'sole_proprietor'),
                 'created_at': calc.get('created_at').strftime('%Y-%m-%d') if calc.get('created_at') else 'N/A'
             }
             calculations_dict[calc_data['id']] = calc_data
@@ -456,6 +393,8 @@ def new():
                 'taxable_income_raw': 0.0,
                 'total_tax': format_currency(0.0),
                 'total_tax_raw': 0.0,
+                'tax_year': datetime.now().year,
+                'entity_type': 'sole_proprietor',
                 'created_at': 'N/A'
             }
 
@@ -511,6 +450,8 @@ def new():
                 'taxable_income_raw': 0.0,
                 'total_tax': format_currency(0.0),
                 'total_tax_raw': 0.0,
+                'tax_year': datetime.now().year,
+                'entity_type': 'sole_proprietor',
                 'created_at': 'N/A'
             },
             tips=[],
@@ -532,18 +473,6 @@ def dashboard():
     session.permanent = False
     session.modified = True
     db = utils.get_mongo_db()
-
-    try:
-        log_tool_usage(
-            tool_name='tax',
-            db=db,
-            user_id=current_user.id,
-            session_id=session.get('sid', 'unknown'),
-            action='dashboard_view'
-        )
-    except Exception as e:
-        current_app.logger.error(f"Failed to log tool usage: {str(e)}", extra={'session_id': session.get('sid', 'unknown')})
-        flash(trans('tax_log_error', default='Error logging tax activity. Please try again.'), 'warning')
 
     try:
         activities = utils.get_all_recent_activities(
@@ -575,6 +504,8 @@ def dashboard():
                 'taxable_income_raw': float(calc.get('taxable_income', 0.0)),
                 'total_tax': format_currency(calc.get('total_tax', 0.0)),
                 'total_tax_raw': float(calc.get('total_tax', 0.0)),
+                'tax_year': calc.get('tax_year', datetime.now().year),
+                'entity_type': calc.get('entity_type', 'sole_proprietor'),
                 'created_at': calc.get('created_at').strftime('%Y-%m-%d') if calc.get('created_at') else 'N/A'
             }
             calculations_dict[calc_data['id']] = calc_data
@@ -594,6 +525,8 @@ def dashboard():
                 'taxable_income_raw': 0.0,
                 'total_tax': format_currency(0.0),
                 'total_tax_raw': 0.0,
+                'tax_year': datetime.now().year,
+                'entity_type': 'sole_proprietor',
                 'created_at': 'N/A'
             }
 
@@ -651,18 +584,6 @@ def history():
     session.modified = True
     db = utils.get_mongo_db()
 
-    try:
-        log_tool_usage(
-            tool_name='tax',
-            db=db,
-            user_id=current_user.id,
-            session_id=session.get('sid', 'unknown'),
-            action='history_view'
-        )
-    except Exception as e:
-        current_app.logger.error(f"Failed to log tool usage: {str(e)}", extra={'session_id': session.get('sid', 'unknown')})
-        flash(trans('tax_log_error', default='Error logging tax activity. Please try again.'), 'warning')
-
     filter_criteria = {} if utils.is_admin() else {'user_id': current_user.id}
 
     if request.method == 'POST':
@@ -675,22 +596,11 @@ def history():
                 flash(trans("tax_not_found", default='Tax calculation not found.'), "danger")
                 return redirect(url_for('tax.history'))
             
-            if current_user.is_authenticated and not utils.is_admin():
-                if not utils.check_ficore_credit_balance(required_amount=1, user_id=current_user.id):
-                    current_app.logger.warning(f"Insufficient Ficore Credits for deleting tax calculation {tax_id} by user {current_user.id}", extra={'session_id': session.get('sid', 'unknown')})
-                    flash(trans('tax_insufficient_credits', default='Insufficient Ficore Credits to delete a tax calculation. Please purchase more credits.'), 'danger')
-                    return redirect(url_for('dashboard.index'))
-            
             try:
                 with db.client.start_session() as mongo_session:
                     with mongo_session.start_transaction():
                         result = db.tax_calculations.delete_one({'_id': ObjectId(tax_id), **filter_criteria}, session=mongo_session)
                         if result.deleted_count > 0:
-                            if current_user.is_authenticated and not utils.is_admin():
-                                if not deduct_ficore_credits(db, current_user.id, 1, 'delete_tax', tax_id):
-                                    current_app.logger.error(f"Failed to deduct Ficore Credit for deleting tax calculation {tax_id} by user {current_user.id}", extra={'session_id': session.get('sid', 'unknown')})
-                                    flash(trans('tax_credit_deduction_failed', default='Failed to deduct Ficore Credit for deleting tax calculation.'), 'danger')
-                                    return redirect(url_for('tax.history'))
                             mongo_session.commit_transaction()
                         else:
                             current_app.logger.warning(f"Tax calculation ID {tax_id} not found for session {session['sid']}", extra={'session_id': session['sid']})
@@ -730,6 +640,8 @@ def history():
                 'taxable_income_raw': float(calc.get('taxable_income', 0.0)),
                 'total_tax': format_currency(calc.get('total_tax', 0.0)),
                 'total_tax_raw': float(calc.get('total_tax', 0.0)),
+                'tax_year': calc.get('tax_year', datetime.now().year),
+                'entity_type': calc.get('entity_type', 'sole_proprietor'),
                 'created_at': calc.get('created_at').strftime('%Y-%m-%d %H:%M') if calc.get('created_at') else 'N/A'
             }
             calculations_dict[calc_data['id']] = calc_data
@@ -747,24 +659,3 @@ def history():
             calculations={},
             tool_title=trans('tax_history', default='Tax History')
         )
-
-def calculate_tax(taxable_income):
-    """Placeholder for tax calculation logic."""
-    # Replace with actual tax calculation logic
-    tax_brackets = [
-        (300000, 0.07),
-        (600000, 0.11),
-        (1100000, 0.15),
-        (1600000, 0.19),
-        (3200000, 0.21),
-        (float('inf'), 0.24)
-    ]
-    tax = 0.0
-    remaining_income = taxable_income
-    for bracket, rate in tax_brackets:
-        if remaining_income <= 0:
-            break
-        taxable_in_bracket = min(remaining_income, bracket - (tax_brackets[tax_brackets.index((bracket, rate)) - 1][0] if tax_brackets.index((bracket, rate)) > 0 else 0))
-        tax += taxable_in_bracket * rate
-        remaining_income -= taxable_in_bracket
-    return tax
