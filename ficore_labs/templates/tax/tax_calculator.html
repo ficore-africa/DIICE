@@ -1,5 +1,11 @@
 {% extends "base.html" %}
 
+{% block head %}
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Ensure Bootstrap JS is included -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+{% endblock %}
+
 {% block title %}{{ t('tax_calculator_title', default='Tax Calculator') | e }} - DIICE{% endblock %}
 
 {% block content %}
@@ -234,7 +240,7 @@
                                         <p class="small mb-3">{{ t('pit_explanation', default='For sole proprietors, tax is calculated using a four-step process according to NTA 2025:') | e }}</p>
                                         <ol class="small">
                                             <li><strong>{{ t('step1_help', default='Net Business Profit:') | e }}</strong> {{ t('step1_help_desc', default='Total income minus main business expenses (6 categories)') | e }}</li>
-                                            <li><strong>{{ t('step2_help', default='Statutory Deductions:') | e }}</strong> {{ t('step2_help_desc', default='Subtract statutory & legal contributions separately') | e }}</li>
+                                            <li><strong>{{ t('step2_help', default='Statutory Deductions:') | e }}</strong> {{ t('step2_help_desc', default='Subtract statutory & legal contributions') | e }}</li>
                                             <li><strong>{{ t('step3_help', default='Rent Relief:') | e }}</strong> {{ t('step3_help_desc', default='Apply rent relief (maximum ₦500,000 or 20% of rent)') | e }}</li>
                                             <li><strong>{{ t('step4_help', default='Progressive Tax:') | e }}</strong> {{ t('step4_help_desc', default='Apply progressive tax bands to final taxable income') | e }}</li>
                                         </ol>
@@ -497,6 +503,19 @@
 
 {% block styles %}
 <style>
+    body {
+        overflow-x: hidden;
+    }
+
+    /* Ensure container-fluid doesn't exceed viewport width */
+    .container-fluid {
+        width: 100%;
+        max-width: 100%;
+        margin: 0 auto;
+        padding-left: 15px;
+        padding-right: 15px;
+    }
+
     /* Enhanced Tax Calculator Styles */
     .step-card {
         transition: all 0.3s ease;
@@ -591,6 +610,25 @@
         
         .tax-band-item {
             padding: 8px;
+        }
+
+        .container-fluid {
+            padding-left: 10px;
+            padding-right: 10px;
+        }
+
+        .row {
+            margin-left: 0;
+            margin-right: 0;
+        }
+
+        .col-12, .col-lg-8, .col-lg-4, .col-md-4 {
+            padding-left: 10px;
+            padding-right: 10px;
+        }
+
+        .modal-dialog {
+            margin: 10px;
         }
     }
     
@@ -779,6 +817,12 @@
             });
 
             observer.observe(summaryDiv, { childList: true, subtree: true });
+
+            // Focus management for tax breakdown modal
+            breakdownModal._element.addEventListener('shown.bs.modal', () => {
+                const modalTitle = breakdownModal._element.querySelector('.modal-title');
+                if (modalTitle) modalTitle.focus();
+            });
         }
 
         function announceToScreenReader(message) {
@@ -1101,6 +1145,7 @@
 
         // Update tax breakdown modal
         function updateTaxBreakdownModal(breakdown) {
+            console.log('Breakdown data:', breakdown); // Debug logging
             let html = '';
             if (breakdown.calculation_type === 'CIT') {
                 html = generateCITBreakdown(breakdown);
@@ -1361,12 +1406,16 @@
                         updateAnnualRent(data.annual_rent);
                     } else {
                         showAlert('danger', '{{ t("tax_calculation_error", default="Error calculating tax:") | e }} ' + (result.message || result.error));
+                        breakdownContent.innerHTML = '<p class="text-muted">{{ t("tax_breakdown_placeholder", default="No tax calculation available. Please calculate your tax first.") | e }}</p>';
+                        showBreakdownButton.disabled = true;
                     }
                 })
                 .catch(error => {
                     loadingModal.hide();
                     console.error('Error:', error);
                     showAlert('danger', '{{ t("tax_calculation_network_error", default="An error occurred while calculating tax. Please check your connection and try again.") | e }}');
+                    breakdownContent.innerHTML = '<p class="text-muted">{{ t("tax_breakdown_placeholder", default="No tax calculation available. Please calculate your tax first.") | e }}</p>';
+                    showBreakdownButton.disabled = true;
                 });
         });
 
@@ -1517,33 +1566,37 @@
             latestBreakdown = null;
         }
 
-        // Update category totals
+        // Update category totals with debounce
+        let updateTimeout;
         function updateCategoryTotals() {
-            let deductibleTotal = 0;
-            let statutoryTotal = 0;
-            let personalTotal = 0;
-            
-            const expenseInputs = form.querySelectorAll('.expense-input');
-            expenseInputs.forEach(input => {
-                const amount = parseFloat(input.value) || 0;
-                const categoryType = input.getAttribute('data-category-type');
+            clearTimeout(updateTimeout);
+            updateTimeout = setTimeout(() => {
+                let deductibleTotal = 0;
+                let statutoryTotal = 0;
+                let personalTotal = 0;
                 
-                switch(categoryType) {
-                    case 'deductible':
-                        deductibleTotal += amount;
-                        break;
-                    case 'statutory':
-                        statutoryTotal += amount;
-                        break;
-                    case 'personal':
-                        personalTotal += amount;
-                        break;
-                }
-            });
-            
-            document.getElementById('deductibleTotal').textContent = formatCurrency(deductibleTotal);
-            document.getElementById('statutoryTotal').textContent = formatCurrency(statutoryTotal);
-            document.getElementById('personalTotal').textContent = formatCurrency(personalTotal);
+                const expenseInputs = form.querySelectorAll('.expense-input');
+                expenseInputs.forEach(input => {
+                    const amount = parseFloat(input.value) || 0;
+                    const categoryType = input.getAttribute('data-category-type');
+                    
+                    switch(categoryType) {
+                        case 'deductible':
+                            deductibleTotal += amount;
+                            break;
+                        case 'statutory':
+                            statutoryTotal += amount;
+                            break;
+                        case 'personal':
+                            personalTotal += amount;
+                            break;
+                    }
+                });
+                
+                document.getElementById('deductibleTotal').textContent = formatCurrency(deductibleTotal);
+                document.getElementById('statutoryTotal').textContent = formatCurrency(statutoryTotal);
+                document.getElementById('personalTotal').textContent = formatCurrency(personalTotal);
+            }, 100); // 100ms debounce
         }
 
         // Clear form
@@ -1556,10 +1609,22 @@
             });
         });
 
-        // Show breakdown modal
-        showBreakdownButton.addEventListener('click', function() {
+                // Show breakdown modal with feedback
+        showBreakdownButton.addEventListener('click', function(e) {
             if (latestBreakdown) {
                 breakdownModal.show();
+                // Ensure focus is set to modal title for accessibility
+                const modalTitle = document.querySelector('#taxBreakdownModal .modal-title');
+                if (modalTitle) {
+                    modalTitle.focus();
+                }
+            } else {
+                // Provide feedback if no calculation is available
+                showAlert('warning', '{{ t("no_calculation_available", default="Please calculate your tax first to view the detailed breakdown.") | e }}');
+                // Ensure button is disabled if no breakdown exists
+                this.disabled = true;
+                // Accessibility: Announce the warning to screen readers
+                announceToScreenReader('{{ t("no_calculation_available", default="Please calculate your tax first to view the detailed breakdown.") | e }}');
             }
         });
 
