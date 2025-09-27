@@ -2937,7 +2937,7 @@ def get_all_recent_activities(db, user_id, session_id=None, limit=10):
 
 def create_dashboard_safe_response(stats, recent_data, additional_data=None):
     """
-    Create a dashboard response that's guaranteed to be JSON serializable.
+    Create a dashboard response guaranteed to be JSON serializable.
     Specifically designed for dashboard API endpoints.
     
     Args:
@@ -2980,3 +2980,4 @@ def create_dashboard_safe_response(stats, recent_data, additional_data=None):
             'timestamp': datetime.now(timezone.utc).isoformat()
 
         }
+
