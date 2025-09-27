@@ -159,10 +159,13 @@ class PaymentForm(FlaskForm):
 payments_bp = Blueprint('payments', __name__, url_prefix='/payments')
 
 def sanitize_dict(d, max_length=1000):
-    """Recursively sanitize all string fields in a dictionary."""
+    """Recursively sanitize all string fields in a dictionary and log problematic fields."""
     for key, value in d.items():
         if isinstance(value, str):
-            d[key] = utils.sanitize_input(value, max_length=max_length)
+            sanitized = utils.sanitize_input(value, max_length=max_length)
+            if sanitized != value:
+                logger.debug(f"Sanitized field {key}: original='{value}', sanitized='{sanitized}'")
+            d[key] = sanitized
         elif isinstance(value, dict):
             sanitize_dict(value, max_length)
         elif isinstance(value, list):
@@ -172,8 +175,14 @@ def sanitize_dict(d, max_length=1000):
 def fetch_payments_with_fallback(db, query, sort_field='created_at', sort_direction=-1, limit=50):
     """Fetch payments with fallback logic and enhanced sanitization for robustness."""
     payments = utils.safe_find_cashflows(db, query, sort_field=sort_field, sort_direction=sort_direction)
-    # Sanitize all payments, even from primary query
-    payments = [sanitize_dict(payment) for payment in payments]
+    # Sanitize all payments and log raw data for debugging
+    sanitized_payments = []
+    for payment in payments:
+        logger.debug(f"Raw payment from DB: {payment}")
+        sanitized_payment = sanitize_dict(payment.copy())
+        sanitized_payments.append(sanitized_payment)
+    payments = sanitized_payments
+    
     if not payments:
         try:
             test_count = db.cashflows.count_documents(query, hint=[('user_id', 1), ('type', 1)])
@@ -186,8 +195,8 @@ def fetch_payments_with_fallback(db, query, sort_field='created_at', sort_direct
                 payments = []
                 for payment in raw_payments:
                     try:
-                        # Sanitize all fields recursively
-                        payment = sanitize_dict(payment)
+                        logger.debug(f"Raw fallback payment: {payment}")
+                        payment = sanitize_dict(payment.copy())
                         from models import to_dict_cashflow
                         cleaned_payment = to_dict_cashflow(payment)
                         if cleaned_payment:
@@ -226,14 +235,22 @@ def index():
         for payment in payments:
             try:
                 # Log raw payment for debugging
-                logger.debug(f"Raw payment before serialization: {payment}")
+                logger.debug(f"Raw payment before serialization in index: {payment}")
                 # Sanitize all fields recursively
-                payment = sanitize_dict(payment)
+                payment = sanitize_dict(payment.copy())
                 cleaned_payment = serialize_for_json(payment)
                 cleaned_payments.append(cleaned_payment)
             except Exception as e:
-                logger.warning(f"Failed to serialize payment {payment.get('_id', 'unknown')}: {str(e)}")
+                logger.warning(f"Failed to serialize payment {payment.get('_id', 'unknown')} in index: {str(e)}")
                 continue
+        
+        if not cleaned_payments and payments:
+            logger.error(
+                f"All payments failed serialization for user {current_user.id}",
+                extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
+            )
+            flash(trans('payments_fetch_error', default='An error occurred while loading your payments. Please try again.'), 'danger')
+            return redirect(url_for('dashboard.index'))
         
         category_stats = utils.calculate_payment_category_stats(cleaned_payments)
         
@@ -269,14 +286,22 @@ def manage():
         for payment in payments:
             try:
                 # Log raw payment for debugging
-                logger.debug(f"Raw payment before serialization: {payment}")
+                logger.debug(f"Raw payment before serialization in manage: {payment}")
                 # Sanitize all fields recursively
-                payment = sanitize_dict(payment)
+                payment = sanitize_dict(payment.copy())
                 cleaned_payment = serialize_for_json(payment)
                 cleaned_payments.append(cleaned_payment)
             except Exception as e:
-                logger.warning(f"Failed to serialize payment {payment.get('_id', 'unknown')}: {str(e)}")
+                logger.warning(f"Failed to serialize payment {payment.get('_id', 'unknown')} in manage: {str(e)}")
                 continue
+        
+        if not cleaned_payments and payments:
+            logger.error(
+                f"All payments failed serialization for user {current_user.id}",
+                extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
+            )
+            flash(trans('payments_fetch_error', default='An error occurred while loading your payments. Please try again.'), 'danger')
+            return redirect(url_for('payments.index'))
         
         category_stats = utils.calculate_payment_category_stats(cleaned_payments)
         
@@ -332,9 +357,9 @@ def view(id):
         payment.setdefault('description', '')
         
         # Log raw payment for debugging
-        logger.debug(f"Raw payment before serialization: {payment}")
+        logger.debug(f"Raw payment before serialization in view: {payment}")
         # Sanitize all fields recursively
-        payment = sanitize_dict(payment)
+        payment = sanitize_dict(payment.copy())
         
         from models import to_dict_cashflow
         payment = to_dict_cashflow(payment)
@@ -375,9 +400,9 @@ def generate_pdf(id):
         
         payment = normalize_datetime(payment)
         # Log raw payment for debugging
-        logger.debug(f"Raw payment before serialization: {payment}")
+        logger.debug(f"Raw payment before serialization in generate_pdf: {payment}")
         # Sanitize all fields recursively
-        payment = sanitize_dict(payment)
+        payment = sanitize_dict(payment.copy())
         
         from models import to_dict_cashflow
         payment = to_dict_cashflow(payment)
@@ -571,9 +596,9 @@ def edit(id):
         
         payment = normalize_datetime(payment)
         # Log raw payment for debugging
-        logger.debug(f"Raw payment before serialization: {payment}")
+        logger.debug(f"Raw payment before serialization in edit: {payment}")
         # Sanitize all fields recursively
-        payment = sanitize_dict(payment)
+        payment = sanitize_dict(payment.copy())
         
         from models import to_dict_cashflow
         payment = to_dict_cashflow(payment)
@@ -783,9 +808,9 @@ def share():
         
         payment = normalize_datetime(payment)
         # Log raw payment for debugging
-        logger.debug(f"Raw payment before serialization: {payment}")
+        logger.debug(f"Raw payment before serialization in share: {payment}")
         # Sanitize all fields recursively
-        payment = sanitize_dict(payment)
+        payment = sanitize_dict(payment.copy())
         
         success = utils.send_message(recipient=recipient, message=message, type=share_type)
         if success:
