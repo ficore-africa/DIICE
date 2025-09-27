@@ -1,4 +1,9 @@
 {% extends "base.html" %}
+{% block head %}
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Ensure Bootstrap JS is included -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+{% endblock %}
 {% block title %}{{ t('tax_calculate_new', default='Calculate Tax') }}{% endblock %}
 {% block content %}
 <!-- Add CSRF meta tag for AJAX submissions -->
@@ -7,7 +12,7 @@
 <div class="container mt-4">
     {% set tool_name = 'tax_calculate_new' %}
     {% set tool_icon = 'fa-calculator' %}
-    {% set subtitle = t('tax_calculate_description', default='Enter your income and deductions to calculate your tax liability') %}
+    {% set subtitle = t('tax_calculate_description', default='Enter your income, rent expenses, and deductions to calculate your tax liability') %}
     {% include 'tool_header.html' %}
 
     <!-- Navigation Breadcrumb -->
@@ -37,6 +42,20 @@
                                 </div>
                             {% endif %}
                             <small class="form-text text-muted">{{ t('tax_income_help', default='Enter your total annual income before deductions') }}</small>
+                        </div>
+
+                        <!-- Annual Rent Expenses -->
+                        <div class="mb-3">
+                            <label for="rent_expenses" class="form-label">{{ form.rent_expenses.label }}</label>
+                            <input type="number" class="form-control income-input" id="rent_expenses" name="rent_expenses" min="0" max="10000000000" step="0.01" placeholder="250000.00" value="{{ form.rent_expenses.data or '' }}">
+                            {% if form.rent_expenses.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.rent_expenses.errors %}
+                                        {{ t(error, default=error) }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <small class="form-text text-muted">{{ t('rent_relief_help', default='Enter your annual rent expenses. Relief is calculated as the lower of ₦500,000 or 20% of rent.') }}</small>
                         </div>
 
                         <!-- Tax Year -->
@@ -78,7 +97,7 @@
                                 {% for item in form.deductions.entries %}
                                     <div class="deduction-entry card p-3 mb-2">
                                         <div class="row">
-                                            <div class="col-md-4">
+                                            <div class="col-md-3">
                                                 <label class="form-label">{{ t('tax_item_name', default='Deduction Name') }}</label>
                                                 {{ item.form.name(class="form-control", type="text", maxlength="50", placeholder=t('tax_deduction_placeholder', default='e.g., Pension, Charity'), value=item.form.name.data or '') }}
                                                 {% if item.form.name.errors %}
@@ -89,7 +108,7 @@
                                                     </div>
                                                 {% endif %}
                                             </div>
-                                            <div class="col-md-4">
+                                            <div class="col-md-3">
                                                 <label class="form-label">{{ t('tax_amount', default='Amount') }}</label>
                                                 {{ item.form.amount(class="form-control deduction-input", type="number", min="0", max="10000000000", step="0.01", placeholder="50000.00", value=item.form.amount.data or '') }}
                                                 {% if item.form.amount.errors %}
@@ -101,6 +120,17 @@
                                                 {% endif %}
                                             </div>
                                             <div class="col-md-3">
+                                                <label class="form-label">{{ t('tax_item_category', default='Category') }}</label>
+                                                {{ item.form.category(class="form-control deduction-input", value=item.form.category.data or '') }}
+                                                {% if item.form.category.errors %}
+                                                    <div class="invalid-feedback d-block">
+                                                        {% for error in item.form.category.errors %}
+                                                            {{ t(error, default=error) }}
+                                                        {% endfor %}
+                                                    </div>
+                                                {% endif %}
+                                            </div>
+                                            <div class="col-md-2">
                                                 <label class="form-label">{{ t('tax_note', default='Note') }} {{ t('tax_optional', default='(Optional)') }}</label>
                                                 {{ item.form.note(class="form-control", type="text", maxlength="200", placeholder=t('tax_note_placeholder', default='Additional details'), value=item.form.note.data or '') }}
                                                 {% if item.form.note.errors %}
@@ -193,24 +223,79 @@
                 </div>
             </div>
 
-            <!-- Recent Activity -->
-            {% if activities %}
-                <div class="card shadow-sm">
-                    <div class="card-header">
-                        <h5 class="mb-0">{{ t('general_recent_activity', default='Recent Activity') }}</h5>
-                    </div>
-                    <div class="card-body">
-                        <ul class="list-group list-group-flush">
-                            {% for activity in activities[:5] %}
-                                <li class="list-group-item">
-                                    <small class="text-muted">{{ activity.timestamp | format_datetime }}</small><br>
-                                    {{ activity.description }}
-                                </li>
-                            {% endfor %}
-                        </ul>
-                    </div>
+            <!-- Taxation Knowledge -->
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <h5 class="mb-0">{{ t('tax_information_title', default='Taxation Knowledge') }}</h5>
                 </div>
-            {% endif %}
+                <div class="card-body">
+                    {% if latest_calculation.entity_type == 'limited_liability' %}
+                        <!-- CIT Information -->
+                        <h6>{{ t('cit_rates_title', default='Companies Income Tax (CIT) Rates') }}</h6>
+                        <div class="alert alert-success">
+                            <h6 class="mb-2">{{ t('small_company_exemption', default='Small Company Exemption') }}</h6>
+                            <p class="mb-1"><strong>₦0 - ₦50,000,000:</strong> 0% {{ t('tax_rate', default='tax rate') }}</p>
+                            <small class="text-muted">{{ t('small_company_note', default='Companies with annual revenue of ₦50 million or less are exempt from CIT') }}</small>
+                        </div>
+                        <div class="alert alert-warning">
+                            <h6 class="mb-2">{{ t('large_company_rate', default='Large Company Rate') }}</h6>
+                            <p class="mb-1"><strong>Above ₦50,000,000:</strong> 30% {{ t('tax_rate', default='tax rate') }}</p>
+                            <small class="text-muted">{{ t('large_company_note', default='Companies with annual revenue above ₦50 million pay 30% tax on taxable income') }}</small>
+                        </div>
+                        <hr>
+                        <h6>{{ t('cit_deductions_title', default='CIT Deductions') }}</h6>
+                        <p class="small text-muted">
+                            {{ t('cit_deductions_description', default='For CIT purposes, all legitimate business expenses are generally deductible from revenue to determine taxable income.') }}
+                        </p>
+                    {% else %}
+                        <!-- PIT Information -->
+                        <h6>{{ t('progressive_tax_rates_title', default='Progressive Tax Rates (NTA 2025)') }}</h6>
+                        <ul class="list-unstyled">
+                            <li><strong>₦0 - ₦800,000:</strong> 0%</li>
+                            <li><strong>₦800,001 - ₦3,000,000:</strong> 15%</li>
+                            <li><strong>₦3,000,001 - ₦12,000,000:</strong> 18%</li>
+                            <li><strong>₦12,000,001 - ₦25,000,000:</strong> 21%</li>
+                            <li><strong>₦25,000,001 - ₦50,000,000:</strong> 23%</li>
+                            <li><strong>Above ₦50,000,000:</strong> 25%</li>
+                        </ul>
+                        <hr>
+                        <h6>{{ t('rent_relief_title', default='Rent Relief') }}</h6>
+                        <p class="small text-muted">
+                            {{ t('rent_relief_description', default='You can claim rent relief equal to the lower of ₦500,000 or 20% of your annual rent.') }}
+                        </p>
+                        <hr>
+                        <h6>{{ t('four_step_process_title', default='Four-Step Tax Calculation') }}</h6>
+                        <div class="step-info mb-3">
+                            <div class="d-flex align-items-center mb-2">
+                                <span class="badge bg-success me-2">1</span>
+                                <strong>{{ t('step1_title', default='Net Business Profit') }}</strong>
+                            </div>
+                            <p class="small text-muted mb-0">{{ t('step1_info', default='Income minus main business expenses (e.g., office admin, staff wages)') }}</p>
+                        </div>
+                        <div class="step-info mb-3">
+                            <div class="d-flex align-items-center mb-2">
+                                <span class="badge bg-info me-2">2</span>
+                                <strong>{{ t('step2_title', default='Statutory Deductions') }}</strong>
+                            </div>
+                            <p class="small text-muted mb-0">{{ t('step2_info', default='Subtract statutory & legal contributions (e.g., pension)') }}</p>
+                        </div>
+                        <div class="step-info mb-3">
+                            <div class="d-flex align-items-center mb-2">
+                                <span class="badge bg-warning me-2">3</span>
+                                <strong>{{ t('step3_title', default='Rent Relief') }}</strong>
+                            </div>
+                            <p class="small text-muted mb-0">{{ t('step3_info', default='Apply rent relief (max ₦500,000 or 20% of rent)') }}</p>
+                        </div>
+                        <div class="step-info mb-3">
+                            <div class="d-flex align-items-center mb-2">
+                                <span class="badge bg-primary me-2">4</span>
+                                <strong>{{ t('step4_title', default='Progressive Tax') }}</strong>
+                            </div>
+                            <p class="small text-muted mb-0">{{ t('step4_info', default='Apply NTA 2025 progressive tax bands') }}</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
         </div>
     </div>
 
@@ -265,6 +350,17 @@
 document.addEventListener('DOMContentLoaded', function() {
     let deductionIndex = {{ form.deductions.entries|length }};
 
+    // Deduction category options
+    const deductionCategories = [
+        {value: 'office_admin', label: '{{ t("tax_category_office_admin", default="Office Administration") }}'},
+        {value: 'staff_wages', label: '{{ t("tax_category_staff_wages", default="Staff Wages") }}'},
+        {value: 'business_travel', label: '{{ t("tax_category_business_travel", default="Business Travel") }}'},
+        {value: 'rent_utilities', label: '{{ t("tax_category_rent_utilities", default="Rent and Utilities") }}'},
+        {value: 'marketing_sales', label: '{{ t("tax_category_marketing_sales", default="Marketing and Sales") }}'},
+        {value: 'cogs', label: '{{ t("tax_category_cogs", default="Cost of Goods Sold") }}'},
+        {value: 'statutory_legal', label: '{{ t("tax_category_statutory_legal", default="Statutory and Legal Contributions") }}'}
+    ];
+
     // Add new deduction field
     window.addDeduction = function() {
         if (deductionIndex >= 20) {
@@ -276,15 +372,21 @@ document.addEventListener('DOMContentLoaded', function() {
         newEntry.className = 'deduction-entry card p-3 mb-2';
         newEntry.innerHTML = `
             <div class="row">
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label class="form-label">{{ t('tax_item_name', default='Deduction Name') }}</label>
                     <input type="text" class="form-control" name="deductions-${deductionIndex}-name" maxlength="50" placeholder="{{ t('tax_deduction_placeholder', default='e.g., Pension, Charity') | e }}">
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label class="form-label">{{ t('tax_amount', default='Amount') }}</label>
                     <input type="number" class="form-control deduction-input" name="deductions-${deductionIndex}-amount" min="0" max="10000000000" step="0.01" placeholder="50000.00">
                 </div>
                 <div class="col-md-3">
+                    <label class="form-label">{{ t('tax_item_category', default='Category') }}</label>
+                    <select class="form-control deduction-input" name="deductions-${deductionIndex}-category">
+                        ${deductionCategories.map(cat => `<option value="${cat.value}">${cat.label}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="col-md-2">
                     <label class="form-label">{{ t('tax_note', default='Note') }} {{ t('tax_optional', default='(Optional)') }}</label>
                     <input type="text" class="form-control" name="deductions-${deductionIndex}-note" maxlength="200" placeholder="{{ t('tax_note_placeholder', default='Additional details') | e }}">
                 </div>
@@ -307,8 +409,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // Update tax summary dynamically
     function updateSummary() {
         const incomeInput = document.getElementById('income').value || 0;
-        const deductionInputs = document.querySelectorAll('.deduction-input');
-        let totalDeductions = 0;
+        const rentInput = document.getElementById('rent_expenses').value || 0;
+        const deductionInputs = document.querySelectorAll('.deduction-input[type="number"]');
+        let totalDeductions = parseFloat(rentInput);
         deductionInputs.forEach(input => {
             const value = parseFloat(input.value) || 0;
             totalDeductions += value;
@@ -318,7 +421,6 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('summary-income').textContent = parseFloat(incomeInput).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         document.getElementById('summary-deductions').textContent = totalDeductions.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         document.getElementById('summary-taxable-income').textContent = taxableIncome.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        // Total tax remains 0 until calculation is performed
         document.getElementById('summary-total-tax').textContent = '0.00';
     }
 
@@ -367,6 +469,72 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.income-input, .deduction-input').forEach(input => {
         input.addEventListener('input', updateSummary);
     });
+
+    // Initialize summary
+    updateSummary();
 });
 </script>
+
+{% block styles %}
+<style>
+    .expense-category .card {
+        transition: all 0.2s ease;
+    }
+    .expense-category .card:hover {
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .border-success {
+        border-color: #28a745 !important;
+    }
+    .border-info {
+        border-color: #17a2b8 !important;
+    }
+    .border-warning {
+        border-color: #ffc107 !important;
+    }
+    .bg-success {
+        background-color: #28a745 !important;
+    }
+    .bg-info {
+        background-color: #17a2b8 !important;
+    }
+    .bg-warning {
+        background-color: #ffc107 !important;
+    }
+    .bg-primary {
+        background-color: #007bff !important;
+    }
+    .form-control:focus,
+    .form-select:focus,
+    .btn:focus {
+        outline: 3px solid #0066cc;
+        outline-offset: 2px;
+        box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.3);
+    }
+    .badge.bg-success {
+        background-color: #155724 !important;
+        color: #ffffff !important;
+    }
+    .badge.bg-info {
+        background-color: #0c5460 !important;
+        color: #ffffff !important;
+    }
+    .badge.bg-warning {
+        background-color: #856404 !important;
+        color: #ffffff !important;
+    }
+    .alert-warning {
+        background-color: #fff3cd;
+        border-color: #ffeaa7;
+        color: #856404;
+    }
+    #taxBreakdownModal .modal-body {
+        max-height: 60vh;
+        overflow-y: auto;
+    }
+    #taxBreakdownModal .modal-dialog {
+        max-width: 800px;
+    }
+</style>
+{% endblock %}
 {% endblock %}
