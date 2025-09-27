@@ -21,18 +21,93 @@ def parse_and_normalize_datetime(value):
     Parse and normalize datetime values, handling strings and naive datetimes.
     
     Args:
-        value: Datetime or string input
+        value: Datetime, string, or other input
         
     Returns:
-        datetime: UTC-aware datetime or None if invalid
+        datetime: UTC-aware datetime object compatible with MongoDB BSON date
     """
+    if value is None:
+        return None
     if isinstance(value, str):
         try:
             dt = parse_datetime(value)
-            return dt.replace(tzinfo=ZoneInfo("UTC")) if dt.tzinfo is None else dt
+            return dt.astimezone(timezone.utc) if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
         except ValueError:
             raise ValueError(f"Invalid datetime string: {value}")
-    return normalize_datetime(value)
+    if isinstance(value, datetime):
+        return value.astimezone(timezone.utc) if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    raise ValueError(f"Unsupported datetime type: {type(value)}")
+
+def convert_naive_to_aware_datetimes(db):
+    """
+    Convert naive datetimes to UTC-aware datetimes in all collections.
+    
+    Args:
+        db: MongoDB database instance
+    """
+    try:
+        # Check if migration has already been applied
+        if db.system_config.find_one({'_id': 'datetime_migration_applied'}):
+            logger.info("Naive datetime migration already applied, skipping.")
+            return
+        
+        datetime_fields = ['created_at', 'updated_at', 'timestamp', 'trial_start', 'trial_end', 
+                          'subscription_start', 'subscription_end', 'expires_at', 'redeemed_at', 
+                          'last_viewed', 'completed_at', 'payment_date', 'approved_at', 'rejected_at']
+        
+        for collection_name in db.list_collection_names():
+            collection = db[collection_name]
+            # Get a sample document to check for relevant fields
+            sample_doc = collection.find_one() or {}
+            # Filter fields that exist in the sample document
+            relevant_fields = [field for field in datetime_fields if field in sample_doc]
+            
+            if not relevant_fields:
+                continue
+                
+            # Find documents with naive datetimes or string datetimes
+            query = {
+                '$or': [
+                    {field: {'$type': ['date', 'string'], '$not': {'$type': 'timestamp'}}}
+                    for field in relevant_fields
+                ]
+            }
+            
+            updated_count = 0
+            for doc in collection.find(query):
+                updates = {}
+                for field in relevant_fields:
+                    if field in doc:
+                        value = doc[field]
+                        try:
+                            if isinstance(value, str) or (isinstance(value, datetime) and value.tzinfo is None):
+                                updates[field] = parse_and_normalize_datetime(value)
+                        except ValueError as ve:
+                            logger.warning(f"Skipping invalid datetime in {collection_name}.{field}: {value}")
+                            continue
+                
+                if updates:
+                    collection.update_one(
+                        {'_id': doc['_id']},
+                        {'$set': updates}
+                    )
+                    updated_count += 1
+            
+            if updated_count > 0:
+                logger.info(f"Converted {updated_count} naive or string datetimes to UTC-aware in {collection_name}")
+        
+        # Mark migration as complete
+        db.system_config.update_one(
+            {'_id': 'datetime_migration_applied'},
+            {'$set': {'value': True, 'migrated_at': datetime.now(timezone.utc)}},
+            upsert=True
+        )
+        logger.info("Naive datetime migration completed and marked in system_config")
+        
+    except Exception as e:
+        logger.error(f"Failed to convert naive datetimes: {str(e)}", exc_info=True)
+        raise
+
 
 def manage_index(collection, keys, options=None, name=None):
     """
@@ -310,6 +385,23 @@ def initialize_app_data(app):
                     logger.info(f"User with ID 'ficorerecords' already exists, skipping admin creation")
             else:
                 logger.info(f"Admin user with ID 'admin' already exists with valid password_hash, skipping creation")
+            
+            # Moved datetime conversion and verification outside the admin user else block
+            try:
+                convert_naive_to_aware_datetimes(db_instance)
+            except Exception as e:
+                logger.error(f"Failed to convert naive datetimes during initialization: {str(e)}", exc_info=True)
+                raise
+                
+            try:
+                verify_no_naive_datetimes(db_instance)
+            except Exception as e:
+                logger.error(f"Failed to verify naive datetimes: {str(e)}", exc_info=True)
+                raise
+                
+        except Exception as e:
+            logger.error(f"{trans('general_database_initialization_failed', default='Failed to initialize database')}: {str(e)}", exc_info=True)
+            raise
             
             collection_schemas = {
                 'users': {
