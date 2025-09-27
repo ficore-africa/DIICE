@@ -4,7 +4,7 @@ from flask_wtf.csrf import CSRFProtect, CSRFError
 from wtforms import FloatField, SubmitField, StringField, FieldList, FormField
 from wtforms.validators import DataRequired, NumberRange, Optional, Length
 from flask_login import current_user, login_required
-from utils import get_all_recent_activities, clean_currency, get_mongo_db, is_admin, requires_role, limiter, get_tax_calculations
+from utils import get_all_recent_activities, clean_currency, get_mongo_db, is_admin, requires_role, limiter, get_optimized_tax_calculation_data
 from datetime import datetime
 from translations import trans
 import uuid
@@ -274,12 +274,12 @@ def new():
                         caching_ext = current_app.extensions.get('caching')
                         if caching_ext:
                             cache = list(caching_ext.values())[0]
-                            cache.delete_memoized(get_tax_calculations)
-                            current_app.logger.debug(f"Cleared cache for get_tax_calculations", extra={'session_id': session_id})
+                            cache.delete_memoized(get_optimized_tax_calculation_data)
+                            current_app.logger.debug(f"Cleared cache for get_optimized_tax_calculation_data", extra={'session_id': session_id})
                         else:
                             current_app.logger.warning(f"Caching extension not found; skipping cache clear", extra={'session_id': session_id})
                     except Exception as e:
-                        current_app.logger.warning(f"Failed to clear cache for get_tax_calculations: {str(e)}", extra={'session_id': session_id})
+                        current_app.logger.warning(f"Failed to clear cache for get_optimized_tax_calculation_data: {str(e)}", extra={'session_id': session_id})
                     success_message = trans("tax_calculated_success", default='Tax calculated successfully!')
                     if is_ajax:
                         return jsonify({'success': True, 'tax_id': str(tax_id), 'message': success_message}), 200
@@ -600,12 +600,12 @@ def history():
                     caching_ext = current_app.extensions.get('caching')
                     if caching_ext:
                         cache = list(caching_ext.values())[0]
-                        cache.delete_memoized(get_tax_calculations)
-                        current_app.logger.debug(f"Cleared cache for get_tax_calculations", extra={'session_id': session.get('sid', 'unknown')})
+                        cache.delete_memoized(get_optimized_tax_calculation_data)
+                        current_app.logger.debug(f"Cleared cache for get_optimized_tax_calculation_data", extra={'session_id': session.get('sid', 'unknown')})
                     else:
                         current_app.logger.warning(f"Caching extension not found; skipping cache clear", extra={'session_id': session.get('sid', 'unknown')})
                 except Exception as e:
-                    current_app.logger.warning(f"Failed to clear cache for get_tax_calculations: {str(e)}", extra={'session_id': session.get('sid', 'unknown')})
+                    current_app.logger.warning(f"Failed to clear cache for get_optimized_tax_calculation_data: {str(e)}", extra={'session_id': session.get('sid', 'unknown')})
                 current_app.logger.info(f"Deleted tax calculation ID {tax_id} for session {session['sid']}", extra={'session_id': session['sid']})
                 flash(trans("tax_deleted_success", default='Tax calculation deleted successfully!'), "success")
             except Exception as e:
@@ -649,5 +649,6 @@ def history():
             calculations={},
             tool_title=trans('tax_history', default='Tax History')
         )
+
 
 
