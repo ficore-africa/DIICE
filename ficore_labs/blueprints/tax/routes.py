@@ -4,7 +4,7 @@ from flask_wtf.csrf import CSRFProtect, CSRFError
 from wtforms import FloatField, SubmitField, StringField, FieldList, FormField, SelectField
 from wtforms.validators import DataRequired, NumberRange, Optional, Length
 from flask_login import current_user, login_required
-from utils import get_all_recent_activities, clean_currency, get_mongo_db, is_admin, requires_role, limiter, get_optimized_tax_calculation_data
+from utils import clean_currency, get_mongo_db, is_admin, requires_role, limiter, get_optimized_tax_calculation_data
 from datetime import datetime
 from translations import trans
 import uuid
@@ -225,18 +225,6 @@ def new():
     is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json
 
     try:
-        activities = get_all_recent_activities(
-            db=db,
-            user_id=current_user.id,
-            session_id=None,
-        )
-        current_app.logger.debug(f"Fetched {len(activities)} recent activities for user {current_user.id}", extra={'session_id': session_id})
-    except Exception as e:
-        current_app.logger.error(f"Failed to fetch recent activities: {str(e)}", extra={'session_id': session_id})
-        flash(trans('tax_activities_load_error', default='Error loading recent activities.'), 'warning')
-        activities = []
-
-    try:
         filter_criteria = {} if is_admin() else {'user_id': current_user.id}
         if request.method == 'POST':
             current_app.logger.debug(f"POST request.form: {dict(request.form)}", extra={'session_id': session_id})
@@ -268,7 +256,6 @@ def new():
                     },
                     tips=[],
                     insights=[],
-                    activities=activities,
                     tool_title=trans('tax_calculator_title', default='Tax Calculator'),
                     active_tab='calculate-tax',
                     current_year=current_year
@@ -398,7 +385,6 @@ def new():
                         },
                         tips=[],
                         insights=[],
-                        activities=activities,
                         tool_title=trans('tax_calculator_title', default='Tax Calculator'),
                         active_tab='calculate-tax',
                         current_year=current_year
@@ -431,7 +417,6 @@ def new():
                     },
                     tips=[],
                     insights=[],
-                    activities=activities,
                     tool_title=trans('tax_calculator_title', default='Tax Calculator'),
                     active_tab='calculate-tax',
                     current_year=current_year
@@ -505,7 +490,6 @@ def new():
             latest_calculation=latest_calculation,
             tips=tips,
             insights=insights,
-            activities=activities,
             tool_title=trans('tax_calculator_title', default='Tax Calculator'),
             active_tab='calculate-tax',
             current_year=current_year
@@ -538,7 +522,6 @@ def new():
             },
             tips=[],
             insights=[],
-            activities=activities,
             tool_title=trans('tax_calculator_title', default='Tax Calculator'),
             active_tab='calculate-tax',
             current_year=current_year
@@ -556,17 +539,6 @@ def dashboard():
     session.permanent = False
     session.modified = True
     db = get_mongo_db()
-
-    try:
-        activities = get_all_recent_activities(
-            db=db,
-            user_id=current_user.id,
-            session_id=None,
-        )
-    except Exception as e:
-        current_app.logger.error(f"Failed to fetch recent activities: {str(e)}", extra={'session_id': session.get('sid', 'unknown')})
-        flash(trans('tax_activities_load_error', default='Error loading recent activities.'), 'warning')
-        activities = []
 
     try:
         filter_criteria = {} if is_admin() else {'user_id': current_user.id}
@@ -638,7 +610,6 @@ def dashboard():
             latest_calculation=latest_calculation,
             tips=tips,
             insights=insights,
-            activities=activities,
             tool_title=trans('tax_dashboard', default='Tax Dashboard')
         )
     except Exception as e:
@@ -650,7 +621,6 @@ def dashboard():
             latest_calculation={},
             tips=[],
             insights=[],
-            activities=[],
             tool_title=trans('tax_dashboard', default='Tax Dashboard')
         )
 
