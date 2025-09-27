@@ -124,7 +124,7 @@ TRADER_TOOLS = [
         "icon": "bi-calculator"
     },
     {
-        "endpoint": "tax.tax_calculator",
+        "endpoint": "tax.index",
         "label": "Tax Calculator",
         "label_key": "tax_calculator",
         "description_key": "tax_calculator_desc",
@@ -3015,6 +3015,7 @@ def create_dashboard_safe_response(stats, recent_data, additional_data=None):
             'timestamp': datetime.now(timezone.utc).isoformat()
 
         }
+
 
 
 
