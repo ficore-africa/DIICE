@@ -1,611 +1,770 @@
-from flask import render_template, request, jsonify, flash, redirect, url_for
-from flask_login import login_required, current_user
-from . import tax_bp
-import json
+from flask import Blueprint, request, session, redirect, url_for, render_template, flash, current_app, jsonify
+from flask_wtf import FlaskForm
+from flask_wtf.csrf import CSRFProtect, CSRFError
+from wtforms import FloatField, SubmitField, StringField, FieldList, FormField
+from wtforms.validators import DataRequired, NumberRange, Optional, Length
+from flask_login import current_user, login_required
+import utils
+from utils import logger
 from datetime import datetime
-import logging
+import uuid
+import bleach
+from bson import ObjectId
+from models import log_tool_usage, create_tax_calculation
+from helpers.transaction_helpers import create_tax_allocation_transaction
 
-# Optional dependencies with fallback
-try:
-    from utils import get_mongo_db, logger, get_all_expense_categories
-    from translations import trans
-    from tax_calculation_engine import (
-        get_user_entity_type, ENTITY_TYPES, get_entity_type_info,
-        calculate_tax_liability, update_user_entity_type, validate_entity_type
-    )
-except ImportError as e:
-    # Fallback implementations
-    logger = logging.getLogger(__name__)
-    def get_mongo_db():
-        return None
-    def trans(key, default=None):
-        return default or key
-    def get_all_expense_categories():
-        return {}
-    def get_user_entity_type(user_id, db):
-        return 'sole_proprietor'
-    def get_entity_type_info(entity_type):
-        return {
-            'name': entity_type.replace('_', ' ').title(),
-            'tax_type': 'PIT' if entity_type == 'sole_proprietor' else 'CIT',
-            'tax_details': 'Standard tax calculation',
-            'description': 'Default entity description'
-        }
-    ENTITY_TYPES = {
-        'sole_proprietor': {
-            'name': 'Sole Proprietor',
-            'description': 'Individual business owner',
-            'tax_type': 'PIT',
-            'tax_details': 'Progressive tax rates apply'
-        },
-        'limited_liability': {
-            'name': 'Limited Liability Company',
-            'description': 'Registered company',
-            'tax_type': 'CIT',
-            'tax_details': 'Flat or exempt tax rates'
-        }
-    }
-    def update_user_entity_type(user_id, entity_type, db):
-        return True
-    def validate_entity_type(entity_type):
-        return entity_type in ENTITY_TYPES
+tax_bp = Blueprint(
+    'tax',
+    __name__,
+    template_folder='templates/',
+    url_prefix='/tax'
+)
 
-# Progressive tax bands for Nigeria Tax Act 2025
-TAX_BANDS = [
-    {'min': 0, 'max': 800000, 'rate': 0.0, 'description': 'First ₦800,000 (Tax-free)'},
-    {'min': 800001, 'max': 3000000, 'rate': 0.15, 'description': 'Next ₦2,200,000 (15%)'},
-    {'min': 3000001, 'max': 12000000, 'rate': 0.18, 'description': 'Next ₦9,000,000 (18%)'},
-    {'min': 12000001, 'max': 25000000, 'rate': 0.21, 'description': 'Next ₦13,000,000 (21%)'},
-    {'min': 25000001, 'max': 50000000, 'rate': 0.23, 'description': 'Next ₦25,000,000 (23%)'},
-    {'min': 50000001, 'max': float('inf'), 'rate': 0.25, 'description': 'Above ₦50,000,000 (25%)'}
-]
-
-def get_expense_categories():
-    """Get expense categories with translations for tax calculator interface"""
+def clean_currency(value):
+    """Transform input into a float, using improved validation from utils."""
     try:
-        all_categories = get_all_expense_categories()
-        translated_categories = {}
-        for category_key, category_data in all_categories.items():
-            name_key = f"{category_key}_cat"
-            desc_key = f"{category_key}_desc"
-            translated_categories[category_key] = {
-                'name': trans(name_key, default=category_data.get('name', category_key)),
-                'description': trans(desc_key, default=category_data.get('description', '')),
-                'examples': category_data.get('examples', []),
-                'tax_deductible': category_data.get('tax_deductible', False),
-                'is_personal': category_data.get('is_personal', False),
-                'is_statutory': category_data.get('is_statutory', False)
-            }
-        return translated_categories
-    except Exception as e:
-        logger.error(f"Error getting expense categories: {str(e)}")
-        return {
-            'office_admin': {
-                'name': 'Office & Admin',
-                'description': 'Office supplies, stationery, internet/data, utility bills',
-                'examples': ['Office supplies', 'Stationery', 'Internet/Data', 'Electricity'],
-                'tax_deductible': True,
-                'is_personal': False,
-                'is_statutory': False
-            },
-            'staff_wages': {
-                'name': 'Staff Wages',
-                'description': 'Employee salaries and wages',
-                'examples': ['Salaries', 'Wages', 'Bonuses'],
-                'tax_deductible': True,
-                'is_personal': False,
-                'is_statutory': False
-            },
-            'business_travel': {
-                'name': 'Business Travel',
-                'description': 'Travel expenses for business purposes',
-                'examples': ['Flights', 'Hotels', 'Transport'],
-                'tax_deductible': True,
-                'is_personal': False,
-                'is_statutory': False
-            },
-            'rent_utilities': {
-                'name': 'Rent & Utilities',
-                'description': 'Business premises rent and utilities',
-                'examples': ['Office rent', 'Electricity', 'Water'],
-                'tax_deductible': True,
-                'is_personal': False,
-                'is_statutory': False
-            },
-            'marketing_sales': {
-                'name': 'Marketing & Sales',
-                'description': 'Advertising and promotional expenses',
-                'examples': ['Ads', 'Promotions', 'Events'],
-                'tax_deductible': True,
-                'is_personal': False,
-                'is_statutory': False
-            },
-            'cogs': {
-                'name': 'Cost of Goods Sold',
-                'description': 'Direct costs of producing goods',
-                'examples': ['Raw materials', 'Direct labor'],
-                'tax_deductible': True,
-                'is_personal': False,
-                'is_statutory': False
-            },
-            'statutory_legal': {
-                'name': 'Statutory & Legal Contributions',
-                'description': 'Mandatory contributions and legal fees',
-                'examples': ['Pension contributions', 'Tax filings', 'Legal fees'],
-                'tax_deductible': True,
-                'is_personal': False,
-                'is_statutory': True
-            },
-            'personal_expenses': {
-                'name': 'Personal Expenses',
-                'description': 'Non-deductible personal expenses',
-                'examples': ['Personal meals', 'Personal travel'],
-                'tax_deductible': False,
-                'is_personal': True,
-                'is_statutory': False
-            }
-        }
+        return utils.clean_currency(value)
+    except Exception:
+        return 0.0
 
-def calculate_progressive_tax(taxable_income):
-    """Calculate tax using progressive tax bands"""
-    if taxable_income <= 0:
-        return 0, []
-    
-    total_tax = 0
-    breakdown = []
-    
-    for band in TAX_BANDS:
-        band_min = band['min']
-        band_max = band['max']
-        rate = band['rate']
-        
-        if taxable_income < band_min:
-            continue
-            
-        taxable_in_band = min(taxable_income, band_max) - band_min + 1
-        if taxable_in_band <= 0:
-            continue
-            
-        tax_in_band = taxable_in_band * rate
-        total_tax += tax_in_band
-        
-        breakdown.append({
-            'description': band['description'],
-            'taxable_amount': taxable_in_band,
-            'rate': rate,
-            'tax_amount': tax_in_band,
-            'formula': f'₦{taxable_in_band:,.2f} × {rate:.1%} = ₦{tax_in_band:,.2f}'
-        })
-    
-    return total_tax, breakdown
+def strip_commas(value):
+    """Filter to remove commas and return a float."""
+    return clean_currency(value)
 
-def calculate_rent_relief(annual_rent):
-    """Calculate rent relief as lower of ₦500,000 or 20% of annual rent"""
-    if not annual_rent or annual_rent <= 0:
-        return 0
-    twenty_percent = annual_rent * 0.20
-    return min(500000, twenty_percent)
-
-def validate_calculation_inputs(total_income, expenses, annual_rent):
-    """Validate and sanitize calculation inputs"""
-    warnings = []
-    
+def format_currency(value):
+    """Format a numeric value with comma separation, no currency symbol."""
     try:
-        validated_income = float(total_income) if total_income is not None else 0.0
-        if validated_income < 0:
-            warnings.append("Income was negative, adjusted to zero")
-            validated_income = 0.0
+        numeric_value = float(value)
+        formatted = f"{numeric_value:,.2f}"
+        return formatted
     except (ValueError, TypeError):
-        warnings.append("Invalid income value, using zero")
-        validated_income = 0.0
-    
-    validated_expenses = {}
-    if isinstance(expenses, dict):
-        for category, amount in expenses.items():
-            try:
-                validated_amount = float(amount) if amount is not None else 0.0
-                if validated_amount < 0:
-                    warnings.append(f"Negative expense for {category}, adjusted to zero")
-                    validated_amount = 0.0
-                validated_expenses[category] = validated_amount
-            except (ValueError, TypeError):
-                warnings.append(f"Invalid expense amount for {category}, using zero")
-                validated_expenses[category] = 0.0
-    else:
-        warnings.append("Invalid expenses data, using empty expenses")
-    
-    try:
-        validated_rent = float(annual_rent) if annual_rent is not None else 0.0
-        if validated_rent < 0:
-            warnings.append("Annual rent was negative, adjusted to zero")
-            validated_rent = 0.0
-    except (ValueError, TypeError):
-        warnings.append("Invalid annual rent value, using zero")
-        validated_rent = 0.0
-    
-    return validated_income, validated_expenses, validated_rent, warnings
+        return "0.00"
 
-@tax_bp.route('/calculator')
-@login_required
-def tax_calculator():
-    """Render the tax calculator page"""
-    try:
-        db = get_mongo_db()
-        user_entity_type = get_user_entity_type(current_user.id, db)
-        entity_info = get_entity_type_info(user_entity_type)
-        available_entity_types = ENTITY_TYPES
-        expense_categories = get_expense_categories()
-        
-        calculation_context = {
-            'four_step_process': {
-                'step1': 'Net Business Profit Calculation',
-                'step2': 'Statutory & Legal Contributions Deduction',
-                'step3': 'Rent Relief Application',
-                'step4': 'Progressive Tax Band Application'
-            },
-            'deductible_categories': [key for key, data in expense_categories.items() 
-                                    if data.get('tax_deductible', False) and not data.get('is_statutory', False)],
-            'statutory_categories': [key for key, data in expense_categories.items() 
-                                   if data.get('is_statutory', False)],
-            'non_deductible_categories': [key for key, data in expense_categories.items() 
-                                        if not data.get('tax_deductible', False)]
-        }
-        
-        return render_template('tax/tax_calculator.html',
-                             expense_categories=expense_categories,
-                             user_annual_rent=current_user.annual_rent or 0,
-                             user_entity_type=user_entity_type,
-                             entity_info=entity_info,
-                             available_entity_types=available_entity_types,
-                             calculation_context=calculation_context)
-    except Exception as e:
-        logger.error(f"Error in tax_calculator route: {str(e)}")
-        flash('Error loading tax calculator. Please try again.', 'error')
-        return redirect(url_for('dashboard.index'))
+def custom_login_required(f):
+    """Custom login decorator that requires authentication."""
+    from functools import wraps
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if current_user.is_authenticated:
+            return f(*args, **kwargs)
+        flash(trans('general_login_required', default='Please log in to access this page.'), 'warning')
+        return redirect(url_for('users.login', next=request.url))
+    return decorated_function
 
-@tax_bp.route('/calculate', methods=['POST'])
-@login_required
-def calculate_tax():
-    """API endpoint for tax calculation with detailed breakdown"""
+def deduct_ficore_credits(db, user_id, amount, action, tax_id=None):
+    """
+    Deduct Ficore Credits from user balance with enhanced error logging and transaction handling.
+    
+    Args:
+        db: MongoDB database instance
+        user_id: User ID (must match _id field in users collection)
+        amount: Amount to deduct
+        action: Action description for logging
+        tax_id: Optional tax calculation ID for reference
+    
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    session_id = session.get('sid', 'unknown')
+    
     try:
-        db = get_mongo_db()
-        data = request.get_json()
+        if not user_id:
+            logger.error(f"No user_id provided for credit deduction, action: {action}",
+                        extra={'session_id': session_id})
+            return False
         
-        if not data:
-            return jsonify({
-                'success': False,
-                'error': 'No data provided',
-                'message': 'Please provide income and expense data for calculation.'
-            }), 400
+        if amount <= 0:
+            logger.error(f"Invalid deduction amount {amount} for user {user_id}, action: {action}. Must be positive.",
+                        extra={'session_id': session_id, 'user_id': user_id})
+            return False
         
-        # Validate inputs
-        total_income = float(data.get('total_income', 0))
-        annual_rent = float(data.get('annual_rent', current_user.annual_rent or 0))
-        expenses = data.get('expenses', {})
-        validated_income, validated_expenses, validated_rent, warnings = validate_calculation_inputs(
-            total_income, expenses, annual_rent
-        )
+        user = db.users.find_one({'_id': user_id})
+        if not user:
+            logger.error(f"User {user_id} not found in database for credit deduction, action: {action}.",
+                        extra={'session_id': session_id, 'user_id': user_id})
+            return False
         
-        if validated_income < 0 or any(v < 0 for v in validated_expenses.values()) or validated_rent < 0:
-            return jsonify({
-                'success': False,
-                'error': 'Validation failed',
-                'message': 'Input values cannot be negative',
-                'validation_errors': warnings
-            }), 400
+        current_balance = float(user.get('ficore_credit_balance', 0))
+        logger.debug(f"Current balance for user {user_id}: {current_balance}, attempting to deduct: {amount}",
+                    extra={'session_id': session_id, 'user_id': user_id})
         
-        user_entity_type = get_user_entity_type(current_user.id, db)
-        entity_info = get_entity_type_info(user_entity_type)
-        current_year = datetime.now().year
+        if current_balance < amount:
+            logger.warning(f"Insufficient credits for user {user_id}: required {amount}, available {current_balance}, action: {action}",
+                         extra={'session_id': session_id, 'user_id': user_id})
+            return False
         
-        try:
-            if user_entity_type == 'limited_liability':
-                result = simulate_cit_calculation(validated_income, validated_expenses, entity_info)
-            else:
-                result = simulate_pit_four_step_calculation(validated_income, validated_expenses, validated_rent, entity_info)
-            
-            result['calculation_metadata'] = {
-                'user_id': current_user.id,
-                'calculation_timestamp': datetime.now().isoformat(),
-                'tax_year': current_year,
-                'calculation_version': '2.1',
-                'entity_type': user_entity_type,
-                'input_validation_passed': True
-            }
-            if warnings:
-                result['calculation_warnings'] = warnings
+        with db.client.start_session() as mongo_session:
+            with mongo_session.start_transaction():
+                result = db.users.update_one(
+                    {'_id': user_id},
+                    {'$inc': {'ficore_credit_balance': -amount}},
+                    session=mongo_session
+                )
                 
-            logger.info(f"Tax calculation completed for user {current_user.id}")
-            return jsonify({
-                'success': True,
-                'breakdown': result,
-                'message': 'Tax calculation completed successfully'
-            })
-        except Exception as calc_error:
-            logger.error(f"Calculation error for user {current_user.id}: {str(calc_error)}")
-            return jsonify({
-                'success': False,
-                'error': 'Calculation error',
-                'message': 'Unable to complete tax calculation.',
-                'details': str(calc_error)
-            }), 400
+                if result.modified_count == 0:
+                    error_msg = f"Failed to deduct {amount} credits for user {user_id}, action: {action}: No documents modified."
+                    logger.error(error_msg, extra={'session_id': session_id, 'user_id': user_id})
+                    db.ficore_credit_transactions.insert_one({
+                        '_id': ObjectId(),
+                        'user_id': user_id,
+                        'action': action,
+                        'amount': float(-amount),
+                        'tax_id': str(tax_id) if tax_id else None,
+                        'timestamp': datetime.utcnow(),
+                        'session_id': session_id,
+                        'status': 'failed'
+                    }, session=mongo_session)
+                    raise ValueError(error_msg)
+                
+                transaction = {
+                    '_id': ObjectId(),
+                    'user_id': user_id,
+                    'action': action,
+                    'amount': float(-amount),
+                    'tax_id': str(tax_id) if tax_id else None,
+                    'timestamp': datetime.utcnow(),
+                    'session_id': session_id,
+                    'status': 'completed'
+                }
+                db.ficore_credit_transactions.insert_one(transaction, session=mongo_session)
+                
+                db.audit_logs.insert_one({
+                    'admin_id': 'system',
+                    'action': f'deduct_ficore_credits_{action}',
+                    'details': {
+                        'user_id': user_id,
+                        'amount': amount,
+                        'tax_id': str(tax_id) if tax_id else None,
+                        'previous_balance': current_balance,
+                        'new_balance': current_balance - amount
+                    },
+                    'timestamp': datetime.utcnow()
+                }, session=mongo_session)
+                
+                mongo_session.commit_transaction()
+                
+        logger.info(f"Successfully deducted {amount} Ficore Credits for {action} by user {user_id}. New balance: {current_balance - amount}",
+                   extra={'session_id': session_id, 'user_id': user_id})
+        return True
+        
     except Exception as e:
-        logger.error(f"Unexpected error in tax calculation for user {current_user.id}: {str(e)}")
-        return jsonify({
-            'success': False,
-            'error': 'Internal server error',
-            'message': 'An unexpected error occurred.',
-            'user_message': 'Please try again later.'
-        }), 500
+        logger.error(f"Error deducting {amount} Ficore Credits for {action} by user {user_id}: {str(e)}",
+                    exc_info=True, extra={'session_id': session_id, 'user_id': user_id})
+        return False
 
-def simulate_cit_calculation(total_income, expenses, entity_info):
-    """Simulate CIT calculation with detailed breakdown"""
-    cit_revenue_threshold = 50000000.0
-    expense_categories = get_expense_categories()
-    total_expenses = sum(expenses.values())
+class TaxItemForm(FlaskForm):
+    name = StringField(
+        trans('tax_item_name', default='Item Name'),
+        validators=[
+            DataRequired(message=trans('tax_item_name_required', default='Item name is required')),
+            Length(min=2, max=50, message=trans('tax_item_name_length', default='Item name must be between 2 and 50 characters'))
+        ]
+    )
+    amount = FloatField(
+        trans('tax_item_amount', default='Amount'),
+        filters=[strip_commas],
+        validators=[
+            DataRequired(message=trans('tax_item_amount_required', default='Amount is required')),
+            NumberRange(min=0.01, max=10000000000, message=trans('tax_amount_max', default='Amount must be between 0.01 and 10 billion'))
+        ]
+    )
+    note = StringField(
+        trans('tax_item_note', default='Note (Optional)'),
+        validators=[
+            Optional(),
+            Length(max=200, message=trans('tax_item_note_length', default='Note must be less than 200 characters'))
+        ]
+    )
     
-    categorized_expenses = {}
-    for category, amount in expenses.items():
-        if category in expense_categories:
-            categorized_expenses[category] = {
-                'amount': amount,
-                'category_name': expense_categories[category]['name'],
-                'tax_deductible': expense_categories[category]['tax_deductible']
-            }
-    
-    if total_income <= cit_revenue_threshold:
-        result = {
-            'calculation_type': 'CIT',
-            'entity_type': 'limited_liability',
-            'entity_info': entity_info,
-            'total_revenue': total_income,
-            'revenue_threshold': cit_revenue_threshold,
-            'total_expenses': total_expenses,
-            'exemption_applied': True,
-            'tax_rate': 0.0,
-            'taxable_income': 0.0,
-            'tax_liability': 0.0,
-            'effective_tax_rate': 0.0,
-            'exemption_reason': f'Small company exemption (revenue ≤₦{cit_revenue_threshold:,.0f})',
-            'expense_breakdown': categorized_expenses,
-            'calculation_steps': [
-                {
-                    'step': 1,
-                    'description': 'Revenue Assessment',
-                    'calculation': f'Total Revenue: ₦{total_income:,.2f}',
-                    'result': total_income
-                },
-                {
-                    'step': 2,
-                    'description': 'Threshold Check',
-                    'calculation': f'₦{total_income:,.2f} ≤ ₦{cit_revenue_threshold:,.2f}',
-                    'result': 'Exemption Applied'
-                },
-                {
-                    'step': 3,
-                    'description': 'Final Tax Liability',
-                    'calculation': 'Small Company Exemption = 0% tax rate',
-                    'result': 0.0
-                }
-            ]
-        }
-    else:
-        taxable_income = max(0, total_income - total_expenses)
-        tax_liability = taxable_income * 0.30
-        effective_tax_rate = (tax_liability / total_income * 100) if total_income > 0 else 0
-        
-        result = {
-            'calculation_type': 'CIT',
-            'entity_type': 'limited_liability',
-            'entity_info': entity_info,
-            'total_revenue': total_income,
-            'revenue_threshold': cit_revenue_threshold,
-            'total_expenses': total_expenses,
-            'taxable_income': taxable_income,
-            'exemption_applied': False,
-            'tax_rate': 0.30,
-            'tax_liability': tax_liability,
-            'effective_tax_rate': effective_tax_rate,
-            'expense_breakdown': categorized_expenses,
-            'calculation_steps': [
-                {
-                    'step': 1,
-                    'description': 'Revenue Assessment',
-                    'calculation': f'Total Revenue: ₦{total_income:,.2f}',
-                    'result': total_income
-                },
-                {
-                    'step': 2,
-                    'description': 'Expense Deduction',
-                    'calculation': f'₦{total_income:,.2f} - ₦{total_expenses:,.2f}',
-                    'result': taxable_income
-                },
-                {
-                    'step': 3,
-                    'description': 'Tax Calculation',
-                    'calculation': f'₦{taxable_income:,.2f} × 30%',
-                    'result': tax_liability
-                }
-            ]
-        }
-    
-    return result
+    class Meta:
+        csrf = False  # Disable CSRF for subform, as it's handled by the parent TaxForm
 
-def simulate_pit_four_step_calculation(total_income, expenses, annual_rent, entity_info):
-    """Simulate PIT four-step calculation with detailed breakdown"""
-    expense_categories = get_expense_categories()
-    deductible_categories = ['office_admin', 'staff_wages', 'business_travel', 
-                           'rent_utilities', 'marketing_sales', 'cogs']
-    
-    deductible_expenses = {}
-    for category in deductible_categories:
-        amount = expenses.get(category, 0)
-        if amount > 0:
-            deductible_expenses[category] = {
-                'amount': amount,
-                'category_name': expense_categories.get(category, {}).get('name', category),
-                'tax_deductible': True
-            }
-    
-    total_deductible_expenses = sum(exp['amount'] for exp in deductible_expenses.values())
-    net_business_profit = total_income - total_deductible_expenses
-    
-    step1_breakdown = {
-        'step': 1,
-        'step_name': 'Net Business Profit Calculation',
-        'description': 'Calculate profit using main deductible business expenses',
-        'total_income': total_income,
-        'deductible_expenses': deductible_expenses,
-        'total_deductible_expenses': total_deductible_expenses,
-        'net_business_profit': net_business_profit,
-        'formula': f'₦{total_income:,.2f} - ₦{total_deductible_expenses:,.2f} = ₦{net_business_profit:,.2f}'
-    }
-    
-    statutory_expenses = expenses.get('statutory_legal', 0)
-    adjusted_profit_after_statutory = net_business_profit - statutory_expenses
-    
-    step2_breakdown = {
-        'step': 2,
-        'step_name': 'Statutory & Legal Contributions Deduction',
-        'description': 'Apply statutory and legal expenses deduction',
-        'net_business_profit_input': net_business_profit,
-        'statutory_expenses': statutory_expenses,
-        'adjusted_profit_after_statutory': adjusted_profit_after_statutory,
-        'formula': f'₦{net_business_profit:,.2f} - ₦{statutory_expenses:,.2f} = ₦{adjusted_profit_after_statutory:,.2f}'
-    }
-    
-    rent_relief = calculate_rent_relief(annual_rent)
-    taxable_income_after_rent_relief = adjusted_profit_after_statutory - rent_relief
-    
-    step3_breakdown = {
-        'step': 3,
-        'step_name': 'Rent Relief Application',
-        'description': 'Apply rent relief (lesser of ₦500,000 or 20% of rent)',
-        'adjusted_profit_input': adjusted_profit_after_statutory,
-        'annual_rent': annual_rent,
-        'rent_relief': rent_relief,
-        'taxable_income_after_rent_relief': taxable_income_after_rent_relief,
-        'formula': f'₦{adjusted_profit_after_statutory:,.2f} - ₦{rent_relief:,.2f} = ₦{taxable_income_after_rent_relief:,.2f}'
-    }
-    
-    final_taxable_income = max(0, taxable_income_after_rent_relief)
-    tax_liability, tax_band_breakdown = calculate_progressive_tax(final_taxable_income)
-    effective_tax_rate = (tax_liability / total_income * 100) if total_income > 0 else 0
-    
-    step4_breakdown = {
-        'step': 4,
-        'step_name': 'Progressive Tax Band Application',
-        'description': 'Apply NTA 2025 progressive tax bands',
-        'taxable_income': final_taxable_income,
-        'tax_liability': tax_liability,
-        'effective_tax_rate': effective_tax_rate,
-        'tax_band_breakdown': tax_band_breakdown,
-        'formula': f'Progressive bands applied to ₦{final_taxable_income:,.2f} = ₦{tax_liability:,.2f}'
-    }
-    
-    personal_expenses = expenses.get('personal_expenses', 0)
-    
-    return {
-        'calculation_type': 'PIT',
-        'entity_type': 'sole_proprietor',
-        'entity_info': entity_info,
-        'four_step_breakdown': {
-            'step1': step1_breakdown,
-            'step2': step2_breakdown,
-            'step3': step3_breakdown,
-            'step4': step4_breakdown
-        },
-        'summary': {
-            'total_income': total_income,
-            'total_deductible_expenses': total_deductible_expenses,
-            'statutory_expenses': statutory_expenses,
-            'personal_expenses': personal_expenses,
-            'rent_relief': rent_relief,
-            'final_taxable_income': final_taxable_income,
-            'tax_liability': tax_liability,
-            'effective_tax_rate': effective_tax_rate
-        },
-        'expense_breakdown': {
-            'deductible': deductible_expenses,
-            'statutory': {
-                'statutory_legal': {
-                    'amount': statutory_expenses,
-                    'category_name': 'Statutory & Legal Contributions',
-                    'tax_deductible': True
-                }
-            } if statutory_expenses > 0 else {},
-            'non_deductible': {
-                'personal_expenses': {
-                    'amount': personal_expenses,
-                    'category_name': 'Personal Expenses',
-                    'tax_deductible': False
-                }
-            } if personal_expenses > 0 else {}
-        }
-    }
+class TaxForm(FlaskForm):
+    income = FloatField(
+        trans('tax_income', default='Annual Income'),
+        filters=[strip_commas],
+        validators=[
+            DataRequired(message=trans('tax_income_required', default='Annual income is required')),
+            NumberRange(min=0, max=10000000000, message=trans('tax_income_max', default='Income must be between 0 and 10 billion'))
+        ]
+    )
+    deductions = FieldList(
+        FormField(TaxItemForm),
+        min_entries=0,
+        max_entries=20,
+        validators=[Optional()]
+    )
+    submit = SubmitField(trans('tax_calculate', default='Calculate Tax'))
 
-@tax_bp.route('/update-rent', methods=['POST'])
-@login_required
-def update_annual_rent():
-    """Update user's annual rent in database"""
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        lang = session.get('lang', 'en')
+        self.income.label.text = trans('tax_income', lang) or 'Annual Income'
+        self.submit.label.text = trans('tax_calculate', lang) or 'Calculate Tax'
+
+    def validate(self, extra_validators=None):
+        if not super().validate(extra_validators):
+            logger.debug(f"Form validation failed: {self.errors}", extra={'session_id': session.get('sid', 'unknown')})
+            return False
+        try:
+            item_names = []
+            for item in self.deductions.entries:
+                if not isinstance(item.form, TaxItemForm):
+                    logger.warning(f"Invalid entry in deductions: {item.__dict__}",
+                                  extra={'session_id': session.get('sid', 'unknown')})
+                    self.deductions.errors.append(
+                        trans('tax_invalid_item', default='Invalid deduction item format')
+                    )
+                    return False
+                if item.form.name.data and item.form.amount.data:
+                    item_names.append(item.form.name.data.lower())
+                
+                if len(item_names) != len(set(item_names)):
+                    self.deductions.errors.append(
+                        trans('tax_duplicate_item_names', default='Deduction item names must be unique')
+                    )
+                    return False
+            return True
+        except Exception as e:
+            logger.error(f"Error in TaxForm.validate: {str(e)}",
+                        exc_info=True, extra={'session_id': session.get('sid', 'unknown')})
+            self.deductions.errors.append(
+                trans('tax_validation_error', default='Error validating tax data.')
+            )
+            return False
+
+@tax_bp.route('/', methods=['GET'])
+@custom_login_required
+@utils.requires_role(['personal', 'admin'])
+def index():
+    """Tax calculator landing page with navigation cards."""
+    return render_template('tax/index.html')
+
+@tax_bp.route('/new', methods=['GET', 'POST'])
+@custom_login_required
+@utils.requires_role(['personal', 'admin'])
+@utils.limiter.limit("10 per minute")
+def new():
+    session.permanent = False
+    session_id = session.get('sid', str(uuid.uuid4()))
+    session['sid'] = session_id
+    current_app.logger.debug(f"Session data: {session}", extra={'session_id': session_id})
+    
+    form = TaxForm(formdata=request.form if request.method == 'POST' else None)
+    db = utils.get_mongo_db()
+
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json
+
     try:
-        data = request.get_json()
-        annual_rent = float(data.get('annual_rent', 0))
-        
-        db = get_mongo_db()
-        result = db.users.update_one(
-            {'_id': current_user.id},
-            {'$set': {'annual_rent': annual_rent}}
+        log_tool_usage(
+            tool_name='tax',
+            db=db,
+            user_id=current_user.id,
+            session_id=session_id,
+            action='main_view'
         )
-        
-        if result.modified_count > 0:
-            logger.info(f"Updated annual rent for user {current_user.id}: {annual_rent}")
-        
-        return jsonify({
-            'success': True,
-            'message': 'Annual rent updated successfully'
-        })
     except Exception as e:
-        logger.error(f"Error updating annual rent for user {current_user.id}: {str(e)}")
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 400
+        current_app.logger.error(f"Failed to log tool usage: {str(e)}", extra={'session_id': session_id})
+        flash(trans('tax_log_error', default='Error logging tax calculator activity. Please try again.'), 'warning')
 
-@tax_bp.route('/update-entity-type', methods=['POST'])
-@login_required
-def update_entity_type():
-    """Update user's business entity type"""
     try:
-        data = request.get_json()
-        entity_type = data.get('entity_type')
-        
-        if not validate_entity_type(entity_type):
-            return jsonify({
-                'success': False,
-                'error': 'Invalid entity type'
-            }), 400
-        
-        db = get_mongo_db()
-        success = update_user_entity_type(current_user.id, entity_type, db)
-        
-        if success:
-            logger.info(f"Updated entity type for user {current_user.id}: {entity_type}")
-            entity_info = get_entity_type_info(entity_type)
-            return jsonify({
-                'success': True,
-                'message': 'Entity type updated successfully',
-                'entity_type': entity_type,
-                'entity_info': entity_info
-            })
-        else:
-            return jsonify({
-                'success': False,
-                'error': 'Failed to update entity type'
-            }), 500
+        activities = utils.get_all_recent_activities(
+            db=db,
+            user_id=current_user.id,
+            session_id=None,
+        )
+        current_app.logger.debug(f"Fetched {len(activities)} recent activities for user {current_user.id}", extra={'session_id': session_id})
     except Exception as e:
-        logger.error(f"Error updating entity type for user {current_user.id}: {str(e)}")
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 400
+        current_app.logger.error(f"Failed to fetch recent activities: {str(e)}", extra={'session_id': session_id})
+        flash(trans('tax_activities_load_error', default='Error loading recent activities.'), 'warning')
+        activities = []
+
+    try:
+        filter_criteria = {} if utils.is_admin() else {'user_id': current_user.id}
+        if request.method == 'POST':
+            current_app.logger.debug(f"POST request.form: {dict(request.form)}", extra={'session_id': session_id})
+            if not form.validate_on_submit():
+                current_app.logger.debug(f"Form errors: {form.errors}", extra={'session_id': session_id})
+                error_message = trans('tax_form_invalid', default='Invalid form data. Please check your inputs.')
+                if is_ajax:
+                    return jsonify({'success': False, 'message': error_message, 'errors': form.errors}), 400
+                flash(error_message, 'danger')
+                return render_template(
+                    'tax/new.html',
+                    form=form,
+                    calculations={},
+                    latest_calculation={
+                        'id': None,
+                        'user_id': None,
+                        'session_id': session_id,
+                        'user_email': current_user.email,
+                        'income': format_currency(0.0),
+                        'income_raw': 0.0,
+                        'deductions': [],
+                        'taxable_income': format_currency(0.0),
+                        'taxable_income_raw': 0.0,
+                        'total_tax': format_currency(0.0),
+                        'total_tax_raw': 0.0,
+                        'created_at': 'N/A'
+                    },
+                    tips=[],
+                    insights=[],
+                    activities=activities,
+                    tool_title=trans('tax_calculator_title', default='Tax Calculator'),
+                    active_tab='calculate-tax'
+                ), 400
+
+            if current_user.is_authenticated and not utils.is_admin():
+                if not utils.check_ficore_credit_balance(required_amount=1, user_id=current_user.id):
+                    current_app.logger.warning(f"Insufficient Ficore Credits for calculating tax by user {current_user.id}", extra={'session_id': session_id})
+                    error_message = trans('tax_insufficient_credits', default='Insufficient Ficore Credits to calculate tax. Please purchase more credits.')
+                    if is_ajax:
+                        return jsonify({'success': False, 'message': error_message}), 400
+                    flash(error_message, 'danger')
+                    return redirect(url_for('dashboard.index'))
+
+            try:
+                log_tool_usage(
+                    tool_name='tax',
+                    db=db,
+                    user_id=current_user.id,
+                    session_id=session_id,
+                    action='calculate_tax'
+                )
+            except Exception as e:
+                current_app.logger.error(f"Failed to log tax calculation: {str(e)}", extra={'session_id': session_id})
+                flash(trans('tax_log_error', default='Error logging tax calculation. Continuing with submission.'), 'warning')
+
+            income = float(form.income.data)
+            deductions = []
+            total_deductions = 0.0
+            for item in form.deductions.entries:
+                if item.form.name.data and item.form.amount.data:
+                    deduction_item = {
+                        'name': bleach.clean(item.form.name.data),
+                        'amount': float(item.form.amount.data),
+                        'note': bleach.clean(item.form.note.data) if item.form.note.data else None
+                    }
+                    deductions.append(deduction_item)
+                    total_deductions += deduction_item['amount']
+
+            taxable_income = max(0, income - total_deductions)
+            total_tax = calculate_tax(taxable_income)  # Assume this function exists in utils
+
+            tax_id = ObjectId()
+            tax_data = {
+                '_id': tax_id,
+                'user_id': current_user.id,
+                'session_id': session_id,
+                'income': income,
+                'deductions': deductions,
+                'taxable_income': taxable_income,
+                'total_tax': total_tax,
+                'created_at': datetime.utcnow()
+            }
+            current_app.logger.debug(f"Saving tax calculation: {tax_data}", extra={'session_id': session_id})
+            try:
+                with db.client.start_session() as mongo_session:
+                    with mongo_session.start_transaction():
+                        created_tax_id = create_tax_calculation(db, tax_data)
+                        create_tax_allocation_transaction(db, tax_data, 'tax_calculation', total_tax, 'Tax Calculation', session_id)
+                        if current_user.is_authenticated and not utils.is_admin():
+                            if not deduct_ficore_credits(db, current_user.id, 1, 'calculate_tax', tax_id):
+                                db.tax_calculations.delete_one({'_id': tax_id}, session=mongo_session)
+                                raise ValueError("Credit deduction failed")
+                        mongo_session.commit_transaction()
+                current_app.logger.info(f"Tax calculation {created_tax_id} saved successfully to MongoDB for session {session_id}", extra={'session_id': session_id})
+                try:
+                    caching_ext = current_app.extensions.get('caching')
+                    if caching_ext:
+                        cache = list(caching_ext.values())[0]
+                        cache.delete_memoized(utils.get_tax_calculations)
+                        current_app.logger.debug(f"Cleared cache for get_tax_calculations", extra={'session_id': session_id})
+                    else:
+                        current_app.logger.warning(f"Caching extension not found; skipping cache clear", extra={'session_id': session_id})
+                except Exception as e:
+                    current_app.logger.warning(f"Failed to clear cache for get_tax_calculations: {str(e)}", extra={'session_id': session_id})
+
+                success_message = trans("tax_calculated_success", default='Tax calculated successfully!')
+                if is_ajax:
+                    return jsonify({'success': True, 'tax_id': str(created_tax_id), 'message': success_message}), 200
+                flash(success_message, "success")
+                return redirect(url_for('tax.dashboard'))
+            except Exception as e:
+                current_app.logger.error(f"Failed to save tax calculation {tax_id} to MongoDB for session {session_id}: {str(e)}", extra={'session_id': session_id})
+                error_message = trans("tax_storage_error", default='Error saving tax calculation.')
+                if is_ajax:
+                    return jsonify({'success': False, 'message': error_message}), 500
+                flash(error_message, "danger")
+                return render_template(
+                    'tax/new.html',
+                    form=form,
+                    calculations={},
+                    latest_calculation={
+                        'id': None,
+                        'user_id': None,
+                        'session_id': session_id,
+                        'user_email': current_user.email,
+                        'income': format_currency(0.0),
+                        'income_raw': 0.0,
+                        'deductions': [],
+                        'taxable_income': format_currency(0.0),
+                        'taxable_income_raw': 0.0,
+                        'total_tax': format_currency(0.0),
+                        'total_tax_raw': 0.0,
+                        'created_at': 'N/A'
+                    },
+                    tips=[],
+                    insights=[],
+                    activities=activities,
+                    tool_title=trans('tax_calculator_title', default='Tax Calculator'),
+                    active_tab='calculate-tax'
+                )
+
+        calculations = list(db.tax_calculations.find(filter_criteria).sort('created_at', -1).limit(10))
+        calculations_dict = {}
+        latest_calculation = None
+        for calc in calculations:
+            calc_data = {
+                'id': str(calc['_id']),
+                'user_id': calc.get('user_id'),
+                'session_id': calc.get('session_id'),
+                'user_email': calc.get('user_email', current_user.email),
+                'income': format_currency(calc.get('income', 0.0)),
+                'income_raw': float(calc.get('income', 0.0)),
+                'deductions': calc.get('deductions', []),
+                'taxable_income': format_currency(calc.get('taxable_income', 0.0)),
+                'taxable_income_raw': float(calc.get('taxable_income', 0.0)),
+                'total_tax': format_currency(calc.get('total_tax', 0.0)),
+                'total_tax_raw': float(calc.get('total_tax', 0.0)),
+                'created_at': calc.get('created_at').strftime('%Y-%m-%d') if calc.get('created_at') else 'N/A'
+            }
+            calculations_dict[calc_data['id']] = calc_data
+            if not latest_calculation or (calc.get('created_at') and (latest_calculation['created_at'] == 'N/A' or calc.get('created_at') > datetime.strptime(latest_calculation['created_at'], '%Y-%m-%d'))):
+                latest_calculation = calc_data
+
+        if not latest_calculation:
+            latest_calculation = {
+                'id': None,
+                'user_id': None,
+                'session_id': session_id,
+                'user_email': current_user.email,
+                'income': format_currency(0.0),
+                'income_raw': 0.0,
+                'deductions': [],
+                'taxable_income': format_currency(0.0),
+                'taxable_income_raw': 0.0,
+                'total_tax': format_currency(0.0),
+                'total_tax_raw': 0.0,
+                'created_at': 'N/A'
+            }
+
+        tips = [
+            trans("tax_tip_review_deductions", default='Review all possible deductions to reduce taxable income.'),
+            trans("tax_tip_file_early", default='File your taxes early to avoid penalties.'),
+            trans("tax_tip_keep_records", default='Keep detailed records of all deductible expenses.'),
+            trans("tax_tip_consult_expert", default='Consult a tax professional for complex situations.')
+        ]
+
+        insights = []
+        try:
+            income_float = float(latest_calculation.get('income_raw', 0.0))
+            taxable_income_float = float(latest_calculation.get('taxable_income_raw', 0.0))
+            if income_float > 0:
+                if taxable_income_float / income_float > 0.8:
+                    insights.append(trans("tax_insight_high_taxable", default='Your taxable income is high. Consider additional deductions.'))
+                if len(latest_calculation.get('deductions', [])) == 0:
+                    insights.append(trans("tax_insight_no_deductions", default='No deductions claimed. Explore eligible deductions to lower your tax.'))
+        except (ValueError, TypeError) as e:
+            current_app.logger.warning(f"Error parsing tax amounts for insights: {str(e)}", extra={'session_id': session_id})
+
+        return render_template(
+            'tax/new.html',
+            form=form,
+            calculations=calculations_dict,
+            latest_calculation=latest_calculation,
+            tips=tips,
+            insights=insights,
+            activities=activities,
+            tool_title=trans('tax_calculator_title', default='Tax Calculator'),
+            active_tab='calculate-tax'
+        )
+    except Exception as e:
+        current_app.logger.exception(f"Unexpected error in tax.new: {str(e)}", extra={'session_id': session_id})
+        error_message = trans('tax_dashboard_load_error', default='Error loading tax calculator.')
+        if is_ajax:
+            return jsonify({'success': False, 'message': error_message}), 500
+        flash(error_message, 'danger')
+        return render_template(
+            'tax/new.html',
+            form=form,
+            calculations={},
+            latest_calculation={
+                'id': None,
+                'user_id': None,
+                'session_id': session_id,
+                'user_email': current_user.email,
+                'income': format_currency(0.0),
+                'income_raw': 0.0,
+                'deductions': [],
+                'taxable_income': format_currency(0.0),
+                'taxable_income_raw': 0.0,
+                'total_tax': format_currency(0.0),
+                'total_tax_raw': 0.0,
+                'created_at': 'N/A'
+            },
+            tips=[],
+            insights=[],
+            activities=activities,
+            tool_title=trans('tax_calculator_title', default='Tax Calculator'),
+            active_tab='calculate-tax'
+        ), 500
+
+@tax_bp.route('/dashboard', methods=['GET'])
+@custom_login_required
+@utils.requires_role(['personal', 'admin'])
+@utils.limiter.limit("10 per minute")
+def dashboard():
+    """Tax calculator dashboard page."""
+    if 'sid' not in session:
+        session['sid'] = str(uuid.uuid4())
+        current_app.logger.debug(f"New session created with sid: {session['sid']}", extra={'session_id': session['sid']})
+    session.permanent = False
+    session.modified = True
+    db = utils.get_mongo_db()
+
+    try:
+        log_tool_usage(
+            tool_name='tax',
+            db=db,
+            user_id=current_user.id,
+            session_id=session.get('sid', 'unknown'),
+            action='dashboard_view'
+        )
+    except Exception as e:
+        current_app.logger.error(f"Failed to log tool usage: {str(e)}", extra={'session_id': session.get('sid', 'unknown')})
+        flash(trans('tax_log_error', default='Error logging tax activity. Please try again.'), 'warning')
+
+    try:
+        activities = utils.get_all_recent_activities(
+            db=db,
+            user_id=current_user.id,
+            session_id=None,
+        )
+    except Exception as e:
+        current_app.logger.error(f"Failed to fetch recent activities: {str(e)}", extra={'session_id': session.get('sid', 'unknown')})
+        flash(trans('tax_activities_load_error', default='Error loading recent activities.'), 'warning')
+        activities = []
+
+    try:
+        filter_criteria = {} if utils.is_admin() else {'user_id': current_user.id}
+        calculations = list(db.tax_calculations.find(filter_criteria).sort('created_at', -1).limit(10))
+        
+        calculations_dict = {}
+        latest_calculation = None
+        for calc in calculations:
+            calc_data = {
+                'id': str(calc['_id']),
+                'user_id': calc.get('user_id'),
+                'session_id': calc.get('session_id'),
+                'user_email': calc.get('user_email', current_user.email),
+                'income': format_currency(calc.get('income', 0.0)),
+                'income_raw': float(calc.get('income', 0.0)),
+                'deductions': calc.get('deductions', []),
+                'taxable_income': format_currency(calc.get('taxable_income', 0.0)),
+                'taxable_income_raw': float(calc.get('taxable_income', 0.0)),
+                'total_tax': format_currency(calc.get('total_tax', 0.0)),
+                'total_tax_raw': float(calc.get('total_tax', 0.0)),
+                'created_at': calc.get('created_at').strftime('%Y-%m-%d') if calc.get('created_at') else 'N/A'
+            }
+            calculations_dict[calc_data['id']] = calc_data
+            if not latest_calculation or (calc.get('created_at') and (latest_calculation['created_at'] == 'N/A' or calc.get('created_at') > datetime.strptime(latest_calculation['created_at'], '%Y-%m-%d'))):
+                latest_calculation = calc_data
+
+        if not latest_calculation:
+            latest_calculation = {
+                'id': None,
+                'user_id': None,
+                'session_id': session.get('sid', 'unknown'),
+                'user_email': current_user.email,
+                'income': format_currency(0.0),
+                'income_raw': 0.0,
+                'deductions': [],
+                'taxable_income': format_currency(0.0),
+                'taxable_income_raw': 0.0,
+                'total_tax': format_currency(0.0),
+                'total_tax_raw': 0.0,
+                'created_at': 'N/A'
+            }
+
+        tips = [
+            trans("tax_tip_review_deductions", default='Review all possible deductions to reduce taxable income.'),
+            trans("tax_tip_file_early", default='File your taxes early to avoid penalties.'),
+            trans("tax_tip_keep_records", default='Keep detailed records of all deductible expenses.'),
+            trans("tax_tip_consult_expert", default='Consult a tax professional for complex situations.')
+        ]
+
+        insights = []
+        try:
+            income_float = float(latest_calculation.get('income_raw', 0.0))
+            taxable_income_float = float(latest_calculation.get('taxable_income_raw', 0.0))
+            if income_float > 0:
+                if taxable_income_float / income_float > 0.8:
+                    insights.append(trans("tax_insight_high_taxable", default='Your taxable income is high. Consider additional deductions.'))
+                if len(latest_calculation.get('deductions', [])) == 0:
+                    insights.append(trans("tax_insight_no_deductions", default='No deductions claimed. Explore eligible deductions to lower your tax.'))
+        except (ValueError, TypeError) as e:
+            current_app.logger.warning(f"Error parsing tax amounts for insights: {str(e)}", extra={'session_id': session.get('sid', 'unknown')})
+
+        return render_template(
+            'tax/dashboard.html',
+            calculations=calculations_dict,
+            latest_calculation=latest_calculation,
+            tips=tips,
+            insights=insights,
+            activities=activities,
+            tool_title=trans('tax_dashboard', default='Tax Dashboard')
+        )
+    except Exception as e:
+        current_app.logger.error(f"Error in tax.dashboard: {str(e)}", extra={'session_id': session.get('sid', 'unknown')})
+        flash(trans('tax_dashboard_load_error', default='Error loading tax dashboard.'), 'danger')
+        return render_template(
+            'tax/dashboard.html',
+            calculations={},
+            latest_calculation={},
+            tips=[],
+            insights=[],
+            activities=[],
+            tool_title=trans('tax_dashboard', default='Tax Dashboard')
+        )
+
+@tax_bp.route('/history', methods=['GET', 'POST'])
+@custom_login_required
+@utils.requires_role(['personal', 'admin'])
+@utils.limiter.limit("10 per minute")
+def history():
+    """Manage tax calculations page."""
+    if 'sid' not in session:
+        session['sid'] = str(uuid.uuid4())
+        current_app.logger.debug(f"New session created with sid: {session['sid']}", extra={'session_id': session['sid']})
+    session.permanent = False
+    session.modified = True
+    db = utils.get_mongo_db()
+
+    try:
+        log_tool_usage(
+            tool_name='tax',
+            db=db,
+            user_id=current_user.id,
+            session_id=session.get('sid', 'unknown'),
+            action='history_view'
+        )
+    except Exception as e:
+        current_app.logger.error(f"Failed to log tool usage: {str(e)}", extra={'session_id': session.get('sid', 'unknown')})
+        flash(trans('tax_log_error', default='Error logging tax activity. Please try again.'), 'warning')
+
+    filter_criteria = {} if utils.is_admin() else {'user_id': current_user.id}
+
+    if request.method == 'POST':
+        action = request.form.get('action')
+        if action == 'delete':
+            tax_id = request.form.get('tax_id')
+            tax_calc = db.tax_calculations.find_one({'_id': ObjectId(tax_id), **filter_criteria})
+            if not tax_calc:
+                current_app.logger.warning(f"Tax calculation {tax_id} not found for deletion", extra={'session_id': session.get('sid', 'unknown')})
+                flash(trans("tax_not_found", default='Tax calculation not found.'), "danger")
+                return redirect(url_for('tax.history'))
+            
+            if current_user.is_authenticated and not utils.is_admin():
+                if not utils.check_ficore_credit_balance(required_amount=1, user_id=current_user.id):
+                    current_app.logger.warning(f"Insufficient Ficore Credits for deleting tax calculation {tax_id} by user {current_user.id}", extra={'session_id': session.get('sid', 'unknown')})
+                    flash(trans('tax_insufficient_credits', default='Insufficient Ficore Credits to delete a tax calculation. Please purchase more credits.'), 'danger')
+                    return redirect(url_for('dashboard.index'))
+            
+            try:
+                with db.client.start_session() as mongo_session:
+                    with mongo_session.start_transaction():
+                        result = db.tax_calculations.delete_one({'_id': ObjectId(tax_id), **filter_criteria}, session=mongo_session)
+                        if result.deleted_count > 0:
+                            if current_user.is_authenticated and not utils.is_admin():
+                                if not deduct_ficore_credits(db, current_user.id, 1, 'delete_tax', tax_id):
+                                    current_app.logger.error(f"Failed to deduct Ficore Credit for deleting tax calculation {tax_id} by user {current_user.id}", extra={'session_id': session.get('sid', 'unknown')})
+                                    flash(trans('tax_credit_deduction_failed', default='Failed to deduct Ficore Credit for deleting tax calculation.'), 'danger')
+                                    return redirect(url_for('tax.history'))
+                            mongo_session.commit_transaction()
+                        else:
+                            current_app.logger.warning(f"Tax calculation ID {tax_id} not found for session {session['sid']}", extra={'session_id': session['sid']})
+                            flash(trans("tax_not_found", default='Tax calculation not found.'), "danger")
+                            return redirect(url_for('tax.history'))
+                try:
+                    caching_ext = current_app.extensions.get('caching')
+                    if caching_ext:
+                        cache = list(caching_ext.values())[0]
+                        cache.delete_memoized(utils.get_tax_calculations)
+                        current_app.logger.debug(f"Cleared cache for get_tax_calculations", extra={'session_id': session.get('sid', 'unknown')})
+                    else:
+                        current_app.logger.warning(f"Caching extension not found; skipping cache clear", extra={'session_id': session.get('sid', 'unknown')})
+                except Exception as e:
+                    current_app.logger.warning(f"Failed to clear cache for get_tax_calculations: {str(e)}", extra={'session_id': session.get('sid', 'unknown')})
+                current_app.logger.info(f"Deleted tax calculation ID {tax_id} for session {session['sid']}", extra={'session_id': session['sid']})
+                flash(trans("tax_deleted_success", default='Tax calculation deleted successfully!'), "success")
+            except Exception as e:
+                current_app.logger.error(f"Failed to delete tax calculation ID {tax_id} for session {session['sid']}: {str(e)}", extra={'session_id': session['sid']})
+                flash(trans("tax_delete_failed", default='Error deleting tax calculation.'), "danger")
+            return redirect(url_for('tax.history'))
+
+    try:
+        calculations = list(db.tax_calculations.find(filter_criteria).sort('created_at', -1).limit(20))
+        calculations_dict = {}
+        
+        for calc in calculations:
+            calc_data = {
+                'id': str(calc['_id']),
+                'user_id': calc.get('user_id'),
+                'session_id': calc.get('session_id'),
+                'user_email': calc.get('user_email', current_user.email),
+                'income': format_currency(calc.get('income', 0.0)),
+                'income_raw': float(calc.get('income', 0.0)),
+                'deductions': calc.get('deductions', []),
+                'taxable_income': format_currency(calc.get('taxable_income', 0.0)),
+                'taxable_income_raw': float(calc.get('taxable_income', 0.0)),
+                'total_tax': format_currency(calc.get('total_tax', 0.0)),
+                'total_tax_raw': float(calc.get('total_tax', 0.0)),
+                'created_at': calc.get('created_at').strftime('%Y-%m-%d %H:%M') if calc.get('created_at') else 'N/A'
+            }
+            calculations_dict[calc_data['id']] = calc_data
+
+        return render_template(
+            'tax/history.html',
+            calculations=calculations_dict,
+            tool_title=trans('tax_history', default='Tax History')
+        )
+    except Exception as e:
+        current_app.logger.error(f"Error in tax.history: {str(e)}", extra={'session_id': session.get('sid', 'unknown')})
+        flash(trans('tax_history_load_error', default='Error loading tax calculations for management.'), 'danger')
+        return render_template(
+            'tax/history.html',
+            calculations={},
+            tool_title=trans('tax_history', default='Tax History')
+        )
+
+def calculate_tax(taxable_income):
+    """Placeholder for tax calculation logic."""
+    # Replace with actual tax calculation logic
+    tax_brackets = [
+        (300000, 0.07),
+        (600000, 0.11),
+        (1100000, 0.15),
+        (1600000, 0.19),
+        (3200000, 0.21),
+        (float('inf'), 0.24)
+    ]
+    tax = 0.0
+    remaining_income = taxable_income
+    for bracket, rate in tax_brackets:
+        if remaining_income <= 0:
+            break
+        taxable_in_bracket = min(remaining_income, bracket - (tax_brackets[tax_brackets.index((bracket, rate)) - 1][0] if tax_brackets.index((bracket, rate)) > 0 else 0))
+        tax += taxable_in_bracket * rate
+        remaining_income -= taxable_in_bracket
+    return tax
