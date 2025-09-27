@@ -246,8 +246,6 @@ TAX_TRANSLATIONS = {
         'tax_view_history': 'View History',
         'tax_insights': 'Insights',
         'general_recent_activity': 'Recent Activity',
-        
-        # New keys from warnings
         'category_staff_wages': 'Staff & Wages',
         'category_business_travel': 'Business Travel & Transport',
         'category_rent_utilities': 'Rent & Utilities',
@@ -261,7 +259,22 @@ TAX_TRANSLATIONS = {
         'entity_type': 'Entity Type',
         'entity_type_required': 'Entity type is required',
         'entity_type_length': 'Entity type must be a valid selection',
-        'vat_threshold_content': 'VAT registration is required for businesses with annual turnover above ₦25 million.'
+        'vat_threshold_content': 'VAT registration is required for businesses with annual turnover above ₦25 million.',
+        
+        # New keys from latest warnings
+        'general_personal_finance_tools': 'Personal Finance Tools',
+        'tax_summary': 'Tax Summary',
+        'Review all possible deductions to reduce taxable income': 'Review all possible deductions to reduce taxable income',
+        'File your taxes early to avoid penalties': 'File your taxes early to avoid penalties',
+        'Keep detailed records of all deductible expenses': 'Keep detailed records of all deductible expenses',
+        'Consult a tax professional for complex situations': 'Consult a tax professional for complex situations',
+        'tax_category_office_admin': 'Office & Admin',
+        'tax_category_staff_wages': 'Staff & Wages',
+        'tax_category_business_travel': 'Business Travel & Transport',
+        'tax_category_rent_utilities': 'Rent & Utilities',
+        'tax_category_marketing_sales': 'Marketing & Sales',
+        'tax_category_cogs': 'Cost of Goods Sold (COGS)',
+        'tax_category_statutory_legal': 'Statutory & Legal Contributions'
     },
     'ha': {
         'tax_calculator_title': 'Mai kirga haraji mai wayo',
@@ -505,8 +518,6 @@ TAX_TRANSLATIONS = {
         'tax_view_history': 'Duba Tarihi',
         'tax_insights': 'Bayani',
         'general_recent_activity': 'Ayyukan Kwanan nan',
-        
-        # New keys from warnings
         'category_staff_wages': 'Ma\'aikata da Albashi',
         'category_business_travel': 'Balaguro da Sufuri na Kasuwanci',
         'category_rent_utilities': 'Kudin Haya da Kayayyaki',
@@ -520,6 +531,21 @@ TAX_TRANSLATIONS = {
         'entity_type': 'Nau\'in Kasuwanci',
         'entity_type_required': 'Nau\'in kasuwanci ana bukata',
         'entity_type_length': 'Nau\'in kasuwanci dole ne ya zama zaɓi mai inganci',
-        'vat_threshold_content': 'Rijistar VAT ana bukata ga kasuwancin da ke da jimillar kudaden shiga na shekara sama da Naira miliyan 25.'
+        'vat_threshold_content': 'Rijistar VAT ana bukata ga kasuwancin da ke da jimillar kudaden shiga na shekara sama da Naira miliyan 25.',
+        
+        # New keys from latest warnings
+        'general_personal_finance_tools': 'Kayan Aikin Kuɗi na Kai',
+        'tax_summary': 'Takaicin Haraji',
+        'Review all possible deductions to reduce taxable income': 'Duba duk ragi masu yiwuwa don rage kudin da za a biya haraji',
+        'File your taxes early to avoid penalties': 'Gabatar da harajinka da wuri don gujewa hukunci',
+        'Keep detailed records of all deductible expenses': 'Ajiye cikakkun bayanai na duk abubuwan kashewa da za a iya cirewa',
+        'Consult a tax professional for complex situations': 'Tuntuɓi ƙwararren haraji don yanayi masu sarƙaƙiya',
+        'tax_category_office_admin': 'Ofis da Gudanarwa',
+        'tax_category_staff_wages': 'Ma\'aikata da Albashi',
+        'tax_category_business_travel': 'Balaguro da Sufuri na Kasuwanci',
+        'tax_category_rent_utilities': 'Kudin Haya da Kayayyaki',
+        'tax_category_marketing_sales': 'Talla da Sayarwa',
+        'tax_category_cogs': 'Kudin Kayayyakin da aka Sayar (COGS)',
+        'tax_category_statutory_legal': 'Gudummawa ta Dokoki da Shari\'a'
     }
 }
