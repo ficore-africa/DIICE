@@ -1,12 +1,10 @@
 {% extends "base.html" %}
 {% block head %}
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<!-- Ensure Bootstrap JS is included -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 {% endblock %}
 {% block title %}{{ t('tax_calculate_new', default='Calculate Tax') }}{% endblock %}
 {% block content %}
-<!-- Add CSRF meta tag for AJAX submissions -->
 <meta name="csrf-token" content="{{ csrf_token() }}">
 
 <div class="container mt-4">
@@ -15,7 +13,6 @@
     {% set subtitle = t('tax_calculate_description', default='Enter your annual income, rent expenses, pension contributions, and deductions to calculate your tax liability') %}
     {% include 'tool_header.html' %}
 
-    <!-- Navigation Breadcrumb -->
     <nav aria-label="breadcrumb" class="mb-4">
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="{{ url_for('tax.index') }}">{{ t('tax_calculator_title', default='Tax Calculator') }}</a></li>
@@ -41,7 +38,7 @@
                                     {% endfor %}
                                 </div>
                             {% endif %}
-                            <small class="form-text text-muted">{{ t('tax_annual_income_help', default='Enter your total annual income before deductions (NGN)') }}</small>
+                            <small class="form-text text-muted">{{ t('tax_income_help', default='Enter your total annual income before deductions (NGN)') }}</small>
                         </div>
 
                         <!-- Annual Rent Expenses -->
@@ -75,7 +72,7 @@
                         <!-- Tax Year -->
                         <div class="mb-3">
                             <label for="tax_year" class="form-label">{{ form.tax_year.label }}</label>
-                            <input type="text" class="form-control" id="tax_year" name="tax_year" placeholder="2026" value="{{ form.tax_year.data or current_year }}">
+                            <input type="text" class="form-control" id="tax_year" name="tax_year" placeholder="{{ current_year }}" value="{{ form.tax_year.data or current_year }}">
                             {% if form.tax_year.errors %}
                                 <div class="invalid-feedback d-block">
                                     {% for error in form.tax_year.errors %}
@@ -83,7 +80,7 @@
                                     {% endfor %}
                                 </div>
                             {% endif %}
-                            <small class="form-text text-muted">{{ t('tax_year_help', default='Enter the tax year for this calculation (e.g., 2026)') }}</small>
+                            <small class="form-text text-muted">{{ t('tax_year_help', default='Enter the tax year for this calculation (e.g., 2025)') }}</small>
                         </div>
 
                         <!-- Entity Type -->
@@ -263,7 +260,7 @@
                         </p>
                     {% else %}
                         <!-- PIT Information -->
-                        <h6>{{ t('tax_progressive_tax_rates_title', default='Progressive Tax Rates (NTA 2026)') }}</h6>
+                        <h6>{{ t('tax_progressive_tax_rates_title', default='Progressive Tax Rates (NTA 2025)') }}</h6>
                         <ul class="list-unstyled">
                             <li><strong>₦0 - ₦800,000:</strong> 0%</li>
                             <li><strong>₦800,001 - ₦3,000,000:</strong> 15%</li>
@@ -305,7 +302,7 @@
                                 <span class="badge bg-primary me-2">4</span>
                                 <strong>{{ t('tax_step4_title', default='Progressive Tax') }}</strong>
                             </div>
-                            <p class="small text-muted mb-0">{{ t('tax_step4_info', default='Apply NTA 2026 progressive tax bands') }}</p>
+                            <p class="small text-muted mb-0">{{ t('tax_step4_info', default='Apply NTA 2025 progressive tax bands') }}</p>
                         </div>
                     {% endif %}
                 </div>
@@ -365,7 +362,6 @@
 document.addEventListener('DOMContentLoaded', function() {
     let deductionIndex = {{ form.deductions.entries|length }};
 
-    // Deduction category options
     const deductionCategories = [
         {value: 'office_admin', label: '{{ t("tax_category_office_admin", default="Office Administration") | e }}'},
         {value: 'staff_wages', label: '{{ t("tax_category_staff_wages", default="Staff Wages") | e }}'},
@@ -376,7 +372,6 @@ document.addEventListener('DOMContentLoaded', function() {
         {value: 'statutory_contributions', label: '{{ t("tax_category_statutory_contributions", default="Statutory Contributions") | e }}'}
     ];
 
-    // Add new deduction field
     window.addDeduction = function() {
         if (deductionIndex >= 20) {
             showAlert('warning', '{{ t("tax_max_deductions", default="Maximum of 20 deductions allowed.") | e }}');
@@ -415,17 +410,15 @@ document.addEventListener('DOMContentLoaded', function() {
         updateSummary();
     };
 
-    // Remove deduction field
     window.removeDeduction = function(button) {
         button.closest('.deduction-entry').remove();
         updateSummary();
     };
 
-    // Update tax summary dynamically
     function updateSummary() {
         const incomeInput = parseFloat(document.getElementById('income').value) || 0;
         const rentInput = parseFloat(document.getElementById('rent_expenses').value) || 0;
-        const pensionInput = parseFloat(document.getElementById('pension_contribution').value) || (incomeInput * 0.08); // Default 8% for employees
+        const pensionInput = parseFloat(document.getElementById('pension_contribution').value) || (incomeInput * 0.08);
         const deductionInputs = document.querySelectorAll('.deduction-input[type="number"]');
         let totalDeductions = rentInput + pensionInput;
         deductionInputs.forEach(input => {
@@ -437,10 +430,9 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('summary-income').textContent = incomeInput.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         document.getElementById('summary-deductions').textContent = totalDeductions.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         document.getElementById('summary-taxable-income').textContent = taxableIncome.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        document.getElementById('summary-total-tax').textContent = '0.00'; // Tax calculated on submission
+        document.getElementById('summary-total-tax').textContent = '0.00';
     }
 
-    // Show alert messages
     function showAlert(type, message) {
         const alertContainer = document.createElement('div');
         alertContainer.className = `alert alert-${type} alert-dismissible fade show`;
@@ -452,7 +444,6 @@ document.addEventListener('DOMContentLoaded', function() {
         setTimeout(() => alertContainer.remove(), 5000);
     }
 
-    // Handle form submission via AJAX
     document.getElementById('tax-form').addEventListener('submit', function(e) {
         e.preventDefault();
         const formData = new FormData(this);
@@ -493,12 +484,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Update summary on input change
     document.querySelectorAll('.income-input, .deduction-input').forEach(input => {
         input.addEventListener('input', updateSummary);
     });
 
-    // Initialize summary
     updateSummary();
 });
 </script>
@@ -511,58 +500,24 @@ document.addEventListener('DOMContentLoaded', function() {
     .deduction-entry .card:hover {
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
-    .border-success {
-        border-color: #28a745 !important;
-    }
-    .border-info {
-        border-color: #17a2b8 !important;
-    }
-    .border-warning {
-        border-color: #ffc107 !important;
-    }
-    .bg-success {
-        background-color: #28a745 !important;
-    }
-    .bg-info {
-        background-color: #17a2b8 !important;
-    }
-    .bg-warning {
-        background-color: #ffc107 !important;
-    }
-    .bg-primary {
-        background-color: #007bff !important;
-    }
-    .form-control:focus,
-    .form-select:focus,
-    .btn:focus {
+    .border-success { border-color: #28a745 !important; }
+    .border-info { border-color: #17a2b8 !important; }
+    .border-warning { border-color: #ffc107 !important; }
+    .bg-success { background-color: #28a745 !important; }
+    .bg-info { background-color: #17a2b8 !important; }
+    .bg-warning { background-color: #ffc107 !important; }
+    .bg-primary { background-color: #007bff !important; }
+    .form-control:focus, .form-select:focus, .btn:focus {
         outline: 3px solid #0066cc;
         outline-offset: 2px;
         box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.3);
     }
-    .badge.bg-success {
-        background-color: #155724 !important;
-        color: #ffffff !important;
-    }
-    .badge.bg-info {
-        background-color: #0c5460 !important;
-        color: #ffffff !important;
-    }
-    .badge.bg-warning {
-        background-color: #856404 !important;
-        color: #ffffff !important;
-    }
-    .alert-warning {
-        background-color: #fff3cd;
-        border-color: #ffeaa7;
-        color: #856404;
-    }
-    #taxBreakdownModal .modal-body {
-        max-height: 60vh;
-        overflow-y: auto;
-    }
-    #taxBreakdownModal .modal-dialog {
-        max-width: 800px;
-    }
+    .badge.bg-success { background-color: #155724 !important; color: #ffffff !important; }
+    .badge.bg-info { background-color: #0c5460 !important; color: #ffffff !important; }
+    .badge.bg-warning { background-color: #856404 !important; color: #ffffff !important; }
+    .alert-warning { background-color: #fff3cd; border-color: #ffeaa7; color: #856404; }
+    #taxBreakdownModal .modal-body { max-height: 60vh; overflow-y: auto; }
+    #taxBreakdownModal .modal-dialog { max-width: 800px; }
 </style>
 {% endblock %}
 {% endblock %}
