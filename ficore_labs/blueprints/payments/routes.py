@@ -1,4 +1,3 @@
-```python
 from flask import Blueprint, render_template, redirect, url_for, flash, request, Response
 from flask_login import login_required, current_user
 from flask_wtf import FlaskForm
@@ -541,4 +540,3 @@ def share():
             'success': False,
             'message': trans('payments_share_error', default='Error sharing payment')
         }, 500)
-```
