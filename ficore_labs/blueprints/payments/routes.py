@@ -215,6 +215,9 @@ def index():
         cleaned_payments = []
         for payment in payments:
             try:
+                for field in ['party_name', 'contact', 'description']:
+                    if field in payment and isinstance(payment[field], str):
+                        payment[field] = utils.sanitize_input(payment[field], max_length=1000)
                 cleaned_payment = serialize_for_json(payment)
                 cleaned_payments.append(cleaned_payment)
             except Exception as e:
@@ -255,6 +258,9 @@ def manage():
         cleaned_payments = []
         for payment in payments:
             try:
+                for field in ['party_name', 'contact', 'description']:
+                    if field in payment and isinstance(payment[field], str):
+                        payment[field] = utils.sanitize_input(payment[field], max_length=1000)
                 cleaned_payment = serialize_for_json(payment)
                 cleaned_payments.append(cleaned_payment)
             except Exception as e:
