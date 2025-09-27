@@ -169,6 +169,7 @@ def new():
     
     form = TaxForm(formdata=request.form if request.method == 'POST' else None)
     db = get_mongo_db()
+    current_year = datetime.now().year  # Compute current year for template
 
     is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json
 
@@ -210,13 +211,16 @@ def new():
                         'taxable_income_raw': 0.0,
                         'total_tax': format_currency(0.0),
                         'total_tax_raw': 0.0,
-                        'created_at': 'N/A'
+                        'created_at': 'N/A',
+                        'tax_year': current_year,
+                        'entity_type': 'sole_proprietor'
                     },
                     tips=[],
                     insights=[],
                     activities=activities,
                     tool_title=trans('tax_calculator_title', default='Tax Calculator'),
-                    active_tab='calculate-tax'
+                    active_tab='calculate-tax',
+                    current_year=current_year
                 ), 400
 
             try:
@@ -307,13 +311,16 @@ def new():
                             'taxable_income_raw': 0.0,
                             'total_tax': format_currency(0.0),
                             'total_tax_raw': 0.0,
-                            'created_at': 'N/A'
+                            'created_at': 'N/A',
+                            'tax_year': current_year,
+                            'entity_type': 'sole_proprietor'
                         },
                         tips=[],
                         insights=[],
                         activities=activities,
                         tool_title=trans('tax_calculator_title', default='Tax Calculator'),
-                        active_tab='calculate-tax'
+                        active_tab='calculate-tax',
+                        current_year=current_year
                     )
             except TaxCalculationError as e:
                 current_app.logger.error(f"Tax calculation error for user {current_user.id}: {str(e)}", extra={'session_id': session_id})
@@ -337,13 +344,16 @@ def new():
                         'taxable_income_raw': 0.0,
                         'total_tax': format_currency(0.0),
                         'total_tax_raw': 0.0,
-                        'created_at': 'N/A'
+                        'created_at': 'N/A',
+                        'tax_year': current_year,
+                        'entity_type': 'sole_proprietor'
                     },
                     tips=[],
                     insights=[],
                     activities=activities,
                     tool_title=trans('tax_calculator_title', default='Tax Calculator'),
-                    active_tab='calculate-tax'
+                    active_tab='calculate-tax',
+                    current_year=current_year
                 ), 400
 
         calculations = list(db.tax_calculations.find(filter_criteria).sort('created_at', -1).limit(10))
@@ -362,7 +372,7 @@ def new():
                 'taxable_income_raw': float(calc.get('taxable_income', 0.0)),
                 'total_tax': format_currency(calc.get('total_tax', 0.0)),
                 'total_tax_raw': float(calc.get('total_tax', 0.0)),
-                'tax_year': calc.get('tax_year', datetime.now().year),
+                'tax_year': calc.get('tax_year', current_year),
                 'entity_type': calc.get('entity_type', 'sole_proprietor'),
                 'created_at': calc.get('created_at').strftime('%Y-%m-%d') if calc.get('created_at') else 'N/A'
             }
@@ -383,7 +393,7 @@ def new():
                 'taxable_income_raw': 0.0,
                 'total_tax': format_currency(0.0),
                 'total_tax_raw': 0.0,
-                'tax_year': datetime.now().year,
+                'tax_year': current_year,
                 'entity_type': 'sole_proprietor',
                 'created_at': 'N/A'
             }
@@ -416,7 +426,8 @@ def new():
             insights=insights,
             activities=activities,
             tool_title=trans('tax_calculator_title', default='Tax Calculator'),
-            active_tab='calculate-tax'
+            active_tab='calculate-tax',
+            current_year=current_year
         )
     except Exception as e:
         current_app.logger.exception(f"Unexpected error in tax.new: {str(e)}", extra={'session_id': session_id})
@@ -440,7 +451,7 @@ def new():
                 'taxable_income_raw': 0.0,
                 'total_tax': format_currency(0.0),
                 'total_tax_raw': 0.0,
-                'tax_year': datetime.now().year,
+                'tax_year': current_year,
                 'entity_type': 'sole_proprietor',
                 'created_at': 'N/A'
             },
@@ -448,7 +459,8 @@ def new():
             insights=[],
             activities=activities,
             tool_title=trans('tax_calculator_title', default='Tax Calculator'),
-            active_tab='calculate-tax'
+            active_tab='calculate-tax',
+            current_year=current_year
         ), 500
 
 @tax_bp.route('/dashboard', methods=['GET'])
@@ -649,6 +661,3 @@ def history():
             calculations={},
             tool_title=trans('tax_history', default='Tax History')
         )
-
-
-
