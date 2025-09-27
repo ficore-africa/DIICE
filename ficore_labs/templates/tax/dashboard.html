@@ -1,45 +1,9 @@
-<script type="text/javascript">
-        var gk_isXlsx = false;
-        var gk_xlsxFileLookup = {};
-        var gk_fileData = {};
-        function filledCell(cell) {
-          return cell !== '' && cell != null;
-        }
-        function loadFileData(filename) {
-        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
-            try {
-                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
-                var firstSheetName = workbook.SheetNames[0];
-                var worksheet = workbook.Sheets[firstSheetName];
-
-                // Convert sheet to JSON to filter blank rows
-                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
-                // Filter out blank rows (rows where all cells are empty, null, or undefined)
-                var filteredData = jsonData.filter(row => row.some(filledCell));
-
-                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
-                var headerRowIndex = filteredData.findIndex((row, index) =>
-                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
-                );
-                // Fallback
-                if (headerRowIndex === -1 || headerRowIndex > 25) {
-                  headerRowIndex = 0;
-                }
-
-                // Convert filtered JSON back to CSV
-                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
-                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
-                return csv;
-            } catch (e) {
-                console.error(e);
-                return "";
-            }
-        }
-        return gk_fileData[filename] || "";
-        }
-        </script>{% extends "base.html" %}
+{% extends "base.html" %}
 {% block title %}{{ t('tax_dashboard', default='Tax Dashboard') }}{% endblock %}
 {% block content %}
+<!-- Add CSRF meta tag for potential AJAX interactions -->
+<meta name="csrf-token" content="{{ csrf_token() }}">
+
 <div class="container mt-4">
     {% set tool_name = 'tax_dashboard' %}
     {% set tool_icon = 'fa-chart-pie' %}
@@ -55,61 +19,137 @@
     </nav>
 
     {% if latest_calculation.id %}
-        <div class="card shadow-sm mb-4">
-            <div class="card-header bg-primary text-white">
-                <h5 class="mb-0">{{ t('tax_latest_calculation', default='Latest Tax Calculation') }} - {{ latest_calculation.created_at }}</h5>
+        <div class="row">
+            <!-- Latest Calculation -->
+            <div class="col-lg-8">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">{{ t('tax_latest_calculation', default='Latest Tax Calculation') }} - {{ latest_calculation.created_at }}</h5>
+                        <span class="badge bg-info">{{ t('tax_entity_type', default='Entity Type') }}: {{ t('tax_entity_' + latest_calculation.entity_type, default=latest_calculation.entity_type.replace('_', ' ').title()) }}</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center mb-3">
+                            <div class="col-md-3">
+                                <small class="text-muted d-block">{{ t('tax_income', default='Income') }}</small>
+                                <strong class="text-primary">{{ latest_calculation.income }}</strong>
+                            </div>
+                            <div class="col-md-3">
+                                <small class="text-muted d-block">{{ t('tax_total_deductions', default='Total Deductions') }}</small>
+                                <strong class="text-info">{{ latest_calculation.deductions | sum(attribute='amount') | format_currency }}</strong>
+                            </div>
+                            <div class="col-md-3">
+                                <small class="text-muted d-block">{{ t('tax_taxable_income', default='Taxable Income') }}</small>
+                                <strong class="text-warning">{{ latest_calculation.taxable_income }}</strong>
+                            </div>
+                            <div class="col-md-3">
+                                <small class="text-muted d-block">{{ t('tax_total_tax', default='Total Tax') }}</small>
+                                <strong class="text-danger">{{ latest_calculation.total_tax }}</strong>
+                            </div>
+                        </div>
+
+                        {% if latest_calculation.deductions %}
+                            <div class="mt-3">
+                                <small class="text-muted d-block mb-1"><i class="fas fa-receipt text-warning me-1"></i>{{ t('tax_deductions', default='Deductions') }}</small>
+                                <ul class="list-unstyled small">
+                                    {% for item in latest_calculation.deductions %}
+                                        <li class="mb-1">{{ item.name }}: {{ item.amount | format_currency }} {% if item.note %}({{ item.note | e }}){% endif %}</li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        {% endif %}
+
+                        <div class="mt-3">
+                            <small class="text-muted d-block mb-1">{{ t('tax_year', default='Tax Year') }}: {{ latest_calculation.tax_year }}</small>
+                        </div>
+                    </div>
+                    <div class="card-footer text-center">
+                        <button type="button" class="btn btn-info" data-bs-toggle="modal" data-bs-target="#taxBreakdownModal">{{ t('tax_view_breakdown', default='View Breakdown') }}</button>
+                    </div>
+                </div>
             </div>
-            <div class="card-body">
-                <div class="row text-center">
-                    <div class="col-md-3">
-                        <small class="text-muted d-block">{{ t('tax_income', default='Income') }}</small>
-                        <strong class="text-primary">{{ latest_calculation.income }}</strong>
+
+            <!-- Quick Actions and Insights -->
+            <div class="col-lg-4">
+                <!-- Quick Actions -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">{{ t('tax_quick_actions', default='Quick Actions') }}</h5>
                     </div>
-                    <div class="col-md-3">
-                        <small class="text-muted d-block">{{ t('tax_total_deductions', default='Total Deductions') }}</small>
-                        <strong class="text-warning">{{ latest_calculation.deductions | sum(attribute='amount') | format_currency }}</strong>
-                    </div>
-                    <div class="col-md-3">
-                        <small class="text-muted d-block">{{ t('tax_taxable_income', default='Taxable Income') }}</small>
-                        <strong class="text-info">{{ latest_calculation.taxable_income }}</strong>
-                    </div>
-                    <div class="col-md-3">
-                        <small class="text-muted d-block">{{ t('tax_total_tax', default='Total Tax') }}</small>
-                        <strong class="text-danger">{{ latest_calculation.total_tax }}</strong>
+                    <div class="card-body">
+                        <div class="d-grid gap-2">
+                            <a href="{{ url_for('tax.new') }}" class="btn btn-primary">{{ t('tax_calculate_new', default='Calculate Tax') }}</a>
+                            <a href="{{ url_for('tax.history') }}" class="btn btn-secondary">{{ t('tax_view_history', default='View History') }}</a>
+                        </div>
                     </div>
                 </div>
 
-                {% if latest_calculation.deductions %}
-                    <div class="mt-3">
-                        <h6>{{ t('tax_deductions', default='Deductions') }}</h6>
-                        <ul class="list-unstyled">
-                            {% for item in latest_calculation.deductions %}
-                                <li class="mb-1">{{ item.name }}: {{ item.amount | format_currency }} {% if item.note %}({{ item.note }}){% endif %}</li>
-                            {% endfor %}
-                        </ul>
+                <!-- Insights -->
+                {% if insights %}
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">{{ t('tax_insights', default='Insights') }}</h5>
+                        </div>
+                        <div class="card-body">
+                            <ul class="list-group list-group-flush">
+                                {% for insight in insights %}
+                                    <li class="list-group-item">{{ t(insight, default=insight) }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
                     </div>
                 {% endif %}
             </div>
         </div>
 
-        <!-- Insights -->
-        {% if insights %}
-            <div class="card shadow-sm mb-4">
-                <div class="card-header bg-light">
-                    <h6 class="mb-0"><i class="fas fa-lightbulb me-2"></i>{{ t('tax_insights', default='Insights') }}</h6>
-                </div>
-                <div class="card-body">
-                    <ul class="list-unstyled">
-                        {% for insight in insights %}
-                            <li class="mb-2"><i class="fas fa-info-circle text-info me-2"></i>{{ t(insight, default=insight) }}</li>
-                        {% endfor %}
-                    </ul>
+        <!-- Tax Breakdown Modal -->
+        <div class="modal fade" id="taxBreakdownModal" tabindex="-1" aria-labelledby="taxBreakdownModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="taxBreakdownModalLabel">{{ t('tax_breakdown', default='Tax Breakdown') }}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        {% if latest_calculation.calculation_details %}
+                            {% if latest_calculation.entity_type == 'sole_proprietor' %}
+                                <h6>{{ t('tax_step1_net_business_profit', default='Step 1: Net Business Profit') }}</h6>
+                                <p>{{ t('tax_total_income', default='Total Income') }}: {{ latest_calculation.calculation_details.step1_net_business_profit.total_income | format_currency }}</p>
+                                <p>{{ t('tax_total_deductible_expenses', default='Total Deductible Expenses') }}: {{ latest_calculation.calculation_details.step1_net_business_profit.total_deductible_expenses | format_currency }}</p>
+                                <p>{{ t('tax_net_business_profit', default='Net Business Profit') }}: {{ latest_calculation.calculation_details.step1_net_business_profit.net_business_profit | format_currency }}</p>
+                                <h6>{{ t('tax_step2_statutory_deductions', default='Step 2: Statutory Deductions') }}</h6>
+                                <p>{{ t('tax_statutory_expenses', default='Statutory Expenses') }}: {{ latest_calculation.calculation_details.step2_statutory_deductions.statutory_legal_expenses | format_currency }}</p>
+                                <p>{{ t('tax_adjusted_profit', default='Adjusted Profit') }}: {{ latest_calculation.calculation_details.step2_statutory_deductions.adjusted_profit_after_statutory | format_currency }}</p>
+                                <h6>{{ t('tax_step3_rent_relief', default='Step 3: Rent Relief') }}</h6>
+                                <p>{{ t('tax_rent_relief', default='Rent Relief') }}: {{ latest_calculation.calculation_details.step3_rent_relief.calculated_rent_relief | format_currency }}</p>
+                                <p>{{ t('tax_taxable_income', default='Taxable Income') }}: {{ latest_calculation.calculation_details.step3_rent_relief.taxable_income_after_rent_relief | format_currency }}</p>
+                                <h6>{{ t('tax_step4_progressive_tax', default='Step 4: Progressive Tax') }}</h6>
+                                {% for band in latest_calculation.calculation_details.step4_progressive_tax.tax_band_breakdown %}
+                                    <p>{{ band.band_description }}: {{ band.tax_in_band | format_currency }}</p>
+                                {% endfor %}
+                                <p>{{ t('tax_total_tax_liability', default='Total Tax Liability') }}: {{ latest_calculation.calculation_details.step4_progressive_tax.total_tax_liability | format_currency }}</p>
+                            {% else %}
+                                <h6>{{ t('tax_cit_calculation', default='CIT Calculation') }}</h6>
+                                <p>{{ t('tax_total_revenue', default='Total Revenue') }}: {{ latest_calculation.calculation_details.total_revenue | format_currency }}</p>
+                                <p>{{ t('tax_taxable_income', default='Taxable Income') }}: {{ latest_calculation.calculation_details.taxable_income | format_currency }}</p>
+                                <p>{{ t('tax_tax_rate', default='Tax Rate') }}: {{ latest_calculation.calculation_details.tax_rate | float * 100 }}%</p>
+                                <p>{{ t('tax_total_tax_liability', default='Total Tax Liability') }}: {{ latest_calculation.calculation_details.tax_liability | format_currency }}</p>
+                                {% if latest_calculation.calculation_details.exemption_applied %}
+                                    <p>{{ t('tax_exemption_note', default='Exemption Applied') }}: {{ latest_calculation.calculation_details.exemption_reason }}</p>
+                                {% endif %}
+                            {% endif %}
+                        {% else %}
+                            <p>{{ t('tax_breakdown_unavailable', default='No detailed breakdown available for this calculation.') }}</p>
+                        {% endif %}
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ t('general_close', default='Close') }}</button>
+                    </div>
                 </div>
             </div>
-        {% endif %}
+        </div>
     {% else %}
         <div class="text-center py-5">
-            <i class="fas fa-calculator fa-4x mb-3 text-muted"></i>
+            <i class="fas fa-chart-pie fa-4x mb-3 text-muted"></i>
             <h4 class="text-muted">{{ t('tax_no_calculations_empty_state', default='No tax calculations yet') }}</h4>
             <p class="text-muted">{{ t('tax_get_started_description', default='Calculate your first tax to see your tax liability') }}</p>
             <a href="{{ url_for('tax.new') }}" class="btn btn-primary btn-lg">
@@ -118,38 +158,21 @@
         </div>
     {% endif %}
 
-    <!-- Quick Actions -->
-    <div class="row mt-4">
-        <div class="col-12">
-            <div class="card bg-light">
-                <div class="card-body text-center">
-                    <h6 class="mb-3">{{ t('tax_quick_actions', default='Quick Actions') }}</h6>
-                    <a href="{{ url_for('tax.new') }}" class="btn btn-primary me-2">
-                        <i class="fas fa-plus me-1"></i>{{ t('tax_calculate_new', default='Calculate Tax') }}
-                    </a>
-                    <a href="{{ url_for('tax.history') }}" class="btn btn-outline-info">
-                        <i class="fas fa-history me-1"></i>{{ t('tax_view_history', default='View History') }}
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- Recent Activity -->
     {% if activities %}
         <div class="card shadow-sm mt-4">
-            <div class="card-header bg-light">
-                <h6 class="mb-0"><i class="fas fa-clock me-2"></i>{{ t('general_recent_activity', default='Recent Activity') }}</h6>
+            <div class="card-header">
+                <h5 class="mb-0">{{ t('general_recent_activity', default='Recent Activity') }}</h5>
             </div>
             <div class="card-body">
-                <div class="list-group list-group-flush">
+                <ul class="list-group list-group-flush">
                     {% for activity in activities[:5] %}
-                        <div class="list-group-item border-0 px-0">
-                            <small class="text-muted">{{ activity.timestamp | format_datetime }}</small>
-                            <div>{{ activity.description }}</div>
-                        </div>
+                        <li class="list-group-item">
+                            <small class="text-muted">{{ activity.timestamp | format_datetime }}</small><br>
+                            {{ activity.description }}
+                        </li>
                     {% endfor %}
-                </div>
+                </ul>
             </div>
         </div>
     {% endif %}
