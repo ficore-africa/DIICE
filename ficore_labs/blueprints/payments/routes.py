@@ -232,11 +232,16 @@ def index():
     """List all payment cashflows for the current user."""
     try:
         db = utils.get_mongo_db()
-        utils.audit_datetime_fields(db, 'cashflows')
         query = {'user_id': str(current_user.id), 'type': 'payment'}
-        
+
         payments = [normalize_datetime(doc) for doc in fetch_payments_with_fallback(db, query)]
         cleaned_payments = []
+        payments_skipped = 0
+        payments_skipped_ids = []
+        import os
+        error_log_path = os.path.join(os.path.dirname(__file__), 'skipped_payments.log')
+        from pymongo import UpdateOne
+        db_ops = []
         for payment in payments:
             try:
                 logger.debug(f"Raw payment before serialization in index: {payment}")
@@ -246,26 +251,41 @@ def index():
                 cleaned_payment['formatted_date'] = utils.format_date(payment['created_at'], format_type='short')
                 cleaned_payments.append(cleaned_payment)
             except Exception as e:
-                logger.warning(f"Failed to serialize payment {payment.get('_id', 'unknown')} in index: {str(e)}")
+                payment_id = str(payment.get('_id', 'unknown'))
+                logger.warning(f"Failed to serialize payment {payment_id} in index: {str(e)}")
+                payments_skipped += 1
+                payments_skipped_ids.append(payment_id)
+                # Log to a separate file
+                try:
+                    with open(error_log_path, 'a', encoding='utf-8') as f:
+                        f.write(f"{datetime.utcnow().isoformat()} | Skipped payment ID: {payment_id} | Error: {str(e)}\n")
+                except Exception as file_err:
+                    logger.error(f"Failed to write to skipped_payments.log: {str(file_err)}")
+                # Auto-mark as invalid in DB
+                if payment_id != 'unknown':
+                    db_ops.append(UpdateOne({'_id': payment['_id']}, {'$set': {'status': 'invalid'}}, upsert=False))
                 continue
-        
-        if not cleaned_payments and payments:
-            logger.error(
-                f"All payments failed serialization for user {current_user.id}",
-                extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
-            )
-            flash(trans('payments_fetch_error', default='An error occurred while loading your payments. Please try again.'), 'danger')
-            return redirect(url_for('dashboard.index'))
-        
+        # Bulk update invalid status for skipped records
+        if db_ops:
+            try:
+                db.cashflows.bulk_write(db_ops)
+            except Exception as bulk_err:
+                logger.error(f"Failed to bulk mark skipped payments as invalid: {str(bulk_err)}")
+
+        payments_warning = payments_skipped > 0
+
         category_stats = utils.calculate_payment_category_stats(cleaned_payments)
-        
+
         return render_template(
             'payments/index.html',
             payments=cleaned_payments,
             category_stats=category_stats,
             title=trans('payments_title', default='Money Out', lang=session.get('lang', 'en')),
             can_interact=utils.can_user_interact(current_user),
-            expense_categories=expense_categories
+            expense_categories=expense_categories,
+            payments_warning=payments_warning,
+            payments_skipped=payments_skipped,
+            payments_skipped_ids=payments_skipped_ids
         )
     except Exception as e:
         logger.error(

@@ -1255,46 +1255,6 @@ def safe_find_records(db, query, sort_field='created_at', sort_direction=-1):
             logger.error(f"Fallback query failed: {str(e)}", extra={'session_id': session.get('sid', 'no-session-id')})
             raise
 
-def audit_datetime_fields(db, collection_name='cashflows'):
-    """
-    Audit datetime fields in a collection to identify inconsistent created_at values.
-    This function proactively identifies and logs issues for manual or automated correction.
-    
-    Args:
-        db: MongoDB database instance
-        collection_name: Name of the collection to audit
-    
-    Returns:
-        list: List of issues found
-    """
-    try:
-        collection = db[collection_name]
-        datetime_fields = ['created_at', 'updated_at']
-        
-        # Find documents with datetime fields
-        query = {'$or': [{field: {'$exists': True}} for field in datetime_fields]}
-        issues = []
-        
-        for doc in collection.find(query):
-            for field in datetime_fields:
-                if field in doc:
-                    value = doc[field]
-                    if not isinstance(value, datetime):
-                        issues.append(f"Non-datetime {field} in {collection_name} ID {doc['_id']}: {type(value)}")
-                    elif value.tzinfo is None:
-                        issues.append(f"Naive datetime {field} in {collection_name} ID {doc['_id']}")
-        
-        if issues:
-            logger.warning(f"Found {len(issues)} datetime issues in {collection_name}: {issues[:10]}", 
-                         extra={'session_id': session.get('sid', 'no-session-id')})
-        
-        return issues
-        
-    except Exception as e:
-        logger.error(f"Failed to audit datetime fields in {collection_name}: {str(e)}", 
-                    exc_info=True, extra={'session_id': session.get('sid', 'no-session-id')})
-        raise
-
 def bulk_clean_cashflow_data(db, user_id=None):
     """
     Bulk clean cashflow data for a specific user or all users.
@@ -2754,3 +2714,7 @@ def create_dashboard_safe_response(stats, recent_data, additional_data=None):
             'timestamp': datetime.now(timezone.utc).isoformat()
 
         }
+
+
+
+

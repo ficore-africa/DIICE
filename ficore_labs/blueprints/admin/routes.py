@@ -1,3 +1,45 @@
+from flask import Blueprint, render_template, redirect, url_for, flash, request, session
+from flask_login import login_required, current_user
+from utils import get_mongo_db
+from bson import ObjectId
+import os
+
+admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
+
+@admin_bp.route('/invalid', methods=['GET'])
+@login_required
+def invalid_payments():
+    if not current_user.is_authenticated or current_user.role != 'admin':
+        flash('Admin access required.', 'danger')
+        return redirect(url_for('dashboard.index'))
+    db = get_mongo_db()
+    payments = list(db.cashflows.find({'status': 'invalid'}))
+    # Try to load error logs for each payment
+    error_log_path = os.path.join(os.path.dirname(__file__), 'skipped_payments.log')
+    error_logs = {}
+    if os.path.exists(error_log_path):
+        with open(error_log_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                if '| Skipped payment ID:' in line:
+                    parts = line.split('|')
+                    if len(parts) > 2:
+                        pid = parts[1].split(':')[-1].strip()
+                        error_logs[pid] = line.strip()
+    for p in payments:
+        p['id'] = str(p.get('_id', ''))
+        p['error_log'] = error_logs.get(p['id'], None)
+    return render_template('admin/invalid.html', payments=payments)
+
+@admin_bp.route('/clean_invalid', methods=['POST'])
+@login_required
+def clean_invalid_payments():
+    if not current_user.is_authenticated or current_user.role != 'admin':
+        flash('Admin access required.', 'danger')
+        return redirect(url_for('dashboard.index'))
+    db = get_mongo_db()
+    result = db.cashflows.delete_many({'status': 'invalid'})
+    flash(f"Cleaned up {result.deleted_count} invalid/skipped payment records.", 'success')
+    return redirect(url_for('admin.invalid_payments'))
 import logging
 from bson import ObjectId, errors
 from flask import Blueprint, render_template, redirect, url_for, flash, request, session, Response, send_file
