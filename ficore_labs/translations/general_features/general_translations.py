@@ -431,6 +431,7 @@ GENERAL_TRANSLATIONS = {
         'general_category': 'Category',
         'general_home': 'Home',
         'general_dashboard': 'Dashboard',
+        'general_breadcrumb_dashboard': 'Dashboard',
         'general_about': 'About Us',
         'general_contact': 'Contact',
         'general_help': 'Help',
@@ -1525,6 +1526,7 @@ GENERAL_TRANSLATIONS = {
         # General Navigation & UI
         'general_home': 'Gida',
         'general_dashboard': 'Allo',
+        'general_breadcrumb_dashboard': 'Allon Duka',
         'general_about': 'Game da Mu',
         'general_contact': 'Tuntuɓa',
         'general_help': 'Taimako',
