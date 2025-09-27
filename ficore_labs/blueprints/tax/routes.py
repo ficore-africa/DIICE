@@ -21,13 +21,13 @@ tax_bp = Blueprint(
 
 # Define valid deduction categories
 DEDUCTION_CATEGORIES = [
-    ('office_admin', 'Office Administration'),
-    ('staff_wages', 'Staff Wages'),
-    ('business_travel', 'Business Travel'),
-    ('rent_utilities', 'Rent and Utilities'),
-    ('marketing_sales', 'Marketing and Sales'),
-    ('cogs', 'Cost of Goods Sold'),
-    ('statutory_contributions', 'Statutory and Legal Contributions')
+    ('office_admin', trans('tax_category_office_admin', default='Office Administration')),
+    ('staff_wages', trans('tax_category_staff_wages', default='Staff Wages')),
+    ('business_travel', trans('tax_category_business_travel', default='Business Travel')),
+    ('rent_utilities', trans('tax_category_rent_utilities', default='Rent and Utilities')),
+    ('marketing_sales', trans('tax_category_marketing_sales', default='Marketing and Sales')),
+    ('cogs', trans('tax_category_cogs', default='Cost of Goods Sold')),
+    ('statutory_contributions', trans('tax_category_statutory_contributions', default='Statutory Contributions'))
 ]
 
 def strip_commas(value):
@@ -64,7 +64,7 @@ def sync_form_deductions_to_cashflows(user_id, tax_year, deductions, db):
                 'tax_year': tax_year,
                 'expense_category': item['category'],
                 'amount': float(item['amount']),
-                'party_name': bleach.clean(item['name']) or 'Tax Deduction',
+                'party_name': bleach.clean(item['name']) or trans('tax_deduction_default_name', default='Tax Deduction'),
                 'description': bleach.clean(item['name']),
                 'note': bleach.clean(item['note']) if item['note'] else None,
                 'created_at': datetime.utcnow()
@@ -76,14 +76,14 @@ def sync_form_deductions_to_cashflows(user_id, tax_year, deductions, db):
 
 class TaxItemForm(FlaskForm):
     name = StringField(
-        trans('tax_item_name', default='Item Name'),
+        trans('tax_item_name', default='Deduction Name'),
         validators=[
-            DataRequired(message=trans('tax_item_name_required', default='Item name is required')),
-            Length(min=2, max=50, message=trans('tax_item_name_length', default='Item name must be between 2 and 50 characters'))
+            DataRequired(message=trans('tax_item_name_required', default='Deduction name is required')),
+            Length(min=2, max=50, message=trans('tax_item_name_length', default='Deduction name must be between 2 and 50 characters'))
         ]
     )
     amount = FloatField(
-        trans('tax_item_amount', default='Amount'),
+        trans('tax_item_amount', default='Amount (NGN)'),
         filters=[strip_commas],
         validators=[
             DataRequired(message=trans('tax_item_amount_required', default='Amount is required')),
@@ -104,25 +104,33 @@ class TaxItemForm(FlaskForm):
             Length(max=200, message=trans('tax_item_note_length', default='Note must be less than 200 characters'))
         ]
     )
-    
+
     class Meta:
         csrf = False  # Disable CSRF for subform, as it's handled by the parent TaxForm
 
 class TaxForm(FlaskForm):
     income = FloatField(
-        trans('tax_income', default='Annual Income'),
+        trans('tax_annual_income', default='Annual Income (NGN)'),
         filters=[strip_commas],
         validators=[
             DataRequired(message=trans('tax_income_required', default='Annual income is required')),
-            NumberRange(min=0, max=10000000000, message=trans('tax_income_max', default='Income must be between 0 and 10 billion'))
+            NumberRange(min=0, max=10000000000, message=trans('tax_income_max', default='Annual income must be between 0 and 10 billion'))
         ]
     )
     rent_expenses = FloatField(
-        trans('rent_expenses', default='Annual Rent Expenses'),
+        trans('tax_annual_rent_expenses', default='Annual Rent Expenses (NGN)'),
         filters=[strip_commas],
         validators=[
             Optional(),
-            NumberRange(min=0, max=10000000000, message=trans('rent_expenses_max', default='Rent expenses must be between 0 and 10 billion'))
+            NumberRange(min=0, max=10000000000, message=trans('tax_rent_expenses_max', default='Annual rent expenses must be between 0 and 10 billion'))
+        ]
+    )
+    pension_contribution = FloatField(
+        trans('tax_pension_contribution', default='Annual Pension Contribution (NGN)'),
+        filters=[strip_commas],
+        validators=[
+            Optional(),
+            NumberRange(min=0, max=10000000000, message=trans('tax_pension_max', default='Pension contribution must be between 0 and 10 billion'))
         ]
     )
     deductions = FieldList(
@@ -139,10 +147,10 @@ class TaxForm(FlaskForm):
         ]
     )
     entity_type = StringField(
-        trans('entity_type', default='Entity Type'),
+        trans('tax_entity_type', default='Entity Type'),
         validators=[
-            DataRequired(message=trans('entity_type_required', default='Entity type is required')),
-            Length(max=50, message=trans('entity_type_length', default='Entity type must be less than 50 characters'))
+            DataRequired(message=trans('tax_entity_type_required', default='Entity type is required')),
+            Length(max=50, message=trans('tax_entity_type_length', default='Entity type must be less than 50 characters'))
         ]
     )
     submit = SubmitField(trans('tax_calculate', default='Calculate Tax'))
@@ -150,11 +158,12 @@ class TaxForm(FlaskForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         lang = session.get('lang', 'en')
-        self.income.label.text = trans('tax_income', lang) or 'Annual Income'
-        self.rent_expenses.label.text = trans('rent_expenses', lang) or 'Annual Rent Expenses'
-        self.tax_year.label.text = trans('tax_year', lang) or 'Tax Year'
-        self.entity_type.label.text = trans('entity_type', lang) or 'Entity Type'
-        self.submit.label.text = trans('tax_calculate', lang) or 'Calculate Tax'
+        self.income.label.text = trans('tax_annual_income', default='Annual Income (NGN)', lang=lang)
+        self.rent_expenses.label.text = trans('tax_annual_rent_expenses', default='Annual Rent Expenses (NGN)', lang=lang)
+        self.pension_contribution.label.text = trans('tax_pension_contribution', default='Annual Pension Contribution (NGN)', lang=lang)
+        self.tax_year.label.text = trans('tax_year', default='Tax Year', lang=lang)
+        self.entity_type.label.text = trans('tax_entity_type', default='Entity Type', lang=lang)
+        self.submit.label.text = trans('tax_calculate', default='Calculate Tax', lang=lang)
 
     def validate(self, extra_validators=None):
         if not super().validate(extra_validators):
@@ -165,7 +174,7 @@ class TaxForm(FlaskForm):
             for item in self.deductions.entries:
                 if not isinstance(item.form, TaxItemForm):
                     current_app.logger.warning(f"Invalid entry in deductions: {item.__dict__}",
-                                  extra={'session_id': session.get('sid', 'unknown')})
+                                              extra={'session_id': session.get('sid', 'unknown')})
                     self.deductions.errors.append(
                         trans('tax_invalid_item', default='Invalid deduction item format')
                     )
@@ -177,7 +186,7 @@ class TaxForm(FlaskForm):
                         trans('tax_invalid_category', default='Invalid deduction category')
                     )
                     return False
-                
+
                 if len(item_names) != len(set(item_names)):
                     self.deductions.errors.append(
                         trans('tax_duplicate_item_names', default='Deduction item names must be unique')
@@ -196,8 +205,8 @@ class TaxForm(FlaskForm):
             return True
         except Exception as e:
             current_app.logger.error(f"Error in TaxForm.validate: {str(e)}",
-                        exc_info=True, extra={'session_id': session.get('sid', 'unknown')})
-            self.deductions.errors.append(
+                                     exc_info=True, extra={'session_id': session.get('sid', 'unknown')})
+            self.form_errors.append(
                 trans('tax_validation_error', default='Error validating tax data.')
             )
             return False
@@ -218,7 +227,7 @@ def new():
     session_id = session.get('sid', str(uuid.uuid4()))
     session['sid'] = session_id
     current_app.logger.debug(f"Session data: {session}", extra={'session_id': session_id})
-    
+
     form = TaxForm(formdata=request.form if request.method == 'POST' else None)
     db = get_mongo_db()
     current_year = datetime.now().year
@@ -265,6 +274,7 @@ def new():
             try:
                 income = float(form.income.data)
                 rent_expenses = float(form.rent_expenses.data or 0.0)
+                pension_contribution = float(form.pension_contribution.data or (income * 0.08))  # Default 8% for employees
                 deductions = []
                 total_deductions = 0.0
                 for item in form.deductions.entries:
@@ -278,15 +288,23 @@ def new():
                         deductions.append(deduction_item)
                         total_deductions += deduction_item['amount']
 
-                # Add rent expenses as a deduction if provided
+                # Add rent expenses and pension as deductions if provided
                 if rent_expenses > 0:
                     deductions.append({
-                        'name': 'Rent Expenses',
+                        'name': trans('tax_rent_expenses', default='Rent Expenses'),
                         'amount': rent_expenses,
                         'category': 'rent_utilities',
-                        'note': 'Annual rent expenses from form'
+                        'note': trans('tax_rent_expenses_note', default='Annual rent expenses from form')
                     })
                     total_deductions += rent_expenses
+                if pension_contribution > 0:
+                    deductions.append({
+                        'name': trans('tax_pension_contribution', default='Pension Contribution'),
+                        'amount': pension_contribution,
+                        'category': 'statutory_contributions',
+                        'note': trans('tax_pension_note', default='Pension contribution from form or default 8%')
+                    })
+                    total_deductions += pension_contribution
 
                 tax_year = int(form.tax_year.data)
                 entity_type = form.entity_type.data
@@ -308,14 +326,14 @@ def new():
                 tax_result = calculate_tax_liability(current_user.id, tax_year, db)
                 if 'error' in tax_result:
                     raise TaxCalculationError(tax_result['error'])
-                
+
                 taxable_income = tax_result.get('summary', {}).get('taxable_income', 0.0)
                 total_tax = tax_result.get('final_tax_liability', 0.0)
 
                 # Validate taxable income
                 if taxable_income < 0:
                     current_app.logger.warning(f"Negative taxable income ({taxable_income}) for user {current_user.id} in tax year {tax_year}", 
-                                             extra={'session_id': session_id})
+                                              extra={'session_id': session_id})
                     error_message = trans('tax_negative_taxable', default='Taxable income is negative. Please review your deductions.')
                     if is_ajax:
                         return jsonify({'success': False, 'message': error_message, 'details': {'taxable_income': taxable_income}}), 400
@@ -517,9 +535,9 @@ def new():
                 'taxable_income_raw': 0.0,
                 'total_tax': format_currency(0.0),
                 'total_tax_raw': 0.0,
+                'created_at': 'N/A',
                 'tax_year': current_year,
-                'entity_type': 'sole_proprietor',
-                'created_at': 'N/A'
+                'entity_type': 'sole_proprietor'
             },
             tips=[],
             insights=[],
@@ -713,5 +731,6 @@ def history():
             calculations={},
             tool_title=trans('tax_history', default='Tax History')
         )
+
 
 
