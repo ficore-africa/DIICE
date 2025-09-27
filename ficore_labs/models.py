@@ -9,6 +9,8 @@ from utils import get_mongo_db, logger, normalize_datetime
 from zoneinfo import ZoneInfo
 from dateutil.parser import parse as parse_datetime
 import os
+import time
+import uuid
 
 # Configure logger for the application
 logger = logging.getLogger('business_finance_app')
@@ -77,8 +79,7 @@ def manage_index(collection, keys, options=None, name=None):
         return True
         
     except Exception as e:
-        error_msg = str(e).replace('\\', '\\\\')
-        logger.error(f"Failed to create index on {collection.name}: {error_msg}", exc_info=True)
+        logger.error(f"Failed to create index on {collection.name}: {str(e)}", exc_info=True)
         raise
 
 def to_dict_record(record):
@@ -153,7 +154,7 @@ def get_db():
         logger.info(f"Successfully connected to MongoDB database: {db.name}")
         return db
     except Exception as e:
-        logger.error(f"Error connecting to database: {str(e).replace('\\', '\\\\')}", exc_info=True)
+        logger.error(f"Error connecting to database: {str(e)}", exc_info=True)
         raise
 
 def verify_no_naive_datetimes(db):
@@ -191,7 +192,7 @@ def initialize_app_data(app):
                 logger.info(f"Attempt {attempt + 1}/{max_retries} - {trans('general_database_connection_established', default='MongoDB connection established')}")
                 break
             except Exception as e:
-                logger.error(f"Failed to initialize database (attempt {attempt + 1}/{max_retries}): {str(e).replace('\\', '\\\\')}", exc_info=True)
+                logger.error(f"Failed to initialize database (attempt {attempt + 1}/{max_retries}): {str(e)}", exc_info=True)
                 if attempt == max_retries - 1:
                     raise RuntimeError(trans('general_database_connection_failed', default='MongoDB connection failed after max retries'))
                 time.sleep(retry_delay)
@@ -234,7 +235,7 @@ def initialize_app_data(app):
                     except DuplicateKeyError:
                         logger.info(f"Admin user creation/update skipped due to existing user with same email or ID")
                     except Exception as e:
-                        logger.error(f"Failed to create/update default admin user: {str(e).replace('\\', '\\\\')}", exc_info=True)
+                        logger.error(f"Failed to create/update default admin user: {str(e)}", exc_info=True)
                         raise
                 else:
                     logger.info(f"User with ID 'ficorerecords' already exists, skipping admin creation")
@@ -608,14 +609,14 @@ def initialize_app_data(app):
                         db_instance.create_collection(collection_name, validator=config.get('validator', {}))
                         logger.info(f"{trans('general_collection_created', default='Created collection')}: {collection_name}")
                     except Exception as e:
-                        logger.error(f"Failed to create collection {collection_name}: {str(e).replace('\\', '\\\\')}", exc_info=True)
+                        logger.error(f"Failed to create collection {collection_name}: {str(e)}", exc_info=True)
                         raise
                 else:
                     try:
                         db_instance.command('collMod', collection_name, validator=config.get('validator', {}))
                         logger.info(f"Updated validator for collection: {collection_name}")
                     except Exception as e:
-                        logger.error(f"Failed to update validator for collection {collection_name}: {str(e).replace('\\', '\\\\')}", exc_info=True)
+                        logger.error(f"Failed to update validator for collection {collection_name}: {str(e)}", exc_info=True)
                         raise
                 
                 collection_obj = db_instance[collection_name]
@@ -626,7 +627,7 @@ def initialize_app_data(app):
                     try:
                         manage_index(collection_obj, keys, options, index_name)
                     except Exception as e:
-                        logger.error(f"Failed to manage index on {collection_name}: {str(e).replace('\\', '\\\\')}", exc_info=True)
+                        logger.error(f"Failed to manage index on {collection_name}: {str(e)}", exc_info=True)
                         raise
             
             if 'rewards' in collections:
@@ -645,7 +646,7 @@ def initialize_app_data(app):
                         result = db_instance.rewards.insert_one(sample_reward)
                         logger.info(f"Created sample reward with ID: {result.inserted_id}")
                     except Exception as e:
-                        logger.error(f"Failed to create sample reward: {str(e).replace('\\', '\\\\')}", exc_info=True)
+                        logger.error(f"Failed to create sample reward: {str(e)}", exc_info=True)
                         raise
             
             if 'records' in collections:
@@ -663,7 +664,7 @@ def initialize_app_data(app):
                         result = db_instance.records.insert_one(sample_inventory)
                         logger.info(f"Created sample inventory record with ID: {result.inserted_id}")
                     except Exception as e:
-                        logger.error(f"Failed to create sample inventory record: {str(e).replace('\\', '\\\\')}", exc_info=True)
+                        logger.error(f"Failed to create sample inventory record: {str(e)}", exc_info=True)
                         raise
             
             if 'users' in collections:
@@ -710,7 +711,7 @@ def initialize_app_data(app):
                                     )
                                     logger.info(f"Stored temporary password for user {user['_id']} in temp_passwords collection")
                                 except Exception as e:
-                                    logger.error(f"Failed to store temporary password for user {user['_id']}: {str(e).replace('\\', '\\\\')}", exc_info=True)
+                                    logger.error(f"Failed to store temporary password for user {user['_id']}: {str(e)}", exc_info=True)
                                     raise
                             if 'is_trial' not in user:
                                 updates['is_trial'] = True
@@ -746,17 +747,17 @@ def initialize_app_data(app):
                         )
                         logger.info("Marked user fixes as applied in system_config")
                 except Exception as e:
-                    logger.error(f"Failed to fix user documents: {str(e).replace('\\', '\\\\')}", exc_info=True)
+                    logger.error(f"Failed to fix user documents: {str(e)}", exc_info=True)
                     raise
             
             try:
                 verify_no_naive_datetimes(db_instance)
             except Exception as e:
-                logger.error(f"Failed to verify naive datetimes: {str(e).replace('\\', '\\\\')}", exc_info=True)
+                logger.error(f"Failed to verify naive datetimes: {str(e)}", exc_info=True)
                 raise
                 
         except Exception as e:
-            logger.error(f"{trans('general_database_initialization_failed', default='Failed to initialize database')}: {str(e).replace('\\', '\\\\')}", exc_info=True)
+            logger.error(f"{trans('general_database_initialization_failed', default='Failed to initialize database')}: {str(e)}", exc_info=True)
             raise
 
 class User:
@@ -902,7 +903,7 @@ def create_user(db, user_data):
             security_settings=user_doc['security_settings']
         )
     except Exception as e:
-        logger.error(f"Error creating user: {str(e).replace('\\', '\\\\')}", exc_info=True)
+        logger.error(f"Error creating user: {str(e)}", exc_info=True)
         raise ValueError("User with this email or username already exists")
 
 from functools import lru_cache
@@ -939,7 +940,7 @@ def get_user_by_email(db, email):
             )
         return None
     except Exception as e:
-        logger.error(f"{trans('general_user_fetch_error', default='Error getting user by email')} {email}: {str(e).replace('\\', '\\\\')}", exc_info=True)
+        logger.error(f"{trans('general_user_fetch_error', default='Error getting user by email')} {email}: {str(e)}", exc_info=True)
         raise
 
 @lru_cache(maxsize=128)
@@ -974,7 +975,7 @@ def get_user(db, user_id):
             )
         return None
     except Exception as e:
-        logger.error(f"{trans('general_user_fetch_error', default='Error getting user by ID')} {user_id}: {str(e).replace('\\', '\\\\')}", exc_info=True)
+        logger.error(f"{trans('general_user_fetch_error', default='Error getting user by ID')} {user_id}: {str(e)}", exc_info=True)
         raise
 
 def update_user(db, user_id, update_data):
@@ -996,7 +997,7 @@ def update_user(db, user_id, update_data):
         logger.info(f"{trans('general_user_no_change', default='No changes made to user with ID')}: {user_id}")
         return False
     except Exception as e:
-        logger.error(f"{trans('general_user_update_error', default='Error updating user with ID')} {user_id}: {str(e).replace('\\', '\\\\')}", exc_info=True)
+        logger.error(f"{trans('general_user_update_error', default='Error updating user with ID')} {user_id}: {str(e)}", exc_info=True)
         raise
 
 def get_records(db, filter_kwargs):
@@ -1008,7 +1009,7 @@ def get_records(db, filter_kwargs):
         records = safe_find_records(db, filter_kwargs, 'created_at', -1)
         return [to_dict_record(record) for record in records]
     except Exception as e:
-        logger.error(f"{trans('general_records_fetch_error', default='Error getting records')}: {str(e).replace('\\', '\\\\')}", exc_info=True)
+        logger.error(f"{trans('general_records_fetch_error', default='Error getting records')}: {str(e)}", exc_info=True)
         raise
 
 def create_record(db, record_data):
@@ -1028,7 +1029,7 @@ def create_record(db, record_data):
         logger.info(f"{trans('general_record_created', default='Created record with ID')}: {result.inserted_id}")
         return str(result.inserted_id)
     except Exception as e:
-        logger.error(f"{trans('general_record_creation_error', default='Error creating record')}: {str(e).replace('\\', '\\\\')}", exc_info=True)
+        logger.error(f"{trans('general_record_creation_error', default='Error creating record')}: {str(e)}", exc_info=True)
         raise
 
 def update_record(db, record_id, update_data):
@@ -1047,7 +1048,7 @@ def update_record(db, record_id, update_data):
         logger.info(f"{trans('general_record_no_change', default='No changes made to record with ID')}: {record_id}")
         return False
     except Exception as e:
-        logger.error(f"{trans('general_record_update_error', default='Error updating record with ID')} {record_id}: {str(e).replace('\\', '\\\\')}", exc_info=True)
+        logger.error(f"{trans('general_record_update_error', default='Error updating record with ID')} {record_id}: {str(e)}", exc_info=True)
         raise
 
 def get_cashflows(db, filter_kwargs):
@@ -1059,7 +1060,7 @@ def get_cashflows(db, filter_kwargs):
         cashflows = safe_find_cashflows(db, filter_kwargs, 'created_at', -1)
         return [to_dict_cashflow(cashflow) for cashflow in cashflows]
     except Exception as e:
-        logger.error(f"{trans('general_cashflows_fetch_error', default='Error getting cashflows')}: {str(e).replace('\\', '\\\\')}", exc_info=True)
+        logger.error(f"{trans('general_cashflows_fetch_error', default='Error getting cashflows')}: {str(e)}", exc_info=True)
         raise
 
 def create_cashflow(db, cashflow_data):
@@ -1079,7 +1080,7 @@ def create_cashflow(db, cashflow_data):
         logger.info(f"{trans('general_cashflow_created', default='Created cashflow record with ID')}: {result.inserted_id}")
         return str(result.inserted_id)
     except Exception as e:
-        logger.error(f"{trans('general_cashflow_creation_error', default='Error creating cashflow record')}: {str(e).replace('\\', '\\\\')}", exc_info=True)
+        logger.error(f"{trans('general_cashflow_creation_error', default='Error creating cashflow record')}: {str(e)}", exc_info=True)
         raise
 
 def update_cashflow(db, cashflow_id, update_data):
@@ -1098,7 +1099,7 @@ def update_cashflow(db, cashflow_id, update_data):
         logger.info(f"{trans('general_cashflow_no_change', default='No changes made to cashflow record with ID')}: {cashflow_id}")
         return False
     except Exception as e:
-        logger.error(f"{trans('general_cashflow_update_error', default='Error updating cashflow record with ID')} {cashflow_id}: {str(e).replace('\\', '\\\\')}", exc_info=True)
+        logger.error(f"{trans('general_cashflow_update_error', default='Error updating cashflow record with ID')} {cashflow_id}: {str(e)}", exc_info=True)
         raise
 
 def get_audit_logs(db, filter_kwargs):
@@ -1108,7 +1109,7 @@ def get_audit_logs(db, filter_kwargs):
     try:
         return list(db.audit_logs.find(filter_kwargs).sort('timestamp', DESCENDING))
     except Exception as e:
-        logger.error(f"{trans('general_audit_logs_fetch_error', default='Error getting audit logs')}: {str(e).replace('\\', '\\\\')}", exc_info=True)
+        logger.error(f"{trans('general_audit_logs_fetch_error', default='Error getting audit logs')}: {str(e)}", exc_info=True)
         raise
 
 def create_audit_log(db, audit_data):
@@ -1123,7 +1124,7 @@ def create_audit_log(db, audit_data):
         logger.info(f"{trans('general_audit_log_created', default='Created audit log with ID')}: {result.inserted_id}")
         return str(result.inserted_id)
     except Exception as e:
-        logger.error(f"{trans('general_audit_log_creation_error', default='Error creating audit log')}: {str(e).replace('\\', '\\\\')}", exc_info=True)
+        logger.error(f"{trans('general_audit_log_creation_error', default='Error creating audit log')}: {str(e)}", exc_info=True)
         raise
 
 def create_feedback(db, feedback_data):
@@ -1138,7 +1139,7 @@ def create_feedback(db, feedback_data):
         logger.info(f"{trans('general_feedback_created', default='Created feedback with ID')}: {result.inserted_id}")
         return str(result.inserted_id)
     except Exception as e:
-        logger.error(f"{trans('general_feedback_creation_error', default='Error creating feedback')}: {str(e).replace('\\', '\\\\')}", exc_info=True)
+        logger.error(f"{trans('general_feedback_creation_error', default='Error creating feedback')}: {str(e)}", exc_info=True)
         raise
 
 def get_feedback(db, filter_kwargs):
@@ -1148,7 +1149,7 @@ def get_feedback(db, filter_kwargs):
     try:
         return list(db.feedback.find(filter_kwargs).sort('timestamp', DESCENDING))
     except Exception as e:
-        logger.error(f"{trans('general_feedback_fetch_error', default='Error getting feedback')}: {str(e).replace('\\', '\\\\')}", exc_info=True)
+        logger.error(f"{trans('general_feedback_fetch_error', default='Error getting feedback')}: {str(e)}", exc_info=True)
         raise
 
 def to_dict_feedback(record):
@@ -1210,7 +1211,7 @@ def create_kyc_record(db, kyc_data):
         logger.info(f"{trans('general_kyc_created', default='Created KYC record with ID')}: {result.inserted_id}")
         return str(result.inserted_id)
     except Exception as e:
-        logger.error(f"{trans('general_kyc_creation_error', default='Error creating KYC record')}: {str(e).replace('\\', '\\\\')}", exc_info=True)
+        logger.error(f"{trans('general_kyc_creation_error', default='Error creating KYC record')}: {str(e)}", exc_info=True)
         raise
 
 def get_kyc_record(db, filter_kwargs):
@@ -1220,7 +1221,7 @@ def get_kyc_record(db, filter_kwargs):
     try:
         return list(db.kyc_records.find(filter_kwargs).sort('created_at', DESCENDING))
     except Exception as e:
-        logger.error(f"{trans('general_kyc_fetch_error', default='Error getting KYC records')}: {str(e).replace('\\', '\\\\')}", exc_info=True)
+        logger.error(f"{trans('general_kyc_fetch_error', default='Error getting KYC records')}: {str(e)}", exc_info=True)
         raise
 
 def update_kyc_record(db, filter_kwargs, update_data):
@@ -1234,7 +1235,7 @@ def update_kyc_record(db, filter_kwargs, update_data):
             raise Exception("No KYC record found matching the criteria for update.")
         return result
     except Exception as e:
-        logger.error(f"Error updating KYC record: {str(e).replace('\\', '\\\\')}", exc_info=True, extra={'filter': filter_kwargs, 'data': update_data})
+        logger.error(f"Error updating KYC record: {str(e)}", exc_info=True, extra={'filter': filter_kwargs, 'data': update_data})
         raise
 
 def to_dict_kyc_record(record):
@@ -1267,10 +1268,10 @@ def create_waitlist_entry(db, waitlist_data):
         logger.info(f"{trans('general_waitlist_created', default='Created waitlist entry with ID')}: {result.inserted_id}")
         return str(result.inserted_id)
     except DuplicateKeyError:
-        logger.error(f"Duplicate email or WhatsApp number in waitlist: {waitlist_data.get('email')}", exc_info=True)
+        logger.error(f"Duplicate email or WhatsApp number in waitlist: {waitlist_data.get('email')}: {str(e)}", exc_info=True)
         raise ValueError(trans('general_waitlist_duplicate_error', default='Email or WhatsApp number already exists in waitlist'))
     except Exception as e:
-        logger.error(f"{trans('general_waitlist_creation_error', default='Error creating waitlist entry')}: {str(e).replace('\\', '\\\\')}", exc_info=True)
+        logger.error(f"{trans('general_waitlist_creation_error', default='Error creating waitlist entry')}: {str(e)}", exc_info=True)
         raise
 
 def get_waitlist_entries(db, filter_kwargs):
@@ -1280,7 +1281,7 @@ def get_waitlist_entries(db, filter_kwargs):
     try:
         return list(db.waitlist.find(filter_kwargs).sort('created_at', DESCENDING))
     except Exception as e:
-        logger.error(f"{trans('general_waitlist_fetch_error', default='Error getting waitlist entries')}: {str(e).replace('\\', '\\\\')}", exc_info=True)
+        logger.error(f"{trans('general_waitlist_fetch_error', default='Error getting waitlist entries')}: {str(e)}", exc_info=True)
         raise
 
 def to_dict_waitlist(record):
