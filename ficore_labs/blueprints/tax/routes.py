@@ -27,7 +27,7 @@ DEDUCTION_CATEGORIES = [
     ('rent_utilities', 'Rent and Utilities'),
     ('marketing_sales', 'Marketing and Sales'),
     ('cogs', 'Cost of Goods Sold'),
-    ('statutory_legal', 'Statutory and Legal Contributions')
+    ('statutory_contributions', 'Statutory and Legal Contributions')
 ]
 
 def strip_commas(value):
@@ -712,3 +712,4 @@ def history():
             calculations={},
             tool_title=trans('tax_history', default='Tax History')
         )
+
