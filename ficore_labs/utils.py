@@ -1549,7 +1549,7 @@ EXPENSE_CATEGORIES = {
         'description': 'Personal expenses not related to business',
         'examples': ['Personal meals', 'Personal shopping', 'Family expenses']
     },
-    'statutory_legal': {
+    'statutory_contributions': {
         'name': 'Statutory & Legal Contributions',
         'tax_deductible': True,
         'is_personal': False,
@@ -2078,7 +2078,7 @@ def get_optimized_tax_calculation_data(user_id, tax_year):
                         if item['is_tax_deductible']:
                             tax_data['deductible_expenses'] += amount
                             
-                            if category == 'statutory_legal':
+                            if category == 'statutory_contributions':
                                 tax_data['statutory_expenses'] += amount
                             elif category == 'rent_utilities':
                                 tax_data['rent_utilities_expenses'] += amount
@@ -2110,7 +2110,7 @@ def get_optimized_tax_calculation_data(user_id, tax_year):
             
             # Get all expense categories
             all_categories = ['office_admin', 'staff_wages', 'business_travel', 'rent_utilities', 
-                            'marketing_sales', 'cogs', 'personal_expenses', 'statutory_legal']
+                            'marketing_sales', 'cogs', 'personal_expenses', 'statutory_contributions']
             
             expenses = get_expenses_by_categories(user_id, tax_year, all_categories)
             fallback_data['expenses_by_category'] = expenses
@@ -2121,7 +2121,7 @@ def get_optimized_tax_calculation_data(user_id, tax_year):
                 if is_category_tax_deductible(category):
                     fallback_data['deductible_expenses'] += amount
                     
-                    if category == 'statutory_legal':
+                    if category == 'statutory_contributions':
                         fallback_data['statutory_expenses'] += amount
                     elif category == 'rent_utilities':
                         fallback_data['rent_utilities_expenses'] += amount
@@ -2297,8 +2297,8 @@ def apply_statutory_deductions(net_business_profit, user_id, tax_year):
     """
     try:
         # Get statutory & legal contributions expenses
-        statutory_expenses = get_expenses_by_categories(user_id, tax_year, ['statutory_legal'])
-        statutory_amount = statutory_expenses.get('statutory_legal', 0.0)
+        statutory_expenses = get_expenses_by_categories(user_id, tax_year, ['statutory_contributions'])
+        statutory_amount = statutory_expenses.get('statutory_contributions', 0.0)
         
         # Apply statutory deduction
         adjusted_profit = net_business_profit - statutory_amount
@@ -2308,7 +2308,7 @@ def apply_statutory_deductions(net_business_profit, user_id, tax_year):
             'step': 2,
             'step_name': 'Statutory & Legal Contributions Deduction',
             'net_business_profit_input': net_business_profit,
-            'statutory_legal_expenses': statutory_amount,
+            'statutory_contributions_expenses': statutory_amount,
             'adjusted_profit_after_statutory': adjusted_profit,
             'calculation_formula': 'Net Business Profit - Statutory & Legal Contributions'
         }
@@ -2324,7 +2324,7 @@ def apply_statutory_deductions(net_business_profit, user_id, tax_year):
             'step': 2,
             'step_name': 'Statutory & Legal Contributions Deduction',
             'net_business_profit_input': net_business_profit,
-            'statutory_legal_expenses': 0.0,
+            'statutory_contributions_expenses': 0.0,
             'adjusted_profit_after_statutory': net_business_profit,
             'error': str(e)
         }
@@ -2513,7 +2513,7 @@ def calculate_four_step_tax_liability(user_id, tax_year):
             'summary': {
                 'total_income': step1_result.get('total_income', 0.0),
                 'total_deductible_expenses': step1_result.get('total_deductible_expenses', 0.0),
-                'statutory_expenses': step2_result.get('statutory_legal_expenses', 0.0),
+                'statutory_expenses': step2_result.get('statutory_contributions_expenses', 0.0),
                 'rent_relief': step3_result.get('calculated_rent_relief', 0.0),
                 'taxable_income': taxable_income,
                 'final_tax_liability': final_tax_liability
@@ -2714,6 +2714,7 @@ def create_dashboard_safe_response(stats, recent_data, additional_data=None):
             'timestamp': datetime.now(timezone.utc).isoformat()
 
         }
+
 
 
 
