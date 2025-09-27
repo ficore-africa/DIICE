@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 # Define expense categories with simplified names (no ampersands) and aligned with tracking blueprint
 expense_categories = {
     'office_admin': {
-        'name': utils.sanitize_input(trans('category_office_admin', default='Office Admin'), max_length=100),
+        'name': utils.sanitize_input(trans('category_office_admin', default='Office and Admin'), max_length=100),
         'description': utils.sanitize_input(trans('category_office_admin_desc', default='Office supplies, stationery, internet, utility bills'), max_length=1000),
         'examples': [
             utils.sanitize_input(trans('example_office_supplies', default='Office Supplies'), max_length=100),
@@ -37,7 +37,7 @@ expense_categories = {
         'is_statutory': False
     },
     'staff_wages': {
-        'name': utils.sanitize_input(trans('category_staff_wages', default='Staff Wages'), max_length=100),
+        'name': utils.sanitize_input(trans('category_staff_wages', default='Staff and Wages'), max_length=100),
         'description': utils.sanitize_input(trans('category_staff_wages_desc', default='Employee salaries, wages, benefits'), max_length=1000),
         'examples': [
             utils.sanitize_input(trans('example_salaries', default='Salaries'), max_length=100),
@@ -50,7 +50,7 @@ expense_categories = {
         'is_statutory': False
     },
     'business_travel': {
-        'name': utils.sanitize_input(trans('category_business_travel', default='Business Travel'), max_length=100),
+        'name': utils.sanitize_input(trans('category_business_travel', default='Business Travel and Transport'), max_length=100),
         'description': utils.sanitize_input(trans('category_business_travel_desc', default='Fuel, vehicle maintenance, business travel expenses'), max_length=1000),
         'examples': [
             utils.sanitize_input(trans('example_fuel', default='Fuel'), max_length=100),
@@ -63,7 +63,7 @@ expense_categories = {
         'is_statutory': False
     },
     'rent_utilities': {
-        'name': utils.sanitize_input(trans('category_rent_utilities', default='Rent Utilities'), max_length=100),
+        'name': utils.sanitize_input(trans('category_rent_utilities', default='Rent and Utilities'), max_length=100),
         'description': utils.sanitize_input(trans('category_rent_utilities_desc', default='Rent for shop or business office, utilities'), max_length=1000),
         'examples': [
             utils.sanitize_input(trans('example_shop_rent', default='Shop Rent'), max_length=100),
@@ -75,7 +75,7 @@ expense_categories = {
         'is_statutory': False
     },
     'marketing_sales': {
-        'name': utils.sanitize_input(trans('category_marketing_sales', default='Marketing Sales'), max_length=100),
+        'name': utils.sanitize_input(trans('category_marketing_sales', default='Marketing and Sales'), max_length=100),
         'description': utils.sanitize_input(trans('category_marketing_sales_desc', default='Advertising, social media, business cards'), max_length=1000),
         'examples': [
             utils.sanitize_input(trans('example_advertising', default='Advertising'), max_length=100),
@@ -111,7 +111,7 @@ expense_categories = {
         'is_statutory': False
     },
     'statutory_contributions': {
-        'name': utils.sanitize_input(trans('category_statutory_contributions', default='Statutory Contributions'), max_length=100),
+        'name': utils.sanitize_input(trans('category_statutory_contributions', default='Statutory and Legal Contributions'), max_length=100),
         'description': utils.sanitize_input(trans('category_statutory_contributions_desc', default='Accounting, legal, consulting fees'), max_length=1000),
         'examples': [
             utils.sanitize_input(trans('example_accounting_fees', default='Accounting Fees'), max_length=100),
@@ -151,14 +151,14 @@ class PaymentForm(FlaskForm):
             logger.warning(f"Failed to load expense category choices: {str(e)}")
             # Fallback to minimal categories aligned with tracking blueprint
             self.expense_category.choices = [
-                ('office_admin', trans('category_office_admin', default='Office Admin')),
-                ('staff_wages', trans('category_staff_wages', default='Staff Wages')),
-                ('business_travel', trans('category_business_travel', default='Business Travel')),
-                ('rent_utilities', trans('category_rent_utilities', default='Rent Utilities')),
-                ('marketing_sales', trans('category_marketing_sales', default='Marketing Sales')),
+                ('office_admin', trans('category_office_admin', default='Office and Admin')),
+                ('staff_wages', trans('category_staff_wages', default='Staff and Wages')),
+                ('business_travel', trans('category_business_travel', default='Business Travel and Transport')),
+                ('rent_utilities', trans('category_rent_utilities', default='Rent and Utilities')),
+                ('marketing_sales', trans('category_marketing_sales', default='Marketing and Sales')),
                 ('cogs', trans('category_cogs', default='Cost of Goods Sold')),
                 ('personal_expenses', trans('category_personal_expenses', default='Personal Expenses')),
-                ('statutory_contributions', trans('category_statutory_contributions', default='Statutory Contributions'))
+                ('statutory_contributions', trans('category_statutory_contributions', default='Statutory and Legal Contributions'))
             ]
 
 payments_bp = Blueprint('payments', __name__, url_prefix='/payments')
@@ -168,13 +168,15 @@ def sanitize_dict(d, max_length=1000):
     for key, value in d.items():
         if isinstance(value, str):
             sanitized = utils.sanitize_input(value, max_length=max_length)
+            # Replace problematic characters to prevent escaping issues
+            sanitized = sanitized.replace("'", "").replace('"', '').replace('\\', '')
             if sanitized != value:
                 logger.debug(f"Sanitized field {key}: original='{value}', sanitized='{sanitized}'")
             d[key] = sanitized
         elif isinstance(value, dict):
             sanitize_dict(value, max_length)
         elif isinstance(value, list):
-            d[key] = [utils.sanitize_input(item, max_length=max_length) if isinstance(item, str) else item for item in value]
+            d[key] = [utils.sanitize_input(item, max_length=max_length).replace("'", "").replace('"', '').replace('\\', '') if isinstance(item, str) else item for item in value]
     return d
 
 def fetch_payments_with_fallback(db, query, sort_field='created_at', sort_direction=-1, limit=50):
@@ -185,6 +187,7 @@ def fetch_payments_with_fallback(db, query, sort_field='created_at', sort_direct
     for payment in payments:
         logger.debug(f"Raw payment from DB: {payment}")
         sanitized_payment = sanitize_dict(payment.copy())
+        sanitized_payment = clean_document_for_json(sanitized_payment)  # Ensure JSON compatibility
         sanitized_payments.append(sanitized_payment)
     payments = sanitized_payments
     
@@ -202,6 +205,7 @@ def fetch_payments_with_fallback(db, query, sort_field='created_at', sort_direct
                     try:
                         logger.debug(f"Raw fallback payment: {payment}")
                         payment = sanitize_dict(payment.copy())
+                        payment = clean_document_for_json(payment)  # Ensure JSON compatibility
                         from models import to_dict_cashflow
                         cleaned_payment = to_dict_cashflow(payment)
                         if cleaned_payment:
