@@ -14,6 +14,7 @@ from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
 from werkzeug.routing import BuildError
 from wtforms import ValidationError
 from flask_login import current_user
+import re
 
 # Import performance monitoring (will be created)
 try:
@@ -1810,13 +1811,11 @@ def validate_payment_form_data(form_data):
     """
     try:
         errors = {}
-        
         # Required fields validation
         required_fields = ['party_name', 'date', 'amount', 'expense_category']
         for field in required_fields:
             if not form_data.get(field) or str(form_data[field]).strip() == '':
                 errors[field] = f"{field.replace('_', ' ').title()} is required"
-        
         # Party name validation
         if form_data.get('party_name'):
             party_name = str(form_data['party_name']).strip()
@@ -1824,9 +1823,8 @@ def validate_payment_form_data(form_data):
                 errors['party_name'] = "Party name must be at least 2 characters long"
             elif len(party_name) > 100:
                 errors['party_name'] = "Party name cannot exceed 100 characters"
-            elif not re.match(r'^[a-zA-Z0-9\s\-\.\,\'&]+$', party_name):
+            elif not re.match(r'^[a-zA-Z0-9\s\-\.,\'&]+$', party_name):
                 errors['party_name'] = "Party name contains invalid characters"
-        
         # Date validation
         if form_data.get('date'):
             try:
@@ -1834,19 +1832,13 @@ def validate_payment_form_data(form_data):
                     date_obj = datetime.strptime(form_data['date'], '%Y-%m-%d').date()
                 else:
                     date_obj = form_data['date']
-                
-                # Check if date is not in the future
                 if date_obj > date.today():
                     errors['date'] = "Date cannot be in the future"
-                
-                # Check if date is not too far in the past (e.g., more than 10 years)
                 ten_years_ago = date.today().replace(year=date.today().year - 10)
                 if date_obj < ten_years_ago:
                     errors['date'] = "Date cannot be more than 10 years in the past"
-                    
             except (ValueError, TypeError):
                 errors['date'] = "Invalid date format"
-        
         # Amount validation
         if form_data.get('amount') is not None:
             try:
@@ -1859,36 +1851,30 @@ def validate_payment_form_data(form_data):
                     errors['amount'] = "Amount cannot have more than 2 decimal places"
             except (ValueError, TypeError):
                 errors['amount'] = "Amount must be a valid number"
-        
         # Expense category validation
         if form_data.get('expense_category'):
             if not validate_expense_category(form_data['expense_category']):
                 errors['expense_category'] = "Please select a valid expense category"
-        
         # Payment method validation (optional field)
         if form_data.get('method'):
             valid_methods = ['cash', 'card', 'bank']
             if form_data['method'] not in valid_methods:
                 errors['method'] = "Please select a valid payment method"
-        
         # Contact validation (optional field)
         if form_data.get('contact'):
             contact = str(form_data['contact']).strip()
             if len(contact) > 100:
                 errors['contact'] = "Contact cannot exceed 100 characters"
-            elif contact and not re.match(r'^[a-zA-Z0-9\s\-\.\,\+\(\)@]+$', contact):
+            elif contact and not re.match(r'^[a-zA-Z0-9\s\-\.,\+\(\)@]+$', contact):
                 errors['contact'] = "Contact contains invalid characters"
-        
         # Description validation (optional field)
         if form_data.get('description'):
             description = str(form_data['description']).strip()
             if len(description) > 1000:
                 errors['description'] = "Description cannot exceed 1000 characters"
-        
         return len(errors) == 0, errors
     except Exception as e:
-        logger.error(f"Error validating payment form data: {str(e)}", 
-                    extra={'session_id': session.get('sid', 'no-session-id') if has_request_context() else 'no-session-id'})
+        logger.error(f"Error validating payment form data: {str(e)}", extra={'session_id': session.get('sid', 'no-session-id') if has_request_context() else 'no-session-id'})
         return False, {'general': 'Validation error occurred. Please try again.'}
 
 def validate_tax_calculation_input(input_data):
@@ -1921,43 +1907,7 @@ def validate_tax_calculation_input(input_data):
         if input_data.get('annual_rent') is not None:
             try:
                 rent = float(input_data['annual_rent'])
-                if rent < 0:
-                    errors['annual_rent'] = "Annual rent cannot be negative"
-                elif rent > 999999999.99:
-                    errors['annual_rent'] = "Annual rent amount is unreasonably large"
-            except (ValueError, TypeError):
-                errors['annual_rent'] = "Annual rent must be a valid number"
-        
-        # Expenses validation
-        if 'expenses' in input_data and isinstance(input_data['expenses'], dict):
-            for category, amount in input_data['expenses'].items():
-                if amount is not None and str(amount).strip() != '':
-                    try:
-                        expense_amount = float(amount)
-                        if expense_amount < 0:
-                            errors[f'expenses_{category}'] = f"Expense amount for {category} cannot be negative"
-                        elif expense_amount > 999999999.99:
-                            errors[f'expenses_{category}'] = f"Expense amount for {category} is unreasonably large"
-                        
-                        # Validate category exists
-                        if not validate_expense_category(category):
-                            errors[f'expenses_{category}'] = f"Invalid expense category: {category}"
-                            
-                    except (ValueError, TypeError):
-                        errors[f'expenses_{category}'] = f"Expense amount for {category} must be a valid number"
-        
-        return len(errors) == 0, errors
-    except Exception as e:
-        logger.error(f"Error validating tax calculation input: {str(e)}", 
-                    extra={'session_id': session.get('sid', 'no-session-id') if has_request_context() else 'no-session-id'})
-        return False, {'general': 'Validation error occurred. Please try again.'}
-
-def get_user_friendly_error_message(field_name, error_type):
-    """
-    Get user-friendly error messages for form validation.
-    
-    Args:
-        field_name (str): The field that has an error
+                # ...existing code...
         error_type (str): The type of error
         
     Returns:
@@ -1994,50 +1944,65 @@ def get_user_friendly_error_message(field_name, error_type):
             'too_long': 'Contact information is too long (maximum 100 characters)',
             'invalid_chars': 'Contact contains invalid characters'
         },
-        'description': {
-            'too_long': 'Description is too long (maximum 1000 characters)'
-        }
-    }
-    
-    field_errors = error_messages.get(field_name, {})
-    return field_errors.get(error_type, f"Invalid {field_name.replace('_', ' ')}")
-
-def format_validation_errors_for_flash(errors_dict):
+        try:
+            features = []
+            user_role = 'unauthenticated'
+            if has_request_context() and current_user.is_authenticated:
+                user_role = current_user.role
+            if user_role == 'unauthenticated':
+                business_tool_keys = ["debtors_dashboard", "receipts_dashboard", "profit_summary"]
+                for tool in TRADER_TOOLS:
+                    if tool["label_key"] in business_tool_keys:
+                        features.append({
+                            "category": "Business",
+                            "label_key": tool["label_key"],
+                            "description_key": tool["description_key"],
+                            "label": tool["label"],
+                            "description": tool.get("description", "Description not available"),
+                            "url": tool["url"] if tool["url"] != "#" else url_for("users.login", _external=True)
+                        })
+            elif user_role == 'trader':
+                for tool in TRADER_TOOLS:
+                    features.append({
+                        "category": "Business",
+                        "label_key": tool["label_key"],
+                        "description_key": tool["description_key"],
+                        "label": tool["label"],
+                        "description": tool.get("description", "Description not available"),
+                        "url": tool["url"]
+                    })
+            elif user_role == 'admin':
+                for tool in ADMIN_TOOLS:
+                    features.append({
+                        "category": "Admin",
+                        "label_key": tool["label_key"],
+                        "description_key": tool["description_key"],
+                        "label": tool["label"],
+                        "description": tool.get("description", "Description not available"),
+                        "url": tool["url"]
+                    })
+            logger.info(f"Retrieved explore features for role: {user_role}", extra={'session_id': session.get('sid', 'no-session-id'), 'user_role': user_role})
+            return features
+        except Exception as e:
+            logger.error(f"Error retrieving explore features for role {user_role}: {str(e)}", extra={'session_id': session.get('sid', 'no-session-id'), 'user_role': user_role})
+            return [{
+                'category': 'Error',
+                'label': 'Error',
+                'url': '#',
+                'description': 'Feature retrieval failed'
+            }]
+def validate_tax_year(tax_year):
     """
-    Format validation errors for flash messages.
-    
-    Args:
-        errors_dict (dict): Dictionary of field errors
-        
-    Returns:
-        list: List of formatted error messages
+    Validate tax_year is an integer between 1900 and next year.
+    Returns True if valid, False otherwise.
     """
     try:
-        formatted_errors = []
-        for field, error in errors_dict.items():
-            if field.startswith('expenses_'):
-                category = field.replace('expenses_', '')
-                category_name = get_category_metadata(category).get('name', category)
-                formatted_errors.append(f"{category_name}: {error}")
-            else:
-                field_display = field.replace('_', ' ').title()
-                formatted_errors.append(f"{field_display}: {error}")
-        
-        return formatted_errors
-    except Exception as e:
-        logger.error(f"Error formatting validation errors: {str(e)}")
-        return ["Validation errors occurred. Please check your input and try again."]
-        # Validate amount
-        if not amount or amount <= 0:
-            errors.append("Expense amount must be greater than zero")
-        
-        # Additional validation for specific categories
-        if category_key == 'personal_expenses' and description:
-            # Log warning for personal expenses to help users understand tax implications
-            logger.info(f"Personal expense logged (not tax deductible): {description}", 
-                       extra={'session_id': session.get('sid', 'no-session-id') if has_request_context() else 'no-session-id'})
-        
-        return len(errors) == 0, errors
+        year = int(tax_year)
+        if year < 1900 or year > datetime.now().year + 1:
+            return False
+        return True
+    except (ValueError, TypeError):
+        return False
     except Exception as e:
         logger.error(f"Error validating category assignment: {str(e)}", 
                     extra={'session_id': session.get('sid', 'no-session-id') if has_request_context() else 'no-session-id'})
