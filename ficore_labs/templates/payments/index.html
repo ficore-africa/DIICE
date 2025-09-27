@@ -68,7 +68,7 @@
                                 <small class="text-muted">{{ t('general_total_amount', default='Total Amount') }}</small>
                                 <div class="fw-bold" id="totalAmount">
                                     {% set total = payments | sum(attribute='amount') %}
-                                    {{ total | format_currency(currency='₦') }}
+                                    {{ total | format_currency }}
                                 </div>
                             </div>
                         </div>
@@ -77,14 +77,14 @@
                                 <small class="text-muted">{{ t('general_tax_deductible', default='Tax Deductible') }}</small>
                                 <div class="fw-bold text-success" id="taxDeductibleAmount">
                                     {% set deductible_total = payments | selectattr('is_tax_deductible', 'equalto', true) | sum(attribute='amount') %}
-                                    {{ deductible_total | format_currency(currency='₦') }}
+                                    {{ deductible_total | format_currency }}
                                 </div>
                             </div>
                             <div class="col-6">
                                 <small class="text-muted">{{ t('general_non_deductible', default='Non-Deductible') }}</small>
                                 <div class="fw-bold text-warning" id="nonDeductibleAmount">
                                     {% set non_deductible_total = payments | selectattr('is_tax_deductible', 'equalto', false) | sum(attribute='amount') %}
-                                    {{ non_deductible_total | format_currency(currency='₦') }}
+                                    {{ non_deductible_total | format_currency }}
                                 </div>
                             </div>
                         </div>
@@ -110,8 +110,8 @@
                     {% for payment in payments %}
                         <tr>
                             <td data-label="party_name">{{ payment.party_name }}</td>
-                            <td data-label="amount">{{ payment.formatted_amount }}</td>
-                            <td data-label="date">{{ payment.formatted_date }}</td>
+                            <td data-label="amount">{{ payment.amount | format_currency }}</td>
+                            <td data-label="date">{{ payment.created_at | format_date }}</td>
                             <td data-label="method">{{ payment.method or '-' }}</td>
                             <td data-label="category" data-category="{{ payment.expense_category }}">
                                 {% if payment.category_metadata and payment.category_metadata.category_display_name %}
@@ -132,7 +132,7 @@
                                         data-id="{{ payment._id }}"
                                         data-name="{{ payment.party_name }}"
                                         data-amount="{{ payment.amount }}"
-                                        data-date="{{ payment.formatted_date }}"
+                                        data-date="{{ payment.created_at | format_date }}"
                                         data-method="{{ payment.method or '' }}"
                                         data-category="{% if payment.category_metadata and payment.category_metadata.category_display_name %}{{ payment.category_metadata.category_display_name }}{% elif payment.expense_category %}{{ payment.expense_category | title }}{% endif %}"
                                         data-description="{{ payment.description or '' }}"
@@ -181,7 +181,7 @@
                     <button id="shareBtn" class="btn btn-primary" style="display: none;">{{ t('payments_share_receipt', default='Share Receipt') }}</button>
                 {% else %}
                     <a id="downloadBtn" class="btn btn-primary disabled" href="{{ url_for('subscribe_bp.subscribe') }}">{{ t('payments_download_receipt', default='Download Receipt') }}</a>
-                    <button id="shareBtn" class="btn btn-primary disabled" style="display: none;" onclick="alert('{{ t('payments_subscription_required', default='Your trial has expired or you do not have an active subscription. Please subscribe to share payments.') }}')">{{ t('payments_share_receipt', default='Share Receipt') }}</button>
+                    <button id="shareBtn" class="btn btn-primary disabled" style="display: none;" onclick="alert('{{ t('payments_subscription_required', default='Your trial has expired or you do not have an active subscription. Please subscribe to share payments.') | e }}')">{{ t('payments_share_receipt', default='Share Receipt') }}</button>
                 {% endif %}
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ t('general_close', default='Close') }}</button>
             </div>
@@ -339,7 +339,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function formatCurrency(amount) {
         return amount.toLocaleString('en-NG', {
             style: 'currency',
-            currency: '{{ t("general_currency_code", default="NGN") }}',
+            currency: 'NGN',
             minimumFractionDigits: 2,
             maximumFractionDigits: 2
         });
