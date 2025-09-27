@@ -237,65 +237,42 @@ def index():
     try:
         db = utils.get_mongo_db()
         query = {'user_id': str(current_user.id), 'type': 'payment'}
-
-        payments = [normalize_datetime(doc) for doc in fetch_payments_with_fallback(db, query)]
+        payments = list(db.cashflows.find(query).sort('created_at', -1))
+        logger.debug(f"Raw payments for user {current_user.id}: {payments}")
+        
         cleaned_payments = []
-        payments_skipped = 0
-        payments_skipped_ids = []
-        import os
-        error_log_path = os.path.join(os.path.dirname(__file__), 'skipped_payments.log')
-        from pymongo import UpdateOne
-        db_ops = []
         for payment in payments:
             try:
-                logger.debug(f"Raw payment before serialization in index: {payment}")
+                # Sanitize payment data
                 payment = sanitize_dict(payment.copy())
-                cleaned_payment = serialize_for_json(payment)
-                cleaned_payment['formatted_amount'] = utils.format_currency(payment['amount'], currency='₦')
-                cleaned_payment['formatted_date'] = utils.format_date(payment['created_at'], format_type='short')
-                cleaned_payments.append(cleaned_payment)
+                # Convert naive datetimes to timezone-aware
+                if payment.get('created_at') and payment['created_at'].tzinfo is None:
+                    payment['created_at'] = payment['created_at'].replace(tzinfo=ZoneInfo("UTC"))
+                # Add formatted fields
+                payment['formatted_amount'] = utils.format_currency(payment['amount'], currency='₦') if payment.get('amount') else 'N/A'
+                payment['formatted_date'] = utils.format_date(payment['created_at'], format_type='short') if payment.get('created_at') else 'N/A'
+                cleaned_payments.append(payment)
             except Exception as e:
-                payment_id = str(payment.get('_id', 'unknown'))
-                logger.warning(f"Failed to serialize payment {payment_id} in index: {str(e)}")
-                payments_skipped += 1
-                payments_skipped_ids.append(payment_id)
-                # Log to a separate file
-                try:
-                    with open(error_log_path, 'a', encoding='utf-8') as f:
-                        f.write(f"{datetime.utcnow().isoformat()} | Skipped payment ID: {payment_id} | Error: {str(e)}\n")
-                except Exception as file_err:
-                    logger.error(f"Failed to write to skipped_payments.log: {str(file_err)}")
-                # Auto-mark as invalid in DB
-                if payment_id != 'unknown':
-                    db_ops.append(UpdateOne({'_id': payment['_id']}, {'$set': {'status': 'invalid'}}, upsert=False))
+                logger.error(f"Failed to process payment {payment.get('_id', 'unknown')}: {str(e)}")
                 continue
-        # Bulk update invalid status for skipped records
-        if db_ops:
-            try:
-                db.cashflows.bulk_write(db_ops)
-            except Exception as bulk_err:
-                logger.error(f"Failed to bulk mark skipped payments as invalid: {str(bulk_err)}")
-
-        payments_warning = payments_skipped > 0
-
-        category_stats = utils.calculate_payment_category_stats(cleaned_payments)
-
+        
+        # Log if no payments were processed
+        if not cleaned_payments and payments:
+            logger.warning(f"No payments processed for user {current_user.id}, raw count: {len(payments)}")
+        
         return render_template(
             'payments/index.html',
             payments=cleaned_payments,
-            category_stats=category_stats,
+            category_stats=utils.calculate_payment_category_stats(cleaned_payments),
             title=trans('payments_title', default='Money Out', lang=session.get('lang', 'en')),
             can_interact=utils.can_user_interact(current_user),
             expense_categories=expense_categories,
-            payments_warning=payments_warning,
-            payments_skipped=payments_skipped,
-            payments_skipped_ids=payments_skipped_ids
+            payments_warning=len(cleaned_payments) < len(payments),
+            payments_skipped=len(payments) - len(cleaned_payments),
+            payments_skipped_ids=[str(p['_id']) for p in payments if p not in cleaned_payments]
         )
     except Exception as e:
-        logger.error(
-            f"Error fetching payments for user {current_user.id}: {str(e)}",
-            extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
-        )
+        logger.error(f"Error fetching payments for user {current_user.id}: {str(e)}")
         flash(trans('payments_fetch_error', default='An error occurred while loading your payments. Please try again.'), 'danger')
         return redirect(url_for('dashboard.index'))
 
