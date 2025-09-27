@@ -799,7 +799,7 @@ def calculate_cit_liability(user_id, tax_year, db):
     
     validated_tax_year = validate_tax_year(tax_year)
     
-    if not db:
+    if db is None:
         raise InsufficientDataError("Database connection is required", missing_data=['database'])
     
     log_calculation_attempt(user_id, 'CIT', {'tax_year': validated_tax_year})
@@ -934,7 +934,7 @@ def calculate_pit_liability(user_id, tax_year, db):
     
     validated_tax_year = validate_tax_year(tax_year)
     
-    if not db:
+    if db is None:
         raise InsufficientDataError("Database connection is required", missing_data=['database'])
     
     log_calculation_attempt(user_id, 'PIT', {'tax_year': validated_tax_year})
@@ -1076,7 +1076,7 @@ def calculate_tax_liability(user_id, tax_year, db):
     
     try:
         # Validate database connection
-        if not db:
+        if db is None:
             raise InsufficientDataError("Database connection is required", missing_data=['database'])
         
         # Get user's business entity type
