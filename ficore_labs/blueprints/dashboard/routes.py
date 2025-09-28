@@ -151,6 +151,7 @@ def refresh_dashboard_data():
             # Calculate profits
             stats['gross_profit'] = stats['total_receipts_amount'] - stats['total_payments_amount']
             stats['true_profit'] = stats['gross_profit'] - stats['total_inventory_cost']
+            stats['profit_only'] = stats['true_profit']  # Ensure profit_only is included for template
 
         except Exception as stats_error:
             logger.error(
@@ -189,11 +190,172 @@ def refresh_dashboard_data():
 @login_required
 def index():
     """Display the user's dashboard with recent activity and role-specific content."""
-    if not current_user.is_trial_active():
-        # Directly render the subscription required page, no redirect
+    try:
+        # Check if trial is active
+        if not current_user.is_trial_active():
+            return render_template(
+                'subscribe/subscription_required.html',
+                title=trans('subscribe_required_title', default='Subscription Required'),
+                can_interact=False
+            )
+
+        # Initialize database and query parameters
+        db = utils.get_mongo_db()
+        query = {'user_id': str(current_user.id)}
+        stats = utils.standardize_stats_dictionary()
+
+        # Calculate stats (similar to /api/refresh_data)
+        try:
+            # Receipts
+            receipts_result = db.cashflows.aggregate([
+                {'$match': {**query, 'type': 'receipt'}},
+                {'$group': {'_id': None, 'total_amount': {'$sum': '$amount'}, 'count': {'$sum': 1}}}
+            ])
+            receipts_data = next(receipts_result, {})
+            stats['total_receipts'] = receipts_data.get('count', 0)
+            stats['total_receipts_amount'] = receipts_data.get('total_amount', 0)
+
+            # Payments
+            payments_result = db.cashflows.aggregate([
+                {'$match': {**query, 'type': 'payment'}},
+                {'$group': {'_id': None, 'total_amount': {'$sum': '$amount'}, 'count': {'$sum': 1}}}
+            ])
+            payments_data = next(payments_result, {})
+            stats['total_payments'] = payments_data.get('count', 0)
+            stats['total_payments_amount'] = payments_data.get('total_amount', 0)
+
+            # Debtors
+            debtors_result = db.records.aggregate([
+                {'$match': {**query, 'type': 'debtor'}},
+                {'$group': {'_id': None, 'total_amount': {'$sum': '$amount_owed'}, 'count': {'$sum': 1}}}
+            ])
+            debtors_data = next(debtors_result, {})
+            stats['total_debtors'] = debtors_data.get('count', 0)
+            stats['total_debtors_amount'] = debtors_data.get('total_amount', 0)
+
+            # Creditors
+            creditors_result = db.records.aggregate([
+                {'$match': {**query, 'type': 'creditor'}},
+                {'$group': {'_id': None, 'total_amount': {'$sum': '$amount_owed'}, 'count': {'$sum': 1}}}
+            ])
+            creditors_data = next(creditors_result, {})
+            stats['total_creditors'] = creditors_data.get('count', 0)
+            stats['total_creditors_amount'] = creditors_data.get('total_amount', 0)
+
+            # Inventory
+            inventory_result = db.records.aggregate([
+                {'$match': {**query, 'type': 'inventory'}},
+                {'$group': {'_id': None, 'total_cost': {'$sum': '$cost'}, 'count': {'$sum': 1}}}
+            ])
+            inventory_data = next(inventory_result, {})
+            stats['total_inventory'] = inventory_data.get('count', 0)
+            stats['total_inventory_cost'] = inventory_data.get('total_cost', 0)
+
+            # Profits
+            stats['gross_profit'] = stats['total_receipts_amount'] - stats['total_payments_amount']
+            stats['true_profit'] = stats['gross_profit'] - stats['total_inventory_cost']
+            stats['profit_only'] = stats['true_profit']  # Required by template
+        except Exception as stats_error:
+            logger.error(
+                f"Error calculating dashboard stats: {str(stats_error)}",
+                extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
+            )
+            flash(trans('general_error', default='Unable to load dashboard data'), 'danger')
+            return render_template('error/500.html', error_message=str(stats_error), title="Error"), 500
+
+        # Fetch recent activity (limit to 5 records each)
+        try:
+            recent_debtors = list(db.records.find({**query, 'type': 'debtor'}).sort('created_at', -1).limit(5))
+            recent_debtors = [normalize_datetime(clean_document_for_json(doc)) for doc in recent_debtors]
+
+            recent_creditors = list(db.records.find({**query, 'type': 'creditor'}).sort('created_at', -1).limit(5))
+            recent_creditors = [normalize_datetime(clean_document_for_json(doc)) for doc in recent_creditors]
+
+            recent_receipts = list(db.cashflows.find({**query, 'type': 'receipt'}).sort('created_at', -1).limit(5))
+            recent_receipts = [normalize_datetime(clean_document_for_json(doc)) for doc in recent_receipts]
+
+            recent_payments = list(db.cashflows.find({**query, 'type': 'payment'}).sort('created_at', -1).limit(5))
+            recent_payments = [normalize_datetime(clean_document_for_json(doc)) for doc in recent_payments]
+
+            recent_inventory = list(db.records.find({**query, 'type': 'inventory'}).sort('created_at', -1).limit(5))
+            recent_inventory = [normalize_datetime(clean_document_for_json(doc)) for doc in recent_inventory]
+        except Exception as activity_error:
+            logger.error(
+                f"Error fetching recent activity: {str(activity_error)}",
+                extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
+            )
+            recent_debtors = recent_creditors = recent_receipts = recent_payments = recent_inventory = []
+
+        # Calculate streak (example logic, adjust based on your requirements)
+        try:
+            streak = 0  # Placeholder: Implement actual streak calculation
+            # Example: Count consecutive days with at least one record
+            records = db.cashflows.find({**query}).sort('created_at', -1).limit(100)
+            last_date = None
+            for record in records:
+                record_date = safe_parse_datetime(record['created_at']).date()
+                if last_date is None:
+                    last_date = record_date
+                    streak = 1
+                elif (last_date - record_date).days == 1:
+                    streak += 1
+                    last_date = record_date
+                else:
+                    break
+        except Exception as streak_error:
+            logger.error(
+                f"Error calculating streak: {str(streak_error)}",
+                extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
+            )
+            streak = 0
+
+        # Check for inventory loss (example logic, adjust as needed)
+        inventory_loss = stats['total_inventory_cost'] < 0  # Example condition
+
+        # Fetch unpaid debtors and creditors for notifications
+        try:
+            unpaid_debtors = list(db.records.find({**query, 'type': 'debtor', 'status': 'unpaid'}).limit(5))
+            unpaid_debtors = [clean_document_for_json(doc) for doc in unpaid_debtors]
+            unpaid_creditors = list(db.records.find({**query, 'type': 'creditor', 'status': 'unpaid'}).limit(5))
+            unpaid_creditors = [clean_document_for_json(doc) for doc in unpaid_creditors]
+        except Exception as notify_error:
+            logger.error(
+                f"Error fetching notifications data: {str(notify_error)}",
+                extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
+            )
+            unpaid_debtors = unpaid_creditors = []
+
+        # Determine tax prep mode
+        tax_prep_mode = request.args.get('tax_prep') == '1'
+
+        # Determine if daily log reminder should be shown
+        show_daily_log_reminder = reminders.should_show_daily_reminder(db, str(current_user.id))
+
+        # Format stats for template
+        formatted_stats = utils.format_stats_for_template(stats)
+
+        # Render the dashboard template
         return render_template(
-            'subscribe/subscription_required.html',
-            title=trans('subscribe_required_title', default='Subscription Required'),
-            can_interact=False
+            'dashboard/index.html',
+            stats=formatted_stats,
+            recent_debtors=recent_debtors,
+            recent_creditors=recent_creditors,
+            recent_receipts=recent_receipts,
+            recent_payments=recent_payments,
+            recent_inventory=recent_inventory,
+            streak=streak,
+            tax_prep_mode=tax_prep_mode,
+            can_interact=True,
+            show_daily_log_reminder=show_daily_log_reminder,
+            inventory_loss=inventory_loss,
+            unpaid_debtors=unpaid_debtors,
+            unpaid_creditors=unpaid_creditors
         )
-    # ...existing code...
+
+    except Exception as e:
+        logger.error(
+            f"Error rendering dashboard: {str(e)}",
+            extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
+        )
+        flash(trans('general_error', default='An error occurred while loading the dashboard'), 'danger')
+        return render_template('error/500.html', error_message=str(e), title="Error"), 500
