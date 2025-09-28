@@ -108,7 +108,6 @@ def convert_naive_to_aware_datetimes(db):
         logger.error(f"Failed to convert naive datetimes: {str(e)}", exc_info=True)
         raise
 
-
 def manage_index(collection, keys, options=None, name=None):
     """
     Manage MongoDB index creation with simplified conflict resolution.
@@ -180,7 +179,15 @@ def to_dict_record(record):
         'description': record.get('description', ''),
         'reminder_count': record.get('reminder_count', 0),
         'cost': record.get('cost', 0),
-        'expected_margin': record.get('expected_margin', 0),
+        'selling_price': record.get('selling_price', 0),
+        'stock_qty': record.get('stock_qty', 0),
+        'quantity_in_stock': record.get('quantity_in_stock', 0),
+        'reorder_level': record.get('reorder_level', 0),
+        'restock_date': record.get('restock_date', ''),
+        'status': record.get('status', ''),
+        'vendor_id': record.get('vendor_id', ''),
+        'category': record.get('category', ''),
+        'unit': record.get('unit', ''),
         'created_at': normalize_datetime(record.get('created_at')),
         'updated_at': normalize_datetime(record.get('updated_at')) if record.get('updated_at') else None
     }
@@ -230,70 +237,6 @@ def get_db():
         return db
     except Exception as e:
         logger.error(f"Error connecting to database: {str(e)}", exc_info=True)
-        raise
-
-def convert_naive_to_aware_datetimes(db):
-    """
-    Convert naive datetimes to UTC-aware datetimes in all collections.
-    
-    Args:
-        db: MongoDB database instance
-    """
-    try:
-        # Check if migration has already been applied
-        if db.system_config.find_one({'_id': 'datetime_migration_applied'}):
-            logger.info("Naive datetime migration already applied, skipping.")
-            return
-        
-        datetime_fields = ['created_at', 'updated_at', 'timestamp', 'trial_start', 'trial_end', 
-                          'subscription_start', 'subscription_end', 'expires_at', 'redeemed_at', 
-                          'last_viewed', 'completed_at', 'payment_date', 'approved_at', 'rejected_at']
-        
-        for collection_name in db.list_collection_names():
-            collection = db[collection_name]
-            # Get a sample document to check for relevant fields
-            sample_doc = collection.find_one() or {}
-            # Filter fields that exist in the sample document
-            relevant_fields = [field for field in datetime_fields if field in sample_doc]
-            
-            if not relevant_fields:
-                continue
-                
-            # Find documents with naive datetimes
-            query = {
-                '$or': [
-                    {field: {'$type': 'date', '$not': {'$type': 'timestamp'}}}
-                    for field in relevant_fields
-                ]
-            }
-            
-            updated_count = 0
-            for doc in collection.find(query):
-                updates = {}
-                for field in relevant_fields:
-                    if field in doc and isinstance(doc[field], datetime) and doc[field].tzinfo is None:
-                        updates[field] = parse_and_normalize_datetime(doc[field])
-                
-                if updates:
-                    collection.update_one(
-                        {'_id': doc['_id']},
-                        {'$set': updates}
-                    )
-                    updated_count += 1
-            
-            if updated_count > 0:
-                logger.info(f"Converted {updated_count} naive datetimes to UTC-aware in {collection_name}")
-        
-        # Mark migration as complete
-        db.system_config.update_one(
-            {'_id': 'datetime_migration_applied'},
-            {'$set': {'value': True, 'migrated_at': datetime.now(timezone.utc)}},
-            upsert=True
-        )
-        logger.info("Naive datetime migration completed and marked in system_config")
-        
-    except Exception as e:
-        logger.error(f"Failed to convert naive datetimes: {str(e)}", exc_info=True)
         raise
 
 def verify_no_naive_datetimes(db):
@@ -386,23 +329,6 @@ def initialize_app_data(app):
             else:
                 logger.info(f"Admin user with ID 'admin' already exists with valid password_hash, skipping creation")
             
-            # Moved datetime conversion and verification outside the admin user else block
-            try:
-                convert_naive_to_aware_datetimes(db_instance)
-            except Exception as e:
-                logger.error(f"Failed to convert naive datetimes during initialization: {str(e)}", exc_info=True)
-                raise
-                
-            try:
-                verify_no_naive_datetimes(db_instance)
-            except Exception as e:
-                logger.error(f"Failed to verify naive datetimes: {str(e)}", exc_info=True)
-                raise
-                
-        except Exception as e:
-            logger.error(f"{trans('general_database_initialization_failed', default='Failed to initialize database')}: {str(e)}", exc_info=True)
-            raise
-            
             collection_schemas = {
                 'users': {
                     'validator': {
@@ -484,15 +410,38 @@ def initialize_app_data(app):
                                 'description': {'bsonType': ['string', 'null']},
                                 'reminder_count': {'bsonType': ['int', 'null'], 'minimum': 0},
                                 'cost': {'bsonType': ['number', 'null'], 'minimum': 0},
-                                'expected_margin': {'bsonType': ['number', 'null'], 'minimum': 0},
+                                'selling_price': {'bsonType': ['number', 'null'], 'minimum': 0},
+                                'stock_qty': {'bsonType': ['number', 'null'], 'minimum': 0},
+                                'quantity_in_stock': {'bsonType': ['number', 'null'], 'minimum': 0},
+                                'reorder_level': {'bsonType': ['number', 'null'], 'minimum': 0},
+                                'restock_date': {'bsonType': ['string', 'null']},
+                                'status': {'bsonType': ['string', 'null'], 'enum': [None, 'Active', 'Out of Stock', 'Discontinued']},
+                                'vendor_id': {'bsonType': ['string', 'null']},
+                                'category': {'bsonType': ['string', 'null']},
+                                'unit': {'bsonType': ['string', 'null']},
                                 'created_at': {'bsonType': 'date'},
                                 'updated_at': {'bsonType': ['date', 'null']}
-                            }
+                            },
+                            'allOf': [
+                                {
+                                    'if': {'properties': {'type': {'const': 'inventory'}}},
+                                    'then': {
+                                        'required': ['name', 'cost', 'selling_price'],
+                                        'properties': {
+                                            'name': {'bsonType': 'string'},
+                                            'cost': {'bsonType': 'number', 'minimum': 0},
+                                            'selling_price': {'bsonType': 'number', 'minimum': 0}
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     'indexes': [
                         {'key': [('user_id', ASCENDING), ('type', ASCENDING)]},
-                        {'key': [('created_at', DESCENDING)]}
+                        {'key': [('created_at', DESCENDING)]},
+                        {'key': [('user_id', ASCENDING), ('category', ASCENDING)], 'sparse': True},
+                        {'key': [('user_id', ASCENDING), ('status', ASCENDING)], 'sparse': True}
                     ]
                 },
                 'cashflows': {
@@ -534,6 +483,25 @@ def initialize_app_data(app):
                         {'key': [('user_id', ASCENDING), ('expense_category', ASCENDING)]},
                         {'key': [('user_id', ASCENDING), ('tax_year', ASCENDING)]},
                         {'key': [('user_id', ASCENDING), ('is_tax_deductible', ASCENDING)]}
+                    ]
+                },
+                'inventory_movements': {
+                    'validator': {
+                        '$jsonSchema': {
+                            'bsonType': 'object',
+                            'required': ['inventory_item_id', 'change_type', 'quantity', 'date', 'notes'],
+                            'properties': {
+                                'inventory_item_id': {'bsonType': 'string'},
+                                'change_type': {'enum': ['add', 'adjust', 'remove']},
+                                'quantity': {'bsonType': 'number'},
+                                'date': {'bsonType': 'date'},
+                                'notes': {'bsonType': 'string'}
+                            }
+                        }
+                    },
+                    'indexes': [
+                        {'key': [('inventory_item_id', ASCENDING)]},
+                        {'key': [('date', DESCENDING)]}
                     ]
                 },
                 'audit_logs': {
@@ -818,7 +786,7 @@ def initialize_app_data(app):
                         'type': 'inventory',
                         'name': 'Sample Inventory Item',
                         'cost': 100.0,
-                        'expected_margin': 20.0,
+                        'selling_price': 125.0,
                         'created_at': datetime.now(timezone.utc)
                     }
                     try:
