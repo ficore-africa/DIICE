@@ -48,6 +48,80 @@
             {% endif %}
         </div>
         <div class="col-12">
+            <label for="stock_qty" class="form-label">{{ t('inventory_stock_qty', default='Stock Quantity') }}</label>
+            {{ form.stock_qty(class="form-control", type="number", step="0.01", min="0", disabled=not can_interact) }}
+            {% if form.stock_qty.errors %}
+                <p class="text-danger mt-1">{{ form.stock_qty.errors[0] }}</p>
+            {% endif %}
+        </div>
+        <div class="col-12">
+            <label for="category" class="form-label">{{ t('inventory_category', default='Category') }}</label>
+            <select name="category" class="form-control" id="category" {% if not can_interact %}disabled{% endif %}>
+                {% for cat in INVENTORY_CATEGORIES %}
+                    <option value="{{ cat }}">{{ cat }}</option>
+                {% endfor %}
+            </select>
+            {% if form.category.errors %}
+                <p class="text-danger mt-1">{{ form.category.errors[0] }}</p>
+            {% endif %}
+        </div>
+        <div class="col-12">
+            <label for="unit" class="form-label">{{ t('inventory_unit', default='Unit') }}</label>
+            <select name="unit" class="form-control" id="unit" {% if not can_interact %}disabled{% endif %}>
+                {% for unit in INVENTORY_UNITS %}
+                    <option value="{{ unit }}">{{ unit }}</option>
+                {% endfor %}
+            </select>
+            {% if form.unit.errors %}
+                <p class="text-danger mt-1">{{ form.unit.errors[0] }}</p>
+            {% endif %}
+        </div>
+        <div class="col-12">
+            <label for="status" class="form-label">{{ t('inventory_status', default='Status') }}</label>
+            <select name="status" class="form-control" id="status" {% if not can_interact %}disabled{% endif %}>
+                <option value="Active">Active</option>
+                <option value="Out of Stock">Out of Stock</option>
+                <option value="Discontinued">Discontinued</option>
+            </select>
+            {% if form.status.errors %}
+                <p class="text-danger mt-1">{{ form.status.errors[0] }}</p>
+            {% endif %}
+        </div>
+        <div class="col-12">
+            <label for="vendor_id" class="form-label">{{ t('inventory_vendor_id', default='Vendor ID') }}</label>
+            {{ form.vendor_id(class="form-control", disabled=not can_interact) }}
+            {% if form.vendor_id.errors %}
+                <p class="text-danger mt-1">{{ form.vendor_id.errors[0] }}</p>
+            {% endif %}
+        </div>
+        <div class="col-12">
+            <div class="form-check">
+                {{ form.manual_price_override(class="form-check-input", id="manual_price_override") }}
+                <label class="form-check-label" for="manual_price_override">{{ t('inventory_manual_price_override', default='Manual Price Override') }}</label>
+            </div>
+        </div>
+        <div class="col-12" id="selling_price_field" style="display: none;">
+            <label for="selling_price" class="form-label">{{ t('inventory_selling_price', default='Selling Price') }}</label>
+            {{ form.selling_price(class="form-control", type="number", step="0.01", min="0", disabled=not can_interact) }}
+            {% if form.selling_price.errors %}
+                <p class="text-danger mt-1">{{ form.selling_price.errors[0] }}</p>
+            {% endif %}
+        </div>
+        <script>
+        // Show/hide selling price field based on manual override
+        document.addEventListener('DOMContentLoaded', function() {
+            var overrideCheckbox = document.getElementById('manual_price_override');
+            var priceField = document.getElementById('selling_price_field');
+            if (overrideCheckbox) {
+                function togglePriceField() {
+                    priceField.style.display = overrideCheckbox.checked ? 'block' : 'none';
+                }
+                overrideCheckbox.addEventListener('change', togglePriceField);
+                togglePriceField();
+            }
+        });
+        </script>
+        <div class="col-12">
             <button type="submit" class="btn btn-primary w-100" {% if not can_interact %}disabled{% endif %}>{{ t('general_submit', default='Add Item') }}</button>
         </div>
     </form>

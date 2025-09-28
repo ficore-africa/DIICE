@@ -32,6 +32,7 @@
         <div class="header-left">
             {% if current_user.is_authenticated %}
                 <div class="profile-link-container">
+                    {% if current_user.is_trial_active() %}
                     <a href="{{ url_for('dashboard.index') | e }}" class="profile-link" aria-label="{{ t('general_user_profile', default='User Profile') | e }}">
                         <div class="profile-avatar-container">
                             <img src="{{ current_user.profile_picture if current_user.profile_picture else url_for('static', filename='img/default_profile.png') | e }}" alt="{{ t('general_user_profile', default='User Profile') | e }}" class="profile-avatar">
@@ -39,6 +40,7 @@
                         </div>
                         <span class="greeting-text">{{ t('general_hi_user', default='Hi') | e }}, {{ current_user.display_name | default(current_user.id) | e }}</span>
                     </a>
+                    {% endif %}
                     <input type="file" id="profile_picture" name="profile_picture" accept="image/*" style="display: none;">
                 </div>
             {% else %}
@@ -81,11 +83,13 @@
                 <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
                     <ul class="navbar-nav">
                         {% for item in navigation %}
+                            {% if not item.endpoint == 'dashboard.index' or current_user.is_trial_active() %}
                             <li class="nav-item">
                                 <a class="nav-link {% if request.endpoint == item.endpoint %}active{% endif %}" href="{{ item.url | e }}" data-bs-toggle="tooltip" data-bs-title="{{ t(item.tooltip_key, default=item.tooltip) | e }}">
                                     <i class="bi {{ item.icon | default('bi-question-circle') | e }} me-2"></i>{{ t(item.label_key, default=item.label) | e }}
                                 </a>
                             </li>
+                            {% endif %}
                         {% endfor %}
                         <li class="nav-item">
                             <div class="language-buttons d-flex">
@@ -186,10 +190,12 @@
         <nav class="bottom-nav d-md-none" role="navigation" aria-label="{{ t('general_mobile_navigation', default='Mobile navigation') | e }}">
             <div class="nav-container">
                 {% for item in navigation %}
+                    {% if not item.endpoint == 'dashboard.index' or current_user.is_trial_active() %}
                     <a href="{{ item.url | e }}" class="nav-item {% if request.endpoint == item.endpoint %}active{% endif %}" aria-label="{{ t(item.label_key, default=item.label) | e }}">
                         <i class="bi {{ item.icon | default('bi-question-circle') | e }}"></i>
                         <div class="nav-label">{{ t(item.label_key, default=item.label) | e }}</div>
                     </a>
+                    {% endif %}
                 {% endfor %}
                 {% if not current_user.is_subscribed and not current_user.is_trial_active() %}
                     <a href="{{ url_for('subscribe_bp.subscribe') | e }}" class="nav-item {% if request.endpoint == 'subscribe_bp.subscribe' %}active{% endif %}" aria-label="{{ t('subscribe_title', default='Subscribe') | e }}">

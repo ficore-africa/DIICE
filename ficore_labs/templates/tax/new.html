@@ -38,7 +38,7 @@
                                     {% endfor %}
                                 </div>
                             {% endif %}
-                            <small class="form-text text-muted">{{ t('tax_income_help', default='Enter your total annual income before deductions (NGN)') }}</small>
+                            <small class="form-text text-muted">{{ t('tax_income_help', default='Enter your total annual income before deductions (NGN)') }} <a href="{{ url_for('education.education_home') }}" class="link-info" target="_blank">Learn more</a></small>
                         </div>
 
                         <!-- Annual Rent Expenses -->
@@ -52,7 +52,7 @@
                                     {% endfor %}
                                 </div>
                             {% endif %}
-                            <small class="form-text text-muted">{{ t('tax_rent_relief_help', default='Enter your annual rent expenses. Relief is calculated as the lower of ₦500,000 or 20% of annual rent.') }}</small>
+                            <small class="form-text text-muted">{{ t('tax_rent_relief_help', default='Enter your annual rent expenses. Relief is calculated as the lower of ₦500,000 or 20% of annual rent.') }} <a href="{{ url_for('education.education_home') }}" class="link-info" target="_blank">Learn more</a></small>
                         </div>
 
                         <!-- Annual Pension Contribution -->
@@ -66,7 +66,7 @@
                                     {% endfor %}
                                 </div>
                             {% endif %}
-                            <small class="form-text text-muted">{{ t('tax_pension_help', default='Enter your annual pension contribution. Defaults to 8% of income for employees if left blank.') }}</small>
+                            <small class="form-text text-muted">Leave blank if you don’t contribute to a pension scheme. <a href="{{ url_for('education.education_home') }}" class="link-info" target="_blank">Learn more</a></small>
                         </div>
 
                         <!-- Tax Year -->
@@ -97,13 +97,38 @@
                                     {% endfor %}
                                 </div>
                             {% endif %}
-                            <small class="form-text text-muted">{{ t('tax_entity_type_help', default='Select your business entity type') }}</small>
+                            <small class="form-text text-muted">{{ t('tax_entity_type_help', default='Select your business entity type') }} <a href="{{ url_for('education.education_home') }}" class="link-info" target="_blank">Not sure what this means? Learn more in our Tax Education Center</a></small>
                         </div>
 
                         <!-- Deductions -->
+                        <!-- Smart Tax Deduction Suggestions Card -->
+                        {% if deductible_summary and deductible_summary.breakdown %}
+                        <div class="alert alert-warning mb-4 p-4 shadow-sm" role="region" aria-labelledby="deduction-suggestion-heading">
+                            <h4 class="mb-2" id="deduction-suggestion-heading">
+                                <i class="fas fa-lightbulb text-warning"></i> Smart Tax Deduction Suggestions
+                            </h4>
+                            <p class="mb-2">
+                                Based on your logged expenses, you may be eligible for deductions in the following categories:
+                            </p>
+                            <ul class="mb-3">
+                                {% for cat_key, cat in deductible_summary.breakdown.items() %}
+                                <li><strong>{{ cat.name }}:</strong> {{ cat.amount }}</li>
+                                {% endfor %}
+                            </ul>
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="includeDeductibleExpenses" name="includeDeductibleExpenses" value="1">
+                                <label class="form-check-label" for="includeDeductibleExpenses">
+                                    Include deductible expenses from my expense records.
+                                </label>
+                            </div>
+                            <a href="{{ url_for('education.education_home') }}" target="_blank" class="link-info">
+                                See how these deductions work <i class="fas fa-arrow-right"></i>
+                            </a>
+                        </div>
+                        {% endif %}
                         <div class="mb-3">
                             <label class="form-label">{{ t('tax_deductions', default='Deductions') }}</label>
-                            <button type="button" class="btn btn-outline-primary btn-sm mb-2" onclick="addDeduction()">{{ t('tax_add_deduction', default='Add Deduction') }}</button>
+                            <button type="button" class="btn btn-outline-primary btn-sm mb-2" onclick="addDeduction()">{{ t('tax_add_deduction', default='Add Deduction') }}</button> <span class="ms-1" data-bs-toggle="tooltip" title="Learn more about deductible expenses in our education module."><i class="fas fa-info-circle text-info"></i></span>
                             <div id="deductions-container">
                                 {% for item in form.deductions.entries %}
                                     <div class="deduction-entry card p-3 mb-2">

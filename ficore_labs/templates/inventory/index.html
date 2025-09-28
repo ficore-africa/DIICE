@@ -10,6 +10,15 @@
                 <th>Name</th>
                 <th>Cost</th>
                 <th>Expected Margin</th>
+                <th>Quantity in Stock</th>
+                <th>Reorder Level</th>
+                <th>Restock Date</th>
+                <th>Category</th>
+                <th>Unit</th>
+                <th>Status</th>
+                <th>Vendor</th>
+                <th>Selling Price</th>
+                <th>Manual Price Override</th>
                 <th>Created At</th>
             </tr>
         </thead>
@@ -19,6 +28,15 @@
                 <td>{{ item.name }}</td>
                 <td>{{ item.cost }}</td>
                 <td>{{ item.expected_margin }}</td>
+                <td>{{ item.quantity_in_stock if item.quantity_in_stock is defined else '' }}</td>
+                <td>{{ item.reorder_level if item.reorder_level is defined else '' }}</td>
+                <td>{{ item.restock_date if item.restock_date is defined else '' }}</td>
+                <td>{{ item.category if item.category is defined else '' }}</td>
+                <td>{{ item.unit if item.unit is defined else '' }}</td>
+                <td>{{ item.status if item.status is defined else '' }}</td>
+                <td>{{ item.vendor_id if item.vendor_id is defined else '' }}</td>
+                <td>{{ item.selling_price if item.selling_price is defined else '' }}</td>
+                <td>{% if item.manual_price_override %}Yes{% else %}No{% endif %}</td>
                 <td>{{ item.created_at }}</td>
             </tr>
             {% endfor %}

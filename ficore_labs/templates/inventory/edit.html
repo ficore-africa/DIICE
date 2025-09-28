@@ -1,0 +1,88 @@
+{% extends 'base.html' %}
+{% block title %}Edit Inventory Item{% endblock %}
+{% block content %}
+<div class="container mt-5">
+    <h1>Edit Inventory Item</h1>
+    <form action="{{ url_for('inventory.edit', item_id=item.id) }}" method="POST" class="row g-3">
+        {{ form.hidden_tag() }}
+        <div class="col-12">
+            <label for="name" class="form-label">Name</label>
+            {{ form.name(class="form-control") }}
+        </div>
+        <div class="col-12">
+            <label for="cost" class="form-label">Cost</label>
+            {{ form.cost(class="form-control", type="number", step="0.01") }}
+        </div>
+        <div class="col-12">
+            <label for="expected_margin" class="form-label">Expected Margin</label>
+            {{ form.expected_margin(class="form-control", type="number", step="0.01") }}
+        </div>
+        <div class="col-12">
+            <label for="quantity_in_stock" class="form-label">Quantity in Stock</label>
+            {{ form.quantity_in_stock(class="form-control", type="number", step="1") }}
+        </div>
+        <div class="col-12">
+            <label for="reorder_level" class="form-label">Reorder Level</label>
+            {{ form.reorder_level(class="form-control", type="number", step="1") }}
+        </div>
+        <div class="col-12">
+            <label for="restock_date" class="form-label">Restock Date</label>
+            {{ form.restock_date(class="form-control", type="date") }}
+        </div>
+        <div class="col-12">
+            <label for="category" class="form-label">Category</label>
+            <select name="category" class="form-control" id="category">
+                {% for cat in INVENTORY_CATEGORIES %}
+                    <option value="{{ cat }}" {% if form.category.data == cat %}selected{% endif %}>{{ cat }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-12">
+            <label for="unit" class="form-label">Unit</label>
+            <select name="unit" class="form-control" id="unit">
+                {% for unit in INVENTORY_UNITS %}
+                    <option value="{{ unit }}" {% if form.unit.data == unit %}selected{% endif %}>{{ unit }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-12">
+            <label for="status" class="form-label">Status</label>
+            <select name="status" class="form-control" id="status">
+                <option value="Active" {% if form.status.data == 'Active' %}selected{% endif %}>Active</option>
+                <option value="Out of Stock" {% if form.status.data == 'Out of Stock' %}selected{% endif %}>Out of Stock</option>
+                <option value="Discontinued" {% if form.status.data == 'Discontinued' %}selected{% endif %}>Discontinued</option>
+            </select>
+        </div>
+        <div class="col-12">
+            <label for="vendor_id" class="form-label">Vendor ID</label>
+            {{ form.vendor_id(class="form-control") }}
+        </div>
+        <div class="col-12">
+            <div class="form-check">
+                {{ form.manual_price_override(class="form-check-input", id="manual_price_override") }}
+                <label class="form-check-label" for="manual_price_override">Manual Price Override</label>
+            </div>
+        </div>
+        <div class="col-12" id="selling_price_field" style="display: none;">
+            <label for="selling_price" class="form-label">Selling Price</label>
+            {{ form.selling_price(class="form-control", type="number", step="0.01") }}
+        </div>
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var overrideCheckbox = document.getElementById('manual_price_override');
+            var priceField = document.getElementById('selling_price_field');
+            if (overrideCheckbox) {
+                function togglePriceField() {
+                    priceField.style.display = overrideCheckbox.checked ? 'block' : 'none';
+                }
+                overrideCheckbox.addEventListener('change', togglePriceField);
+                togglePriceField();
+            }
+        });
+        </script>
+        <div class="col-12">
+            <button type="submit" class="btn btn-primary w-100">Update Item</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

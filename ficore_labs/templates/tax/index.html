@@ -9,6 +9,9 @@
     {% set tool_icon = 'fa-calculator' %}
     {% set subtitle = t('tax_calculator_description', default='Calculate your taxes and manage your tax records efficiently') %}
     {% include 'tool_header.html' %}
+    <div class="alert alert-info mt-3">
+        <strong>Tip:</strong> Based on your recorded expenses on Ficore, you may have deductible spending from categories like office, transport, tools, etc. <a href="{{ url_for('education.education_home') }}" class="link-info" target="_blank">Learn more in our Tax Education Center</a>
+    </div>
 
     <!-- Navigation Breadcrumb -->
     <nav aria-label="breadcrumb" class="mb-4">
