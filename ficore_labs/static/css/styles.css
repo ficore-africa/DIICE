@@ -24,6 +24,30 @@
         padding-right: 1rem;
     }
 }
+/* Optimize Quick Action Tools section spacing for mobile */
+@media (max-width: 576px) {
+    .quick-actions-section {
+        margin: 0.5rem 0 !important;
+        padding: 0.5rem 0.25rem !important;
+    }
+    .quick-actions-heading {
+        margin-bottom: 0.75rem !important;
+        font-size: 1.1rem !important;
+    }
+    .quick-actions {
+        gap: 8px !important;
+        margin-bottom: 0.5rem !important;
+        padding: 0 !important;
+    }
+    .quick-action-card {
+        padding: 0.5rem !important;
+        margin-bottom: 0.25rem !important;
+        min-height: 100px !important;
+    }
+    .explore-section {
+        margin-top: 0.5rem !important;
+    }
+}
 
 /* Profit display enhancement */
 .alert-info .h5 {
