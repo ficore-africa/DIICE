@@ -162,29 +162,43 @@ def log_audit_action(action, details=None):
 
 def get_setup_wizard_route(role):
     """Get the appropriate setup wizard route based on user role."""
-    # Only one role supported
-    return 'users.setup_wizard'
+    if role in ['trader', 'admin']:
+        return 'users.setup_wizard'
+    logger.error(f"Invalid role '{role}' for setup wizard route")
+    raise ValueError(f"Invalid role: {role}")
 
-def get_post_login_redirect(user_role):
-    """Determine where to redirect user after login based on their role."""
-    # Only one role supported
-    return url_for('general_bp.home')
+def get_post_login_redirect(role):
+    """Determine the redirect URL after login based on user role and trial/subscription status."""
+    try:
+        # Check if user has an active trial or subscription
+        if current_user.is_trial_active() or current_user.is_subscribed:
+            if role in ['trader', 'admin']:
+                return url_for('business.home')
+            logger.error(f"Invalid role '{role}' for post-login redirect")
+            raise ValueError(f"Invalid role: {role}")
+        else:
+            # Redirect to subscription page if trial expired and not subscribed
+            return url_for('subscribe_bp.subscribe')
+    except Exception as e:
+        current_app.logger.error(
+            f"Error determining post-login redirect for role {role}: {str(e)}",
+            extra={'user_id': current_user.id}
+        )
+        return url_for('general_bp.landing')
 
-def get_explore_tools_redirect(user_role):
+def get_explore_tools_redirect(role):
     """Determine where to redirect user when they click 'Explore Your Tools' based on their role."""
     try:
-        if user_role == 'trader':
+        if role == 'trader':
             return url_for('general_bp.home')
-        elif user_role == 'startup':
-            return url_for('dashboard.index')
-        elif user_role == 'admin':
+        elif role == 'admin':
             return url_for('admin.dashboard')
         else:
-            logger.error(f"Invalid role '{user_role}' for explore tools redirect")
-            raise ValueError(f"Invalid role: {user_role}")
+            logger.error(f"Invalid role '{role}' for explore tools redirect")
+            raise ValueError(f"Invalid role: {role}")
     except Exception as e:
-        logger.error(f"Error determining explore tools redirect for role '{user_role}': {str(e)}")
-        return url_for('users.logout')  # Redirect to logout for invalid roles
+        logger.error(f"Error determining explore tools redirect for role '{role}': {str(e)}")
+        return url_for('users.logout')
 
 @users_bp.route('/login', methods=['GET', 'POST'])
 @utils.limiter.limit("50/hour")
