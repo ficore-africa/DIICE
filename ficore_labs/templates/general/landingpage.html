@@ -9,8 +9,8 @@
         <div class="hero-actions">
             <!-- Primary Auth Actions -->
             <div class="auth-buttons">
-                <a href="{{ url_for('users.signup') }}" class="btn btn-primary btn-lg" data-bs-toggle="tooltip" data-bs-title="{{ t('general_signup_tooltip', default='Create your Ficore Africa account with a 30-day free trial') | e }}">
-                    <i class="bi bi-person-plus me-2"></i>{{ t('general_signup', default='Start your free trial') | e }} <span class="badge bg-light text-dark ms-2"><strong>30-day free trial</strong></span>
+                <a href="{{ url_for('users.signup') }}" class="btn btn-primary btn-lg" data-bs-toggle="tooltip" data-bs-title="{{ t('general_signup_tooltip', default='Create your Ficore Africa account') | e }}">
+                    <i class="bi bi-person-plus me-2"></i>{{ t('general_signup', default='Sign up') | e }}
                 </a>
                 <a href="{{ url_for('users.login') }}" class="btn btn-outline-primary btn-lg" data-bs-toggle="tooltip" data-bs-title="{{ t('general_login_tooltip', default='Log in to your account') | e }}">
                     <i class="bi bi-box-arrow-in-right me-2"></i>{{ t('general_login', default='Log In') | e }}
@@ -198,7 +198,7 @@
         <p class="text-muted">{{ t('general_signup_prompt', default='Sign up today to access tools for business management or startup growth.') | e }}</p>
         <div class="hero-actions">
             <div class="auth-buttons">
-                <a href="{{ url_for('users.signup') }}" class="btn btn-primary" data-bs-toggle="tooltip" data-bs-title="{{ t('general_get_started_tooltip', default='Start your financial journey with a 30-day free trial') | e }}">{{ t('general_get_started', default='Start your free trial') | e }}</a>
+                <a href="{{ url_for('users.signup') }}" class="btn btn-primary" data-bs-toggle="tooltip" data-bs-title="{{ t('general_get_started_tooltip', default='Start your financial journey') | e }}">{{ t('general_get_started', default='Sign up') | e }}</a>
                 <a href="{{ url_for('users.login') }}" class="btn btn-outline-primary" data-bs-toggle="tooltip" data-bs-title="{{ t('general_login_tooltip', default='Log in to your account') | e }}">{{ t('general_login', default='Log In') | e }}</a>
             </div>
         </div>
