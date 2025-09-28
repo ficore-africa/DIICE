@@ -425,7 +425,7 @@ def initialize_app_data(app):
                             'anyOf': [
                                 {
                                     'properties': {
-                                        'type': {'const': 'inventory'},
+                                        'type': {'enum': ['inventory']},
                                         'name': {'bsonType': 'string'},
                                         'cost': {'bsonType': 'number', 'minimum': 0},
                                         'selling_price': {'bsonType': 'number', 'minimum': 0}
