@@ -94,12 +94,8 @@ def home():
     """Trader homepage with trial/subscription check."""
     try:
         user = get_user(get_mongo_db(), current_user.id)
-        if not user.is_trial_active():
-            return render_template(
-                'subscribe/subscription_required.html',
-                title=trans('subscribe_required_title', default='Subscription Required'),
-                can_interact=False
-            )
+        if not user.is_trial_active() and not user.is_subscribed:
+            return redirect(url_for('subscribe_bp.subscribe'))
         
         if user.trial_end and user.trial_end.tzinfo is None:
             user.trial_end = user.trial_end.replace(tzinfo=ZoneInfo("UTC"))
@@ -250,7 +246,6 @@ def feedback():
         ['receipts', trans('receipts_dashboard', default='Receipts')],
         ['payment', trans('payments_dashboard', default='Payments')],
         ['report', trans('reports_dashboard', default='Business Reports')],
-
     ]
 
     if request.method == 'POST':
@@ -279,7 +274,7 @@ def feedback():
             
             if current_user.is_authenticated:
                 user = get_user(get_mongo_db(), current_user.id)
-                if not user.is_trial_active():
+                if not user.is_trial_active() and not user.is_subscribed:
                     flash(trans('general_subscription_required', default='Your trial has expired. Please subscribe to submit feedback.'), 'warning')
                     return redirect(url_for('subscribe_bp.subscribe'))
             
@@ -357,18 +352,16 @@ def waitlist():
         extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id if current_user.is_authenticated else 'anonymous', 'ip_address': request.remote_addr}
     )
 
-    form = WaitlistForm()  # Instantiate the form
+    form = WaitlistForm()
 
     if request.method == 'POST':
         if form.validate_on_submit():
             try:
-                # Get form data
                 full_name = form.full_name.data
                 whatsapp_number = form.whatsapp_number.data
                 email = form.email.data
                 business_type = form.business_type.data or None
 
-                # Check for uniqueness of email and WhatsApp number
                 with current_app.app_context():
                     db = get_mongo_db()
                     if get_waitlist_entries(db, {'email': email}):
@@ -378,7 +371,6 @@ def waitlist():
                         flash(trans('general_waitlist_duplicate_error', default='WhatsApp number already exists in waitlist'), 'danger')
                         return render_template('general/waitlist.html', title=trans('general_waitlist', lang=lang, default='Join Our Waitlist'), form=form)
 
-                # Store waitlist entry
                 with current_app.app_context():
                     db = get_mongo_db()
                     waitlist_entry = {
@@ -393,7 +385,6 @@ def waitlist():
                     }
                     create_waitlist_entry(db, waitlist_entry)
                     
-                    # Log audit entry
                     db.audit_logs.insert_one({
                         'admin_id': 'system',
                         'action': 'submit_waitlist',
@@ -420,9 +411,7 @@ def waitlist():
                 flash(trans('general_error', default='Error occurred during waitlist submission'), 'danger')
                 return render_template('general/waitlist.html', title=trans('general_waitlist', lang=lang, default='Join Our Waitlist'), form=form), 500
         else:
-            # Form validation failed
             flash(trans('general_invalid_input', default='Please correct the errors in the form'), 'danger')
             return render_template('general/waitlist.html', title=trans('general_waitlist', lang=lang, default='Join Our Waitlist'), form=form)
     
     return render_template('general/waitlist.html', title=trans('general_waitlist', lang=lang, default='Join Our Waitlist'), form=form)
-
