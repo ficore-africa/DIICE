@@ -704,7 +704,6 @@ def initialize_app_data(app):
                             }
                         }
                     },
-378
                     'indexes': [
                         {'key': [('user_id', ASCENDING), ('module_id', ASCENDING)], 'unique': True},
                         {'key': [('user_id', ASCENDING)]},
