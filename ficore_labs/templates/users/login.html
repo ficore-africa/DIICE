@@ -12,7 +12,7 @@
                         <div class="alert bg-{{ 'red-100 text-red-700 border-red-500' if category in ['danger', 'error'] else 'green-100 text-green-700 border-green-500' }} border-l-4 rounded p-3 mb-4">
                             {{ message | e }}
                             {% if category in ['danger', 'error'] %}
-                                <p class="mt-1 text-sm">{{ t('general_check_credentials', default='Please check your username or email and password.') | e }}</p>
+                                <p class="mt-1 text-sm">{{ t('general_check_credentials', default='Invalid username or password.') | e }}</p>
                             {% endif %}
                         </div>
                     {% endfor %}
@@ -25,9 +25,7 @@
                     <label class="floating-label" for="username">{{ t('general_login_identifier', default='Username or Email') | e }}</label>
                     {% if form.username.errors %}
                         <div class="text-red-600 text-sm mt-1">
-                            {% for error in form.username.errors %}
-                                {{ error | e }}<br>
-                            {% endfor %}
+                            {{ form.username.errors[0] | e }}
                         </div>
                     {% endif %}
                 </div>
@@ -36,13 +34,10 @@
                     <label class="floating-label" for="password">{{ t('general_password', default='Password') | e }}</label>
                     <button type="button" id="togglePassword" class="toggle-password-btn" aria-label="{{ t('general_toggle_password_visibility', default='Toggle password visibility') | e }}">
                         <i class="fas fa-eye eye-icon"></i>
-                        <i class="fas fa-eye-slash eye-slash-icon hidden"></i>
                     </button>
                     {% if form.password.errors %}
                         <div class="text-red-600 text-sm mt-1">
-                            {% for error in form.password.errors %}
-                                {{ error | e }}<br>
-                            {% endfor %}
+                            {{ form.password.errors[0] | e }}
                         </div>
                     {% endif %}
                 </div>
@@ -58,11 +53,99 @@
         </div>
     </div>
 </div>
+<style>
+.login-page__container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 1rem;
+}
+.login-page__card {
+    background: white;
+    border-radius: 0.5rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    padding: 2rem;
+    width: 100%;
+    max-width: 400px;
+}
+.login-page__form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+.form-group {
+    position: relative;
+}
+.form-control {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #ced4da;
+    border-radius: 0.25rem;
+}
+.floating-label {
+    position: absolute;
+    top: 50%;
+    left: 0.75rem;
+    transform: translateY(-50%);
+    transition: all 0.2s ease-out;
+    color: #6b7280;
+    pointer-events: none;
+}
+.form-control:focus + .floating-label,
+.form-control:not(:placeholder-shown) + .floating-label {
+    top: 0;
+    transform: translateY(-100%) scale(0.85);
+    background: white;
+    padding: 0 0.2rem;
+}
+.password-container {
+    position: relative;
+}
+.toggle-password-btn {
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+}
+.eye-icon {
+    font-size: 1.2rem;
+    color: #6b7280;
+}
+.hidden {
+    display: none;
+}
+.btn-primary {
+    width: 100%;
+    padding: 0.75rem;
+    background-color: #2563eb;
+    border: none;
+    border-radius: 0.25rem;
+    color: white;
+    font-weight: 600;
+}
+.btn-primary.loading {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+.remember-container {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.links-container {
+    text-align: center;
+}
+</style>
 <script>
     const togglePassword = document.getElementById('togglePassword');
     const passwordInput = document.getElementById('password');
     const eyeIcon = togglePassword.querySelector('.eye-icon');
-    const eyeSlashIcon = togglePassword.querySelector('.eye-slash-icon');
     const signInButton = document.getElementById('signInButton');
     const loginForm = document.getElementById('loginForm');
 
@@ -70,23 +153,28 @@
         const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
         passwordInput.setAttribute('type', type);
         eyeIcon.classList.toggle('hidden');
-        eyeSlashIcon.classList.toggle('hidden');
+    });
+
+    togglePassword.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            togglePassword.click();
+        }
     });
 
     signInButton.addEventListener('click', (e) => {
         if (!signInButton.classList.contains('loading')) {
             signInButton.classList.add('loading');
             signInButton.disabled = true;
-            loginForm.submit(); // Ensure form submission
+            loginForm.submit();
         }
     });
 
-    // Reset button state on form submission failure
     loginForm.addEventListener('submit', () => {
         setTimeout(() => {
             signInButton.classList.remove('loading');
             signInButton.disabled = false;
-        }, 2000); // Reset after 2 seconds if submission fails
+        }, 2000);
     });
 </script>
 {% endblock %}
