@@ -122,22 +122,6 @@
                             </li>
                         {% endfor %}
                         {% if not current_user.is_subscribed and not current_user.is_trial_active() %}
-                            <li class="nav-item">
-                                <a class="nav-link {% if request.endpoint == 'subscribe_bp.subscribe' %}active{% endif %}" href="{{ url_for('subscribe_bp.subscribe') | e }}" data-bs-toggle="tooltip" data-bs-title="{{ t('subscribe_tooltip', default='Subscribe for full access') | e }}">
-                                    <i class="bi bi-star-fill me-2"></i>{{ t('subscribe_title', default='Subscribe') | e }}
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link {% if request.endpoint == 'view_data' %}active{% endif %}" href="{{ url_for('view_data') | e }}" data-bs-toggle="tooltip" data-bs-title="{{ t('view_data_tooltip', default='View your data') | e }}">
-                                    <i class="bi bi-eye me-2"></i>{{ t('view_data_title', default='View Data') | e }}
-                                </a>
-                            </li>
-                        {% endif %}
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.endpoint == 'users.logout' %}active{% endif %}" href="{{ url_for('users.logout') | e }}" data-bs-toggle="tooltip" data-bs-title="{{ t('general_logout_tooltip', default='Logout') | e }}">
-                                <i class="bi bi-box-arrow-right me-2"></i>{{ t('general_logout', default='Logout') | e }}
-                            </a>
-                        </li>
                     </ul>
                 </div>
             </div>
