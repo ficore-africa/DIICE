@@ -1,6 +1,7 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import logging
+from translations import trans
 from typing import Dict, Any, Tuple, Optional, Union
 
 # Set up comprehensive logging
@@ -705,3 +706,4 @@ def calculate_tax_liability(user_id, tax_year, db):
 
 def calculate_four_step_tax_liability(user_id, tax_year, db):
     return calculate_tax_liability(user_id, tax_year, db)
+
