@@ -37,6 +37,27 @@ def strip_commas(value):
 def format_currency(value):
     """Format a numeric value with comma separation, no currency symbol."""
     try:
+        # --- Deductible summary logic ---
+        payments_db = get_mongo_db()
+        payments_query = {'user_id': str(current_user.id), 'type': 'payment'}
+        payments = list(payments_db.cashflows.find(payments_query))
+        from utils import calculate_payment_category_stats, get_all_expense_categories, format_currency as fmt_cur
+        payment_stats = calculate_payment_category_stats(payments)
+        expense_categories = get_all_expense_categories()
+        deductible_breakdown = {}
+        for cat_key, cat_data in expense_categories.items():
+            if cat_data.get('tax_deductible', False):
+                amount = payment_stats['category_totals'].get(cat_key, 0.0)
+                if amount > 0:
+                    deductible_breakdown[cat_key] = {
+                        'name': cat_data['name'],
+                        'amount': fmt_cur(amount, currency='₦'),
+                    }
+        deductible_total = payment_stats.get('tax_deductible_amount', 0.0)
+        deductible_summary = {
+            'total': fmt_cur(deductible_total, currency='₦'),
+            'breakdown': deductible_breakdown
+        }
         numeric_value = float(value)
         formatted = f"{numeric_value:,.2f}"
         return formatted
@@ -127,6 +148,7 @@ class TaxForm(FlaskForm):
     )
     pension_contribution = FloatField(
         trans('tax_pension_contribution', default='Annual Pension Contribution (NGN)'),
+        description=trans('tax_pension_hint', default="Leave blank if you don’t contribute to a pension scheme."),
         filters=[strip_commas],
         validators=[
             Optional(),
@@ -161,6 +183,7 @@ class TaxForm(FlaskForm):
         self.income.label.text = trans('tax_annual_income', default='Annual Income (NGN)', lang=lang)
         self.rent_expenses.label.text = trans('tax_annual_rent_expenses', default='Annual Rent Expenses (NGN)', lang=lang)
         self.pension_contribution.label.text = trans('tax_pension_contribution', default='Annual Pension Contribution (NGN)', lang=lang)
+        self.pension_contribution.description = trans('tax_pension_hint', default="Leave blank if you don’t contribute to a pension scheme.", lang=lang)
         self.tax_year.label.text = trans('tax_year', default='Tax Year', lang=lang)
         self.entity_type.label.text = trans('tax_entity_type', default='Entity Type', lang=lang)
         self.submit.label.text = trans('tax_calculate', default='Calculate Tax', lang=lang)
@@ -235,6 +258,27 @@ def new():
     is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json
 
     try:
+        # --- Deductible summary logic (always compute) ---
+        payments_db = get_mongo_db()
+        payments_query = {'user_id': str(current_user.id), 'type': 'payment'}
+        payments = list(payments_db.cashflows.find(payments_query))
+        from utils import calculate_payment_category_stats, get_all_expense_categories, format_currency as fmt_cur
+        payment_stats = calculate_payment_category_stats(payments)
+        expense_categories = get_all_expense_categories()
+        deductible_breakdown = {}
+        for cat_key, cat_data in expense_categories.items():
+            if cat_data.get('tax_deductible', False):
+                amount = payment_stats['category_totals'].get(cat_key, 0.0)
+                if amount > 0:
+                    deductible_breakdown[cat_key] = {
+                        'name': cat_data['name'],
+                        'amount': fmt_cur(amount, currency='₦'),
+                    }
+        deductible_total = payment_stats.get('tax_deductible_amount', 0.0)
+        deductible_summary = {
+            'total': fmt_cur(deductible_total, currency='₦'),
+            'breakdown': deductible_breakdown
+        }
         filter_criteria = {} if is_admin() else {'user_id': current_user.id}
         if request.method == 'POST':
             current_app.logger.debug(f"POST request.form: {dict(request.form)}", extra={'session_id': session_id})
@@ -305,6 +349,17 @@ def new():
                         'note': trans('tax_pension_note', default='Pension contribution from form or default 8%')
                     })
                     total_deductions += pension_contribution
+
+                # Only apply suggested deductions if checkbox is ticked
+                include_deductible = request.form.get('includeDeductibleExpenses') == '1'
+                if include_deductible and deductible_summary and deductible_summary.breakdown:
+                    for cat_key, cat in deductible_summary.breakdown.items():
+                        deductions.append({
+                            'name': cat['name'],
+                            'amount': float(cat['amount'].replace('₦','').replace(',','')),  # Remove currency formatting
+                            'category': cat_key,
+                            'note': 'Auto-suggested from expense records'
+                        })
 
                 tax_year = int(form.tax_year.data)
                 entity_type = form.entity_type.data
@@ -511,7 +566,8 @@ def new():
             insights=insights,
             tool_title=trans('tax_calculator_title', default='Tax Calculator'),
             active_tab='calculate-tax',
-            current_year=current_year
+            current_year=current_year,
+            deductible_summary=deductible_summary
         )
     except Exception as e:
         current_app.logger.exception(f"Unexpected error in tax.new: {str(e)}", extra={'session_id': session_id})

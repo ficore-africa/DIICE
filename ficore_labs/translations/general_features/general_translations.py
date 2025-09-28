@@ -1,5 +1,8 @@
 GENERAL_TRANSLATIONS = {
     'en': {
+        'subscribe_trial_expired_message': 'Your free trial has ended. To continue accessing your dashboard and features, please subscribe below.',
+        'subscribe_no_subscription_message': 'You do not have an active subscription. Subscribe to unlock all features and your dashboard.',
+        'subscribe_instructions': 'Choose a subscription plan below to regain access. If you have questions, contact support.',
         'general_login': 'Login',
         'general_login_identifier': 'Username or Email',
         'general_identifier_required': 'Username or Email is required',
@@ -1278,6 +1281,9 @@ GENERAL_TRANSLATIONS = {
         'general_user_profile': 'Bayanin Mai Amfani',
         'general_hi_user': 'Sannu',
         'general_language_english': 'Turanci',
+            'subscribe_trial_expired_message': 'Gwajin kyauta ya ƙare. Don ci gaba da amfani da dashboard da fasalulluka, da fatan za a yi rajista a ƙasa.',
+            'subscribe_no_subscription_message': 'Ba ka da rajista mai aiki. Yi rajista don buɗe duk fasalulluka da dashboard.',
+            'subscribe_instructions': 'Zaɓi shirin rajista a ƙasa don samun damar shiga. Idan kana da tambayoyi, tuntuɓi goyon bayan.',
         'general_language_hausa': 'Hausa',
         'general_about_business_finance': 'Ƙara Koyo Game da Mu',
         'general_faq_business_startup': 'Yaya Ficore Africa ke tallafawa kasuwanci da farawa?',

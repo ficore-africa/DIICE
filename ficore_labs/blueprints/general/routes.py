@@ -95,8 +95,11 @@ def home():
     try:
         user = get_user(get_mongo_db(), current_user.id)
         if not user.is_trial_active():
-            flash(trans('general_subscription_required', default='Your trial has expired. Please subscribe to continue.'), 'warning')
-            return redirect(url_for('subscribe_bp.subscribe'))
+            return render_template(
+                'subscribe/subscription_required.html',
+                title=trans('subscribe_required_title', default='Subscription Required'),
+                can_interact=False
+            )
         
         if user.trial_end and user.trial_end.tzinfo is None:
             user.trial_end = user.trial_end.replace(tzinfo=ZoneInfo("UTC"))

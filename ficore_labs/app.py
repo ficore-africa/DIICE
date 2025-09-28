@@ -259,6 +259,21 @@ class User(UserMixin):
         return self.role == 'admin'
 
 def create_app():
+    # Enforce subscription/trial for non-admins only
+    @app.before_request
+    def enforce_subscription_for_non_admins():
+        # Only check for authenticated users
+        if not current_user.is_authenticated:
+            return
+        # Always allow admins
+        if getattr(current_user, 'is_admin', False):
+            return
+        # Only enforce for non-admins
+        if not current_user.is_trial_active():
+            # Allow access to login, static, and subscription pages
+            allowed_endpoints = ['users.login', 'subscribe_bp.subscribe', 'static']
+            if request.endpoint not in allowed_endpoints:
+                return redirect(url_for('subscribe_bp.subscribe'))
     app = Flask(__name__, template_folder='templates', static_folder='static')
     CORS(app, resources={r"/api/*": {"origins": "*"}})
 
@@ -608,6 +623,12 @@ def create_app():
                 extra={'session_id': session.get('sid', 'no-session-id'), 'ip_address': request.remote_addr}
             )
             if current_user.is_authenticated:
+                if hasattr(current_user, 'is_trial_active') and not current_user.is_trial_active():
+                    return render_template(
+                        'subscribe/subscription_required.html',
+                        title=trans('subscribe_required_title', default='Subscription Required'),
+                        can_interact=False
+                    )
                 return redirect(get_post_login_redirect(current_user.role))
             return redirect(url_for('general_bp.landing'))
         except Exception as e:

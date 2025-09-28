@@ -19,6 +19,12 @@ def home():
         lang = session.get('lang', 'en')
 
         # Check trial/subscription status
+        if not current_user.is_trial_active():
+            return render_template(
+                'subscribe/subscription_required.html',
+                title=trans('subscribe_required_title', default='Subscription Required'),
+                can_interact=False
+            )
         is_read_only = not current_user.is_subscribed and not current_user.is_trial_active()
 
         # Fetch debt summary

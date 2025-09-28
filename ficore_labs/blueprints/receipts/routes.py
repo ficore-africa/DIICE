@@ -524,13 +524,16 @@ def process_voice_sale():
             
             # Parse the transcription to extract sale details
             parsed_data = parse_sale_transcription(transcription)
-            
-            if not parsed_data:
+
+            # If parsing failed or returned error, respond with error and do not log sale
+            if not parsed_data or 'error' in parsed_data:
+                error_message = parsed_data.get('error') if parsed_data and 'error' in parsed_data else trans('voice_parsing_failed', default='Could not extract sale details from speech')
                 return safe_json_response({
                     'success': False,
-                    'message': trans('voice_parsing_failed', default='Could not extract sale details from speech')
+                    'message': error_message,
+                    'transcription': transcription
                 }, 400)
-            
+
             # Create the sale record
             db = utils.get_mongo_db()
             cashflow = {
@@ -547,14 +550,14 @@ def process_voice_sale():
                 'voice_logged': True,
                 'transcription': transcription
             }
-            
+
             result = db.cashflows.insert_one(cashflow)
-            
+
             logger.info(
                 f"Voice sale added for user {current_user.id}: {transcription}",
                 extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
             )
-            
+
             return safe_json_response({
                 'success': True,
                 'message': trans('voice_sale_success', default='Sale recorded successfully!'),
@@ -579,48 +582,40 @@ def process_voice_sale():
         }, 500)
 
 def transcribe_audio(audio_path):
-    """Transcribe audio using AssemblyAI or similar service."""
+    """Transcribe audio using OpenAI Whisper API."""
     try:
-        # For now, we'll use a simple placeholder
-        # In production, you would integrate with AssemblyAI, Google STT, or Whisper
-        
-        # Example AssemblyAI integration:
-        # import assemblyai as aai
-        # aai.settings.api_key = "your-api-key"
-        # transcriber = aai.Transcriber()
-        # transcript = transcriber.transcribe(audio_path)
-        # return transcript.text
-        
-        # For demo purposes, return a sample transcription
-        # In real implementation, replace this with actual STT service
-        return "sold 5 cartons of water for 3000 naira"
-        
+        import openai
+        openai.api_key = os.getenv("OPENAI_API_KEY")
+        if not openai.api_key:
+            logger.error("OpenAI API key not set. Please set OPENAI_API_KEY environment variable.")
+            return None
+        with open(audio_path, "rb") as audio_file:
+            transcript = openai.Audio.transcribe("whisper-1", audio_file)
+        return transcript["text"]
     except Exception as e:
-        logger.error(f"Error transcribing audio: {str(e)}")
+        logger.error(f"Error transcribing audio with OpenAI Whisper: {str(e)}")
         return None
 
 def parse_sale_transcription(transcription):
     """Parse transcription to extract sale details."""
     try:
         text = transcription.lower().strip()
-        
+        logger.info(f"Raw transcript received: {text}")
+
         # Common patterns for sales
         patterns = [
-            # "sold 5 cartons of water for 3000 naira"
-            r'sold\s+(\d+)\s+(.+?)\s+for\s+(\d+)',
-            # "5 bags of rice 2000 naira"
-            r'(\d+)\s+(.+?)\s+(\d+)\s*naira',
-            # "water 5 pieces 1500"
-            r'(.+?)\s+(\d+)\s+(?:pieces?|items?|cartons?|bags?)\s+(\d+)',
+            r'sold\s+(\d+)\s+([\w\s]+?)\s+for\s+(\d+)',
+            r'(\d+)\s+([\w\s]+?)\s+(\d+)\s*naira',
+            r'([\w\s]+?)\s+(\d+)\s+(?:pieces?|items?|cartons?|bags?)\s+(\d+)',
         ]
-        
+
         for pattern in patterns:
             match = re.search(pattern, text)
             if match:
                 groups = match.groups()
+                logger.info(f"Regex matched: {groups}")
                 if len(groups) == 3:
                     try:
-                        # Try different group arrangements
                         if groups[0].isdigit():  # quantity first
                             quantity = int(groups[0])
                             item = groups[1].strip()
@@ -629,31 +624,24 @@ def parse_sale_transcription(transcription):
                             item = groups[0].strip()
                             quantity = int(groups[1])
                             amount = float(groups[2])
-                        
+                        logger.info(f"Parsed sale: item={item}, quantity={quantity}, amount={amount}")
                         return {
                             'item': item,
                             'quantity': quantity,
                             'amount': amount,
                             'customer': 'Voice Customer'
                         }
-                    except (ValueError, IndexError):
+                    except (ValueError, IndexError) as e:
+                        logger.error(f"Parsing error: {str(e)}")
                         continue
-        
-        # Fallback: try to extract just amount
-        amount_match = re.search(r'(\d+)\s*naira', text)
-        if amount_match:
-            return {
-                'item': 'Voice Sale',
-                'quantity': 1,
-                'amount': float(amount_match.group(1)),
-                'customer': 'Voice Customer'
-            }
-        
-        return None
-        
+
+        # No valid sales pattern matched
+        logger.warning(f"No valid sales pattern matched for transcript: {text}")
+        return {'error': "Could not understand sales format. Try: 'Sold 3 cartons of water for 2000 naira'"}
+
     except Exception as e:
         logger.error(f"Error parsing transcription: {str(e)}")
-        return None
+        return {'error': "Could not parse transcription due to an internal error."}
 
 @receipts_bp.route('/share', methods=['POST'])
 @login_required
