@@ -19,6 +19,7 @@ import requests
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import inch
+import openai
 
 logger = logging.getLogger(__name__)
 
@@ -513,7 +514,7 @@ def process_voice_sale():
             temp_audio_path = temp_file.name
         
         try:
-            # Transcribe audio using AssemblyAI or similar service
+            # Transcribe audio using OpenAI Whisper
             transcription = transcribe_audio(temp_audio_path)
             
             if not transcription:
@@ -584,14 +585,16 @@ def process_voice_sale():
 def transcribe_audio(audio_path):
     """Transcribe audio using OpenAI Whisper API."""
     try:
-        import openai
         openai.api_key = os.getenv("OPENAI_API_KEY")
         if not openai.api_key:
             logger.error("OpenAI API key not set. Please set OPENAI_API_KEY environment variable.")
             return None
         with open(audio_path, "rb") as audio_file:
-            transcript = openai.Audio.transcribe("whisper-1", audio_file)
-        return transcript["text"]
+            response = openai.audio.transcriptions.create(
+                model="whisper-1",
+                file=audio_file
+            )
+        return response.text
     except Exception as e:
         logger.error(f"Error transcribing audio with OpenAI Whisper: {str(e)}")
         return None
