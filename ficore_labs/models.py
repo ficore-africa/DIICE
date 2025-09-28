@@ -521,7 +521,7 @@ def initialize_app_data(app):
                         }
                     },
                     'indexes': [
-                        {'key': [('admin_id', ASCENDING)], Cheap: 'sparse'},
+                        {'key': [('admin_id', ASCENDING)], 'sparse': True},
                         {'key': [('timestamp', DESCENDING)]}
                     ]
                 },
@@ -704,6 +704,7 @@ def initialize_app_data(app):
                             }
                         }
                     },
+378
                     'indexes': [
                         {'key': [('user_id', ASCENDING), ('module_id', ASCENDING)], 'unique': True},
                         {'key': [('user_id', ASCENDING)]},
@@ -1128,7 +1129,7 @@ def update_user(db, user_id, update_data):
             {'$set': update_data}
         )
         if result.modified_count > 0:
-            logger.info(f"{trans('general_user_updated, default='Updated user with ID')}: {user_id}")
+            logger.info(f"{trans('general_user_updated', default='Updated user with ID')}: {user_id}")
             get_user.cache_clear()
             get_user_by_email.cache_clear()
             return True
@@ -1321,7 +1322,7 @@ def to_dict_user(user):
         'is_admin': user.is_admin,
         'setup_complete': user.setup_complete,
         'language': user.language,
-        'is_trial': user.trial,
+        'is_trial': user.is_trial,
         'trial_start': user.trial_start,
         'trial_end': user.trial_end,
         'is_subscribed': user.is_subscribed,
