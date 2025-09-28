@@ -602,13 +602,21 @@ def create_app():
     @app.before_request
     def before_request_handler():
         # Skip static and subscription endpoints
-        if request.path.startswith('/static/') or request.endpoint == 'subscribe_bp.subscribe':
+        if request.path.startswith('/static/') or request.endpoint in ['subscribe_bp.subscribe', 'subscribe_bp.subscription_required']:
+            logger.debug(f"Skipping trial check for endpoint: {request.endpoint}", extra={
+                'session_id': session.get('sid', 'no-session-id'),
+                'ip_address': request.remote_addr
+            })
             return
 
         # Ensure language in session
         if 'lang' not in session:
             session['lang'] = 'en'
             session.modified = True
+            logger.info(f"Set default language to en for session {session.get('sid', 'no-session-id')}", extra={
+                'session_id': session.get('sid', 'no-session-id'),
+                'ip_address': request.remote_addr
+            })
 
         # Handle domain redirects
         host = request.host
@@ -638,7 +646,7 @@ def create_app():
         # Enforce subscription for non-admins
         if current_user.is_authenticated and not getattr(current_user, 'is_admin', False):
             if not current_user.is_trial_active():
-                allowed_endpoints = ['users.login', 'subscribe_bp.subscribe', 'static']
+                allowed_endpoints = ['users.login', 'subscribe_bp.subscribe', 'subscribe_bp.subscription_required', 'static']
                 if request.endpoint not in allowed_endpoints:
                     logger.info(f"User {current_user.id} trial expired, redirecting to subscription", extra={
                         'session_id': session.get('sid', 'no-session-id'),
@@ -842,6 +850,21 @@ def create_app():
             'google489486b6f031d46f.html',
             mimetype='text/html'
         )
+
+    @app.route('/googlebd814b9b37c7a0c9.html')
+    def google_site_verification_new():
+        try:
+            return send_from_directory(
+                os.path.join(app.root_path, 'google_verification'),
+                'googlebd814b9b37c7a0c9.html',
+                mimetype='text/html'
+            )
+        except Exception as e:
+            logger.error(f'Failed to serve googlebd814b9b37c7a0c9.html: {str(e)}', extra={
+                'session_id': session.get('sid', 'no-session-id'),
+                'ip_address': request.remote_addr
+            })
+            return render_template('error/404.html', error="Google verification file not found"), 404
 
     @app.route('/sitemap.xml')
     def sitemap():
