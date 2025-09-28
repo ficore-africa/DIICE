@@ -109,13 +109,16 @@
             <a href="{{ url_for('admin.manage_creditors') }}" class="btn btn-primary w-100">{{ t('admin_manage_creditors', default='Manage Creditors') }}</a>
         </div>
         <div class="col-md-4 mb-2">
-            <a href="{{ url_for('admin.manage_funds') }}" class="btn btn-primary w-100">{{ t('admin_manage_funds', default='Manage Funds') }}</a>
+              <a href="{{ url_for('admin.manage_users') }}" class="btn btn-primary w-100">{{ t('admin_manage_users', default='Manage Users') }}</a>
         </div>
         <div class="col-md-4 mb-2">
             <a href="{{ url_for('admin.manage_records') }}" class="btn btn-primary w-100">{{ t('admin_manage_records', default='Manage Income Records') }}</a>
         </div>
         <div class="col-md-4 mb-2">
             <a href="{{ url_for('admin.manage_cashflows') }}" class="btn btn-primary w-100">{{ t('admin_manage_cashflows', default='Manage Payment Outflows') }}</a>
+            </div>
+            <div class="col-md-4 mb-2">
+                <a href="{{ url_for('admin.invalid_payments') }}" class="btn btn-danger w-100">{{ t('admin_invalid_payments', default='Review Invalid Payments') }}</a>
         </div>
         <div class="col-md-4 mb-2">
             <a href="{{ url_for('admin.manage_kyc') }}" class="btn btn-secondary w-100">{{ t('admin_manage_kyc', default='Manage KYC Submissions') }}</a>

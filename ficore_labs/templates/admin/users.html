@@ -71,6 +71,9 @@
                         <th>{{ trans('general_role', default='Role') | escape }}</th>
                         <th>{{ trans('subscription_status', default='Subscription Status') | escape }}</th>
                         <th>{{ trans('general_status', default='Status') | escape }}</th>
+                           <th>{{ trans('user_joined', default='Joined') | escape }}</th>
+                           <th>{{ trans('trial_or_subscription_start', default='Trial/Subscription Start') | escape }}</th>
+                           <th>{{ trans('trial_or_subscription_expiry', default='Trial/Subscription Expiry') | escape }}</th>
                         {% if current_user.is_trial_active or current_user.is_subscribed %}
                         <th>{{ trans('general_actions', default='Actions') | escape }}</th>
                         {% endif %}
@@ -84,6 +87,9 @@
                             <td>{{ trans('general_' + user.role, default=user.role.capitalize()) | escape }}</td>
                             <td>{{ 'Subscribed' if user.is_subscribed and user.is_trial_active else 'Trial' if user.is_trial and user.is_trial_active else 'Expired' | escape }}</td>
                             <td>{{ trans('admin_suspended', default='Suspended') if user.get('suspended') else trans('admin_active', default='Active') | escape }}</td>
+                               <td>{{ user.created_at.strftime('%Y-%m-%d') if user.get('created_at') else '-' }}</td>
+                               <td>{{ user.trial_start.strftime('%Y-%m-%d') if user.get('trial_start') else (user.subscription_start.strftime('%Y-%m-%d') if user.get('subscription_start') else '-') }}</td>
+                               <td>{{ user.trial_end.strftime('%Y-%m-%d') if user.get('trial_end') else (user.subscription_end.strftime('%Y-%m-%d') if user.get('subscription_end') else '-') }}</td>
                             {% if current_user.is_trial_active or current_user.is_subscribed %}
                             <td>
                                 {% if not user.get('suspended') %}
@@ -91,8 +97,8 @@
                                         <button type="submit" class="btn btn-warning btn-sm">{{ trans('admin_suspend', default='Suspend') | escape }}</button>
                                     </form>
                                 {% endif %}
-                                <form action="{{ url_for('admin.delete_user', user_id=user._id) }}" method="POST" class="d-inline">
-                                    <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('{{ trans('general_confirm_delete', default='Are you sure?') | escape }}')">{{ trans('general_delete', default='Delete') | escape }}</button>
+                                    <form action="{{ url_for('admin.delete_user', user_id=user._id) }}" method="POST" class="d-inline">
+                                        <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('{{ trans('general_confirm_delete', default='Are you sure?') | escape }}');">{{ trans('general_delete', default='Delete') | escape }}</button>
                                 </form>
                             </td>
                             {% endif %}
