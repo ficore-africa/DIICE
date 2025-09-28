@@ -162,18 +162,18 @@
 
 .dark-mode .tool-header .btn-group .btn:hover {
     background-color: rgba(59, 130, 246, 0.1);
-    border-color: #3b82f6;
-    color: #93c5fd;
+    border-color: #042e5e;
+    color: #042e5e;
 }
 
 .dark-mode .tool-header .btn-group .btn.active {
-    background-color: #3b82f6;
-    border-color: #3b82f6;
+    background-color: #042e5e;
+    border-color: #042e5e;
     color: #ffffff;
 }
 
 .dark-mode .breadcrumb-item a {
-    color: #93c5fd;
+    color: #042e5e;
 }
 
 .dark-mode .breadcrumb-item.text-muted {
@@ -183,3 +183,4 @@
 .dark-mode .breadcrumb-item.active {
     color: #e5e7eb;
 }
+
