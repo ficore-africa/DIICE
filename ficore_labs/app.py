@@ -783,8 +783,8 @@ def create_app():
                 {'code': 'en', 'name': 'English'},
                 {'code': 'ha', 'name': 'Hausa'}
             ],
-            'navigation': bottom_nav_items,
-            'tools': tools_for_quick,
+            'bottom_nav_items': bottom_nav_items,
+            'tools_for_quick': tools_for_quick,
             'breadcrumb_items': breadcrumb_items,
         }
 
