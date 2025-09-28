@@ -5,43 +5,99 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Error</title>
     <style>
+        :root {
+            --background-main: #F2EFEA;
+            --text-color: #1e293b;
+            --button-primary-bg: #b88a44;
+            --button-primary-hover: #917243;
+            --card-bg: #f9f9f9;
+            --card-border: #e5e7eb;
+            --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            --accent-blue: #3A86FF;
+            --transition-base: all 0.3s ease;
+        }
+        .dark-mode {
+            --background-main: #0f172a;
+            --text-color: #f1f5f9;
+            --button-primary-bg: #4C78C9;
+            --button-primary-hover: #042e5e;
+            --card-bg: #1e293b;
+            --card-border: #4b5563;
+            --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            --accent-blue: #93c5fd;
+        }
         body {
-            font-family: Arial, sans-serif;
+            font-family: Poppins, sans-serif;
+            background-color: var(--background-main);
+            color: var(--text-color);
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
+            min-height: 100vh;
             margin: 0;
-            background-color: #f4f4f4;
-            color: #333;
+            padding: 1rem;
+            box-sizing: border-box;
         }
         .error-container {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            box-shadow: var(--card-shadow);
+            padding: 2rem;
             text-align: center;
-            padding: 20px;
-            background: #fff;
-            border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            max-width: 400px;
+            width: 100%;
+            transition: var(--transition-base);
         }
         h1 {
-            color: #d9534f;
+            font-size: clamp(1.5rem, 4vw, 2rem);
+            font-weight: 700;
+            color: var(--text-color);
+            margin-bottom: 1rem;
         }
         p {
-            font-size: 1.1em;
+            font-size: clamp(0.875rem, 2vw, 1rem);
+            color: var(--text-color);
+            margin-bottom: 1.5rem;
         }
-        a {
-            color: #0275d8;
+        .btn-primary {
+            background: var(--button-primary-bg);
+            color: #fff;
+            padding: 0.75rem 1.5rem;
+            border-radius: 10px;
             text-decoration: none;
+            font-weight: 600;
+            font-size: clamp(0.875rem, 2vw, 0.9375rem);
+            transition: var(--transition-base);
+            display: inline-block;
         }
-        a:hover {
-            text-decoration: underline;
+        .btn-primary:hover {
+            background: var(--button-primary-hover);
+            transform: translateY(-2px);
+            box-shadow: var(--card-shadow);
+        }
+        @media (max-width: 576px) {
+            .error-container {
+                padding: 1.5rem;
+            }
+            h1 {
+                font-size: clamp(1.25rem, 3vw, 1.5rem);
+            }
+            p {
+                font-size: clamp(0.75rem, 1.5vw, 0.875rem);
+            }
+            .btn-primary {
+                padding: 0.5rem 1rem;
+                font-size: clamp(0.75rem, 1.5vw, 0.875rem);
+            }
         }
     </style>
 </head>
 <body>
     <div class="error-container">
         <h1>Error</h1>
-        <p>Sorry, something went wrong.</p>
-        <p><a href="/">Return to Home</a></p>
+        <p>Sorry, something went wrong. Please try again later.</p>
+        <a href="/" class="btn-primary">Return to Home</a>
     </div>
 </body>
 </html>
