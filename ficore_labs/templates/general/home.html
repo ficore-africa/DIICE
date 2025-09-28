@@ -113,7 +113,7 @@
         <section class="quick-actions-section">
             <h3 class="quick-actions-heading">{{ t('general_quick_actions', default='Quick Actions') | e }}</h3>
             <div class="quick-actions">
-                {% for tool in tools_for_template %}
+                {% for tool in tools_for_quick %}
                     {% if not is_read_only or tool.url == url_for('business.view_data') or tool.url == url_for('subscribe_bp.subscribe') %}
                         <a href="{{ tool.url | default('#') | e }}" class="quick-action-card {{ tool.class | default('') }} text-decoration-none {{ 'disabled' if is_read_only and tool.url != url_for('business.view_data') and tool.url != url_for('subscribe_bp.subscribe') }}" aria-label="{{ t(tool.label_key, default=tool.label) | e }}" {% if is_read_only and tool.url != url_for('business.view_data') and tool.url != url_for('subscribe_bp.subscribe') %}aria-disabled="true"{% endif %}>
                             {% if tool.badge %}
