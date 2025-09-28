@@ -1,7 +1,111 @@
-<div class="container text-center">
-    <div class="navbar mb-4">
-        <h1>500 - {{ t('general_internal_server_error', default='Internal Server Error') }}</h1>
-    </div>
-    <p>{{ t('general_something_went_wrong', default='Something went wrong') }}</p>
-    <a href="{{ url_for('index') }}" class="btn btn-primary">{{ t('general_return_to_home', default='Return to Home') }}</a>
-</div>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>500 - Internal Server Error</title>
+    <style>
+        :root {
+            --background-main: #F2EFEA;
+            --text-color: #1e293b;
+            --button-primary-bg: #b88a44;
+            --button-primary-hover: #917243;
+            --card-bg: #f9f9f9;
+            --card-border: #e5e7eb;
+            --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            --accent-blue: #3A86FF;
+            --navbar-bg: rgba(255, 255, 255, 0.95);
+            --navbar-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            --transition-base: all 0.3s ease;
+        }
+        .dark-mode {
+            --background-main: #0f172a;
+            --text-color: #f1f5f9;
+            --button-primary-bg: #4C78C9;
+            --button-primary-hover: #042e5e;
+            --card-bg: #1e293b;
+            --card-border: #4b5563;
+            --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            --accent-blue: #93c5fd;
+            --navbar-bg: rgba(31, 31, 31, 0.95);
+            --navbar-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+        body {
+            font-family: Poppins, sans-serif;
+            background-color: var(--background-main);
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 1rem;
+            box-sizing: border-box;
+        }
+        .container {
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+        }
+        .navbar {
+            background: var(--navbar-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            box-shadow: var(--navbar-shadow);
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        h1 {
+            font-size: clamp(1.5rem, 4vw, 2rem);
+            font-weight: 700;
+            color: var(--text-color);
+            margin: 0;
+        }
+        p {
+            font-size: clamp(0.875rem, 2vw, 1rem);
+            color: var(--text-color);
+            margin-bottom: 1.5rem;
+        }
+        .btn-primary {
+            background: var(--button-primary-bg);
+            color: #fff;
+            padding: 0.75rem 1.5rem;
+            border-radius: 10px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: clamp(0.875rem, 2vw, 0.9375rem);
+            transition: var(--transition-base);
+            display: inline-block;
+        }
+        .btn-primary:hover {
+            background: var(--button-primary-hover);
+            transform: translateY(-2px);
+            box-shadow: var(--card-shadow);
+        }
+        @media (max-width: 576px) {
+            .navbar {
+                padding: 0.75rem;
+            }
+            h1 {
+                font-size: clamp(1.25rem, 3vw, 1.5rem);
+            }
+            p {
+                font-size: clamp(0.75rem, 1.5vw, 0.875rem);
+            }
+            .btn-primary {
+                padding: 0.5rem 1rem;
+                font-size: clamp(0.75rem, 1.5vw, 0.875rem);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container text-center">
+        <div class="navbar mb-4">
+            <h1>500 - {{ t('general_internal_server_error', default='Internal Server Error') }}</h1>
+        </div>
+        <p>{{ t('general_something_went_wrong', default='Something went wrong') }}</p>
+        <a href="{{ url_for('index') }}" class="btn btn-primary">{{ t('general_return_to_home', default='Return to Home') }}</a>
+    </div>
+</body>
+</html>
