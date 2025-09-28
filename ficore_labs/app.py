@@ -750,18 +750,19 @@ def create_app():
                     'ip_address': request.remote_addr if has_request_context() else 'none'
                 })
                 return []
-        nav = []
-        tools = []
+
+        bottom_nav_items = []
+        tools_for_quick = []
         breadcrumb_items = []
 
         if current_user.is_authenticated:
             role = getattr(current_user, 'role', 'trader')
             if role == 'admin':
-                nav = build_nav(ADMIN_NAV)
-                tools = build_nav(ADMIN_TOOLS)
+                bottom_nav_items = build_nav(ADMIN_NAV)
+                tools_for_quick = build_nav(ADMIN_TOOLS)
             else:
-                nav = build_nav(TRADER_NAV)
-                tools = build_nav(TRADER_TOOLS)
+                bottom_nav_items = build_nav(TRADER_NAV)
+                tools_for_quick = build_nav(TRADER_TOOLS)
 
             # Generate breadcrumb items
             try:
