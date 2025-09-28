@@ -1,46 +1,53 @@
 {% extends 'base.html' %}
-{% block title %}Inventory{% endblock %}
+{% block title %}{{ trans('inventory_title', default='Inventory') }}{% endblock %}
 {% block content %}
 <div class="container mt-4">
-    <h2>Inventory</h2>
-    <a href="{{ url_for('inventory.add') }}" class="btn btn-primary mb-3">Add Inventory Item</a>
-    <table class="table table-bordered">
-        <thead>
-            <tr>
-                <th>Name</th>
-                <th>Cost</th>
-                <th>Expected Margin</th>
-                <th>Quantity in Stock</th>
-                <th>Reorder Level</th>
-                <th>Restock Date</th>
-                <th>Category</th>
-                <th>Unit</th>
-                <th>Status</th>
-                <th>Vendor</th>
-                <th>Selling Price</th>
-                <th>Manual Price Override</th>
-                <th>Created At</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for item in inventory_items %}
-            <tr>
-                <td>{{ item.name }}</td>
-                <td>{{ item.cost }}</td>
-                <td>{{ item.expected_margin }}</td>
-                <td>{{ item.quantity_in_stock if item.quantity_in_stock is defined else '' }}</td>
-                <td>{{ item.reorder_level if item.reorder_level is defined else '' }}</td>
-                <td>{{ item.restock_date if item.restock_date is defined else '' }}</td>
-                <td>{{ item.category if item.category is defined else '' }}</td>
-                <td>{{ item.unit if item.unit is defined else '' }}</td>
-                <td>{{ item.status if item.status is defined else '' }}</td>
-                <td>{{ item.vendor_id if item.vendor_id is defined else '' }}</td>
-                <td>{{ item.selling_price if item.selling_price is defined else '' }}</td>
-                <td>{% if item.manual_price_override %}Yes{% else %}No{% endif %}</td>
-                <td>{{ item.created_at }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <h2>{{ trans('inventory_title', default='Inventory') }}</h2>
+    <a href="{{ url_for('inventory.add') }}" class="btn btn-primary mb-3">{{ trans('inventory_add', default='Add Inventory Item') }}</a>
+    {% if inventory_items %}
+    <div class="table-responsive">
+        <table class="table table-bordered table-hover">
+            <thead>
+                <tr>
+                    <th>{{ trans('general_name', default='Name') }}</th>
+                    <th>{{ trans('inventory_cost', default='Cost') }}</th>
+                    <th>{{ trans('inventory_selling_price', default='Selling Price') }}</th>
+                    <th>{{ trans('inventory_quantity_in_stock', default='Quantity in Stock') }}</th>
+                    <th>{{ trans('inventory_reorder_level', default='Reorder Level') }}</th>
+                    <th>{{ trans('inventory_restock_date', default='Restock Date') }}</th>
+                    <th>{{ trans('inventory_category', default='Category') }}</th>
+                    <th>{{ trans('inventory_unit', default='Unit') }}</th>
+                    <th>{{ trans('inventory_status', default='Status') }}</th>
+                    <th>{{ trans('inventory_vendor_id', default='Vendor') }}</th>
+                    <th>{{ trans('general_created_at', default='Created At') }}</th>
+                    <th>{{ trans('general_actions', default='Actions') }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in inventory_items %}
+                <tr>
+                    <td>{{ item.name | e }}</td>
+                    <td>{{ item.cost | format_currency }}</td>
+                    <td>{{ item.selling_price | format_currency }}</td>
+                    <td>{{ item.quantity_in_stock if item.quantity_in_stock is defined else '' }}</td>
+                    <td>{{ item.reorder_level if item.reorder_level is defined else '' }}</td>
+                    <td>{{ item.restock_date if item.restock_date is defined else '' }}</td>
+                    <td>{{ item.category if item.category is defined else '' }}</td>
+                    <td>{{ item.unit if item.unit is defined else '' }}</td>
+                    <td>{{ item.status if item.status is defined else '' }}</td>
+                    <td>{{ item.vendor_id if item.vendor_id is defined else '' }}</td>
+                    <td>{{ item.created_at | format_date }}</td>
+                    <td>
+                        <a href="{{ url_for('inventory.edit', item_id=item._id) }}" class="btn btn-sm btn-outline-primary">{{ trans('general_edit', default='Edit') }}</a>
+                        <a href="{{ url_for('inventory.history', item_id=item._id) }}" class="btn btn-sm btn-outline-secondary">{{ trans('inventory_history', default='History') }}</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="text-muted">{{ trans('inventory_no_items', default='No inventory items found.') }}</p>
+    {% endif %}
 </div>
 {% endblock %}
