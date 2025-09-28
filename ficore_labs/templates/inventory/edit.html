@@ -1,88 +1,128 @@
 {% extends 'base.html' %}
-{% block title %}Edit Inventory Item{% endblock %}
+{% block title %}{{ trans('inventory_edit_title', default='Edit Inventory Item') }}{% endblock %}
 {% block content %}
 <div class="container mt-5">
-    <h1>Edit Inventory Item</h1>
-    <form action="{{ url_for('inventory.edit', item_id=item.id) }}" method="POST" class="row g-3">
+    <div class="d-flex align-items-center mb-4">
+        <button onclick="history.back()" class="btn btn-outline-secondary me-3" aria-label="{{ trans('general_back', default='Back') | e }}">
+            <i class="bi bi-arrow-left"></i> {{ trans('general_back', default='Back') | e }}
+        </button>
+        <a href="{{ url_for('inventory.index') | e }}" class="btn btn-link text-decoration-none">
+            <i class="bi bi-list"></i> {{ trans('inventory_back_to_list', default='Back to Inventory List') | e }}
+        </a>
+    </div>
+
+    <h1>{{ trans('inventory_edit_title', default='Edit Inventory Item') }}</h1>
+    <form action="{{ url_for('inventory.edit', item_id=item._id) }}" method="POST" class="row g-3">
         {{ form.hidden_tag() }}
         <div class="col-12">
-            <label for="name" class="form-label">Name</label>
-            {{ form.name(class="form-control") }}
+            <label for="name" class="form-label">{{ trans('inventory_name', default='Item Name') }}</label>
+            {{ form.name(class="form-control", required=True) }}
+            {% if form.name.errors %}
+                <p class="text-danger mt-1">{{ form.name.errors[0] }}</p>
+            {% endif %}
         </div>
         <div class="col-12">
-            <label for="cost" class="form-label">Cost</label>
-            {{ form.cost(class="form-control", type="number", step="0.01") }}
+            <label for="cost" class="form-label">{{ trans('inventory_cost', default='Cost') }}</label>
+            {{ form.cost(class="form-control", type="number", step="0.01", required=True) }}
+            {% if form.cost.errors %}
+                <p class="text-danger mt-1">{{ form.cost.errors[0] }}</p>
+            {% endif %}
         </div>
         <div class="col-12">
-            <label for="expected_margin" class="form-label">Expected Margin</label>
-            {{ form.expected_margin(class="form-control", type="number", step="0.01") }}
+            <label for="selling_price" class="form-label">{{ trans('inventory_selling_price', default='Selling Price') }}</label>
+            {{ form.selling_price(class="form-control", type="number", step="0.01", required=True) }}
+            <small id="suggested-price" class="form-text text-muted"></small>
+            {% if form.selling_price.errors %}
+                <p class="text-danger mt-1">{{ form.selling_price.errors[0] }}</p>
+            {% endif %}
         </div>
         <div class="col-12">
-            <label for="quantity_in_stock" class="form-label">Quantity in Stock</label>
+            <label for="quantity_in_stock" class="form-label">{{ trans('inventory_quantity_in_stock', default='Quantity in Stock') }}</label>
             {{ form.quantity_in_stock(class="form-control", type="number", step="1") }}
+            {% if form.quantity_in_stock.errors %}
+                <p class="text-danger mt-1">{{ form.quantity_in_stock.errors[0] }}</p>
+            {% endif %}
         </div>
         <div class="col-12">
-            <label for="reorder_level" class="form-label">Reorder Level</label>
+            <label for="reorder_level" class="form-label">{{ trans('inventory_reorder_level', default='Reorder Level') }}</label>
             {{ form.reorder_level(class="form-control", type="number", step="1") }}
+            {% if form.reorder_level.errors %}
+                <p class="text-danger mt-1">{{ form.reorder_level.errors[0] }}</p>
+            {% endif %}
         </div>
         <div class="col-12">
-            <label for="restock_date" class="form-label">Restock Date</label>
+            <label for="restock_date" class="form-label">{{ trans('inventory_restock_date', default='Restock Date') }}</label>
             {{ form.restock_date(class="form-control", type="date") }}
+            {% if form.restock_date.errors %}
+                <p class="text-danger mt-1">{{ form.restock_date.errors[0] }}</p>
+            {% endif %}
         </div>
         <div class="col-12">
-            <label for="category" class="form-label">Category</label>
+            <label for="category" class="form-label">{{ trans('inventory_category', default='Category') }}</label>
             <select name="category" class="form-control" id="category">
+                <option value="">{{ trans('general_select', default='Select Category') }}</option>
                 {% for cat in INVENTORY_CATEGORIES %}
                     <option value="{{ cat }}" {% if form.category.data == cat %}selected{% endif %}>{{ cat }}</option>
                 {% endfor %}
             </select>
+            {% if form.category.errors %}
+                <p class="text-danger mt-1">{{ form.category.errors[0] }}</p>
+            {% endif %}
         </div>
         <div class="col-12">
-            <label for="unit" class="form-label">Unit</label>
+            <label for="unit" class="form-label">{{ trans('inventory_unit', default='Unit') }}</label>
             <select name="unit" class="form-control" id="unit">
+                <option value="">{{ trans('general_select', default='Select Unit') }}</option>
                 {% for unit in INVENTORY_UNITS %}
                     <option value="{{ unit }}" {% if form.unit.data == unit %}selected{% endif %}>{{ unit }}</option>
                 {% endfor %}
             </select>
+            {% if form.unit.errors %}
+                <p class="text-danger mt-1">{{ form.unit.errors[0] }}</p>
+            {% endif %}
         </div>
         <div class="col-12">
-            <label for="status" class="form-label">Status</label>
+            <label for="status" class="form-label">{{ trans('inventory_status', default='Status') }}</label>
             <select name="status" class="form-control" id="status">
-                <option value="Active" {% if form.status.data == 'Active' %}selected{% endif %}>Active</option>
-                <option value="Out of Stock" {% if form.status.data == 'Out of Stock' %}selected{% endif %}>Out of Stock</option>
-                <option value="Discontinued" {% if form.status.data == 'Discontinued' %}selected{% endif %}>Discontinued</option>
+                <option value="Active" {% if form.status.data == 'Active' %}selected{% endif %}>{{ trans('inventory_status_active', default='Active') }}</option>
+                <option value="Out of Stock" {% if form.status.data == 'Out of Stock' %}selected{% endif %}>{{ trans('inventory_status_out_of_stock', default='Out of Stock') }}</option>
+                <option value="Discontinued" {% if form.status.data == 'Discontinued' %}selected{% endif %}>{{ trans('inventory_status_discontinued', default='Discontinued') }}</option>
             </select>
+            {% if form.status.errors %}
+                <p class="text-danger mt-1">{{ form.status.errors[0] }}</p>
+            {% endif %}
         </div>
         <div class="col-12">
-            <label for="vendor_id" class="form-label">Vendor ID</label>
+            <label for="vendor_id" class="form-label">{{ trans('inventory_vendor_id', default='Vendor ID') }}</label>
             {{ form.vendor_id(class="form-control") }}
+            {% if form.vendor_id.errors %}
+                <p class="text-danger mt-1">{{ form.vendor_id.errors[0] }}</p>
+            {% endif %}
         </div>
         <div class="col-12">
-            <div class="form-check">
-                {{ form.manual_price_override(class="form-check-input", id="manual_price_override") }}
-                <label class="form-check-label" for="manual_price_override">Manual Price Override</label>
-            </div>
-        </div>
-        <div class="col-12" id="selling_price_field" style="display: none;">
-            <label for="selling_price" class="form-label">Selling Price</label>
-            {{ form.selling_price(class="form-control", type="number", step="0.01") }}
-        </div>
-        <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            var overrideCheckbox = document.getElementById('manual_price_override');
-            var priceField = document.getElementById('selling_price_field');
-            if (overrideCheckbox) {
-                function togglePriceField() {
-                    priceField.style.display = overrideCheckbox.checked ? 'block' : 'none';
-                }
-                overrideCheckbox.addEventListener('change', togglePriceField);
-                togglePriceField();
-            }
-        });
-        </script>
-        <div class="col-12">
-            <button type="submit" class="btn btn-primary w-100">Update Item</button>
+            <button type="submit" class="btn btn-primary w-100">{{ trans('general_submit', default='Update Item') }}</button>
         </div>
     </form>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const costInput = document.getElementById('cost');
+        const sellingPriceInput = document.getElementById('selling_price');
+        const suggestedPriceText = document.getElementById('suggested-price');
+
+        function updateSuggestedPrice() {
+            const cost = parseFloat(costInput.value) || 0;
+            if (cost > 0) {
+                const suggestedPrice = (cost * 1.25).toFixed(2);
+                suggestedPriceText.textContent = `{{ trans('inventory_suggested_price', default='Suggested: ₦{price} (based on ₦{cost} cost + 25%)') | format(price=suggestedPrice, cost=cost) }}`;
+            } else {
+                suggestedPriceText.textContent = '';
+            }
+        }
+
+        costInput.addEventListener('input', updateSuggestedPrice);
+        updateSuggestedPrice();
+    });
+    </script>
 </div>
 {% endblock %}
