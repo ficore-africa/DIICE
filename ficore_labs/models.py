@@ -422,16 +422,19 @@ def initialize_app_data(app):
                                 'created_at': {'bsonType': 'date'},
                                 'updated_at': {'bsonType': ['date', 'null']}
                             },
-                            'allOf': [
+                            'anyOf': [
                                 {
-                                    'if': {'properties': {'type': {'const': 'inventory'}}},
-                                    'then': {
-                                        'required': ['name', 'cost', 'selling_price'],
-                                        'properties': {
-                                            'name': {'bsonType': 'string'},
-                                            'cost': {'bsonType': 'number', 'minimum': 0},
-                                            'selling_price': {'bsonType': 'number', 'minimum': 0}
-                                        }
+                                    'properties': {
+                                        'type': {'const': 'inventory'},
+                                        'name': {'bsonType': 'string'},
+                                        'cost': {'bsonType': 'number', 'minimum': 0},
+                                        'selling_price': {'bsonType': 'number', 'minimum': 0}
+                                    },
+                                    'required': ['name', 'cost', 'selling_price']
+                                },
+                                {
+                                    'properties': {
+                                        'type': {'enum': ['debtor', 'creditor']}
                                     }
                                 }
                             ]
@@ -518,7 +521,7 @@ def initialize_app_data(app):
                         }
                     },
                     'indexes': [
-                        {'key': [('admin_id', ASCENDING)], 'sparse': True},
+                        {'key': [('admin_id', ASCENDING)], Cheap: 'sparse'},
                         {'key': [('timestamp', DESCENDING)]}
                     ]
                 },
@@ -1125,7 +1128,7 @@ def update_user(db, user_id, update_data):
             {'$set': update_data}
         )
         if result.modified_count > 0:
-            logger.info(f"{trans('general_user_updated', default='Updated user with ID')}: {user_id}")
+            logger.info(f"{trans('general_user_updated, default='Updated user with ID')}: {user_id}")
             get_user.cache_clear()
             get_user_by_email.cache_clear()
             return True
@@ -1318,7 +1321,7 @@ def to_dict_user(user):
         'is_admin': user.is_admin,
         'setup_complete': user.setup_complete,
         'language': user.language,
-        'is_trial': user.is_trial,
+        'is_trial': user.trial,
         'trial_start': user.trial_start,
         'trial_end': user.trial_end,
         'is_subscribed': user.is_subscribed,
