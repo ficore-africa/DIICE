@@ -82,7 +82,7 @@
                 </button>
                 <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
                     <ul class="navbar-nav">
-                        {% for item in navigation %}
+                        {% for item in bottom_nav_items %}
                             {% if not item.endpoint == 'dashboard.index' or current_user.is_trial_active() %}
                             <li class="nav-item">
                                 <a class="nav-link {% if request.endpoint == item.endpoint %}active{% endif %}" href="{{ item.url | e }}" data-bs-toggle="tooltip" data-bs-title="{{ t(item.tooltip_key, default=item.tooltip) | e }}">
@@ -114,7 +114,7 @@
                 </button>
                 <div class="collapse navbar-collapse" id="navbarNav">
                     <ul class="navbar-nav">
-                        {% for item in navigation %}
+                        {% for item in bottom_nav_items %}
                             <li class="nav-item">
                                 <a class="nav-link {% if request.endpoint == item.endpoint %}active{% endif %}" href="{{ item.url | e }}" data-bs-toggle="tooltip" data-bs-title="{{ t(item.tooltip_key, default=item.tooltip) | e }}">
                                     <i class="bi {{ item.icon | default('bi-question-circle') | e }} me-2"></i>{{ t(item.label_key, default=item.label) | e }}
@@ -180,7 +180,7 @@
     {% if current_user.is_authenticated %}
         <nav class="bottom-nav d-md-none" role="navigation" aria-label="{{ t('general_mobile_navigation', default='Mobile navigation') | e }}">
             <div class="nav-container">
-                {% for item in navigation %}
+                {% for item in bottom_nav_items %}
                     {% if not item.endpoint == 'dashboard.index' or current_user.is_trial_active() %}
                     <a href="{{ item.url | e }}" class="nav-item {% if request.endpoint == item.endpoint %}active{% endif %}" aria-label="{{ t(item.label_key, default=item.label) | e }}">
                         <i class="bi {{ item.icon | default('bi-question-circle') | e }}"></i>
