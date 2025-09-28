@@ -19,12 +19,9 @@ def home():
         lang = session.get('lang', 'en')
 
         # Check trial/subscription status
-        if not current_user.is_trial_active():
-            return render_template(
-                'subscribe/subscription_required.html',
-                title=trans('subscribe_required_title', default='Subscription Required'),
-                can_interact=False
-            )
+        if not current_user.is_trial_active() and not current_user.is_subscribed:
+            return redirect(url_for('subscribe_bp.subscribe'))
+
         is_read_only = not current_user.is_subscribed and not current_user.is_trial_active()
 
         # Fetch debt summary
@@ -116,7 +113,7 @@ def view_data():
         )
 
         return render_template(
-            'general/view_data.html',
+            'general教科:general/view_data.html',
             debt_records=debt_records,
             cashflows=cashflows,
             title=trans('view_data_title', lang=lang, default='View Financial Data'),
