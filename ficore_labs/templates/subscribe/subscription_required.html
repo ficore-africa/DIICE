@@ -63,7 +63,7 @@
             <div class="alert alert-info mt-3">
                 {{ t('subscribe_instructions', default='Choose a subscription plan below to regain access. If you have questions, contact support.') | e }}
             </div>
-            <a href="{{ url_for('subscribe_bp.subscribe') }}" class="btn-subscribe">
+            <a href="{{ url_for('subscribe_bp.subscribe', from_subscription_required='true') }}" class="btn-subscribe">
                 {{ t('general_subscribe_now', default='Subscribe Now') | e }}
             </a>
         </div>
