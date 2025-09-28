@@ -72,7 +72,8 @@ def add():
             if form.unit.data:
                 inventory_data['unit'] = form.unit.data
 
-            db.records.insert_one(inventory_data)
+            result = db.records.insert_one(inventory_data)
+            item_id = str(result.inserted_id)
 
             # COGS Expense Automation
             cogs_data = {
@@ -88,7 +89,7 @@ def add():
 
             # Inventory Movement Logging
             movement_data = {
-                'inventory_item_id': str(inventory_data.get('name', '')),
+                'inventory_item_id': item_id,
                 'change_type': 'add',
                 'quantity': inventory_data.get('quantity_in_stock', inventory_data.get('stock_qty', 0)),
                 'date': datetime.now(timezone.utc),
@@ -140,7 +141,7 @@ def edit(item_id):
             new_quantity = form.quantity_in_stock.data or 0
             if new_quantity != old_quantity:
                 movement_data = {
-                    'inventory_item_id': str(item_id),
+                    'inventory_item_id': item_id,
                     'change_type': 'adjust',
                     'quantity': new_quantity - old_quantity,
                     'date': datetime.now(timezone.utc),
@@ -165,5 +166,5 @@ def history(item_id):
     if not item:
         flash(trans('inventory_not_found', default='Inventory item not found.'), 'error')
         return redirect(url_for('inventory.index'))
-    movements = list(db.inventory_movements.find({'inventory_item_id': str(item_id)}).sort('date', -1))
+    movements = list(db.inventory_movements.find({'inventory_item_id': item_id}).sort('date', -1))
     return render_template('inventory/history.html', movements=movements, item_name=item.get('name', 'Unknown Item'))
