@@ -16,10 +16,14 @@ dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
 
 def safe_to_float(value, default=0.0):
     """Convert a value to float, return default if conversion fails."""
+    if value is None:
+        logger.warning(f"Received None value for conversion to float")
+        return default
     try:
-        return float(value) if value is not None else default
-    except (ValueError, TypeError):
-        logger.warning(f"Failed to convert value to float: {value}")
+        result = float(value)
+        return result
+    except (ValueError, TypeError) as e:
+        logger.warning(f"Failed to convert value to float: {value} (type: {type(value)}), error: {str(e)}")
         return default
 
 def normalize_datetime(doc):
@@ -52,7 +56,6 @@ def weekly_profit_data():
         db = utils.get_mongo_db()
         user_id = str(current_user.id)
         today = safe_parse_datetime(datetime.now(timezone.utc))
-        # Get last 7 days
         days = [(today - timedelta(days=i)).date() for i in range(6, -1, -1)]
         profit_per_day = []
 
@@ -63,16 +66,18 @@ def weekly_profit_data():
                 # Sum receipts (income) for the day
                 receipts = db.cashflows.aggregate([
                     {'$match': {'user_id': user_id, 'type': 'receipt', 'created_at': {'$gte': start, '$lt': end}}},
-                    {'$group': {'_id': None, 'total': {'$sum': '$amount'}}}
+                    {'$group': {'_id': None, 'total': {'$sum': {'$toDouble': '$amount'}}}}
                 ])
                 receipts_total = safe_to_float(next(receipts, {}).get('total', 0))
+                logger.debug(f"Day {day}: receipts_total = {receipts_total} (type: {type(receipts_total)})")
 
                 # Sum payments (expenses) for the day
                 payments = db.cashflows.aggregate([
                     {'$match': {'user_id': user_id, 'type': 'payment', 'created_at': {'$gte': start, '$lt': end}}},
-                    {'$group': {'_id': None, 'total': {'$sum': '$amount'}}}
+                    {'$group': {'_id': None, 'total': {'$sum': {'$toDouble': '$amount'}}}}
                 ])
                 payments_total = safe_to_float(next(payments, {}).get('total', 0))
+                logger.debug(f"Day {day}: payments_total = {payments_total} (type: {type(payments_total)})")
 
                 profit = receipts_total - payments_total
                 profit_per_day.append({
@@ -114,52 +119,58 @@ def refresh_dashboard_data():
             # Calculate receipts
             receipts_result = db.cashflows.aggregate([
                 {'$match': {**query, 'type': 'receipt'}},
-                {'$group': {'_id': None, 'total_amount': {'$sum': '$amount'}, 'count': {'$sum': 1}}}
+                {'$group': {'_id': None, 'total_amount': {'$sum': {'$toDouble': '$amount'}}, 'count': {'$sum': 1}}}
             ])
             receipts_data = next(receipts_result, {})
             stats['total_receipts'] = receipts_data.get('count', 0)
             stats['total_receipts_amount'] = safe_to_float(receipts_data.get('total_amount', 0))
+            logger.debug(f"Receipts: total_receipts_amount = {stats['total_receipts_amount']} (type: {type(stats['total_receipts_amount'])})")
 
             # Calculate payments
             payments_result = db.cashflows.aggregate([
                 {'$match': {**query, 'type': 'payment'}},
-                {'$group': {'_id': None, 'total_amount': {'$sum': '$amount'}, 'count': {'$sum': 1}}}
+                {'$group': {'_id': None, 'total_amount': {'$sum': {'$toDouble': '$amount'}}, 'count': {'$sum': 1}}}
             ])
             payments_data = next(payments_result, {})
             stats['total_payments'] = payments_data.get('count', 0)
             stats['total_payments_amount'] = safe_to_float(payments_data.get('total_amount', 0))
+            logger.debug(f"Payments: total_payments_amount = {stats['total_payments_amount']} (type: {type(stats['total_payments_amount'])})")
 
             # Calculate debtors
             debtors_result = db.records.aggregate([
                 {'$match': {**query, 'type': 'debtor'}},
-                {'$group': {'_id': None, 'total_amount': {'$sum': '$amount_owed'}, 'count': {'$sum': 1}}}
+                {'$group': {'_id': None, 'total_amount': {'$sum': {'$toDouble': '$amount_owed'}}, 'count': {'$sum': 1}}}
             ])
             debtors_data = next(debtors_result, {})
             stats['total_debtors'] = debtors_data.get('count', 0)
             stats['total_debtors_amount'] = safe_to_float(debtors_data.get('total_amount', 0))
+            logger.debug(f"Debtors: total_debtors_amount = {stats['total_debtors_amount']} (type: {type(stats['total_debtors_amount'])})")
 
             # Calculate creditors
             creditors_result = db.records.aggregate([
                 {'$match': {**query, 'type': 'creditor'}},
-                {'$group': {'_id': None, 'total_amount': {'$sum': '$amount_owed'}, 'count': {'$sum': 1}}}
+                {'$group': {'_id': None, 'total_amount': {'$sum': {'$toDouble': '$amount_owed'}}, 'count': {'$sum': 1}}}
             ])
             creditors_data = next(creditors_result, {})
             stats['total_creditors'] = creditors_data.get('count', 0)
             stats['total_creditors_amount'] = safe_to_float(creditors_data.get('total_amount', 0))
+            logger.debug(f"Creditors: total_creditors_amount = {stats['total_creditors_amount']} (type: {type(stats['total_creditors_amount'])})")
 
             # Calculate inventory
             inventory_result = db.records.aggregate([
                 {'$match': {**query, 'type': 'inventory'}},
-                {'$group': {'_id': None, 'total_cost': {'$sum': '$cost'}, 'count': {'$sum': 1}}}
+                {'$group': {'_id': None, 'total_cost': {'$sum': {'$toDouble': '$cost'}}, 'count': {'$sum': 1}}}
             ])
             inventory_data = next(inventory_result, {})
             stats['total_inventory'] = inventory_data.get('count', 0)
             stats['total_inventory_cost'] = safe_to_float(inventory_data.get('total_cost', 0))
+            logger.debug(f"Inventory: total_inventory_cost = {stats['total_inventory_cost']} (type: {type(stats['total_inventory_cost'])})")
 
             # Calculate profits
             stats['gross_profit'] = stats['total_receipts_amount'] - stats['total_payments_amount']
             stats['true_profit'] = stats['gross_profit'] - stats['total_inventory_cost']
             stats['profit_only'] = stats['true_profit']  # Ensure profit_only is included for template
+            logger.debug(f"Profits: gross_profit = {stats['gross_profit']} (type: {type(stats['gross_profit'])}), true_profit = {stats['true_profit']} (type: {type(stats['true_profit'])})")
 
         except Exception as stats_error:
             logger.error(
@@ -217,52 +228,59 @@ def index():
             # Receipts
             receipts_result = db.cashflows.aggregate([
                 {'$match': {**query, 'type': 'receipt'}},
-                {'$group': {'_id': None, 'total_amount': {'$sum': '$amount'}, 'count': {'$sum': 1}}}
+                {'$group': {'_id': None, 'total_amount': {'$sum': {'$toDouble': '$amount'}}, 'count': {'$sum': 1}}}
             ])
             receipts_data = next(receipts_result, {})
             stats['total_receipts'] = receipts_data.get('count', 0)
             stats['total_receipts_amount'] = safe_to_float(receipts_data.get('total_amount', 0))
+            logger.debug(f"Receipts: total_receipts_amount = {stats['total_receipts_amount']} (type: {type(stats['total_receipts_amount'])})")
 
             # Payments
             payments_result = db.cashflows.aggregate([
                 {'$match': {**query, 'type': 'payment'}},
-                {'$group': {'_id': None, 'total_amount': {'$sum': '$amount'}, 'count': {'$sum': 1}}}
+                {'$group': {'_id': None, 'total_amount': {'$sum': {'$toDouble': '$amount'}}, 'count': {'$sum': 1}}}
             ])
             payments_data = next(payments_result, {})
             stats['total_payments'] = payments_data.get('count', 0)
             stats['total_payments_amount'] = safe_to_float(payments_data.get('total_amount', 0))
+            logger.debug(f"Payments: total_payments_amount = {stats['total_payments_amount']} (type: {type(stats['total_payments_amount'])})")
 
             # Debtors
             debtors_result = db.records.aggregate([
                 {'$match': {**query, 'type': 'debtor'}},
-                {'$group': {'_id': None, 'total_amount': {'$sum': '$amount_owed'}, 'count': {'$sum': 1}}}
+                {'$group': {'_id': None, 'total_amount': {'$sum': {'$toDouble': '$amount_owed'}}, 'count': {'$sum': 1}}}
             ])
             debtors_data = next(debtors_result, {})
             stats['total_debtors'] = debtors_data.get('count', 0)
             stats['total_debtors_amount'] = safe_to_float(debtors_data.get('total_amount', 0))
+            logger.debug(f"Debtors: total_debtors_amount = {stats['total_debtors_amount']} (type: {type(stats['total_debtors_amount'])})")
 
             # Creditors
             creditors_result = db.records.aggregate([
                 {'$match': {**query, 'type': 'creditor'}},
-                {'$group': {'_id': None, 'total_amount': {'$sum': '$amount_owed'}, 'count': {'$sum': 1}}}
+                {'$group': {'_id': None, 'total_amount': {'$sum': {'$toDouble': '$amount_owed'}}, 'count': {'$sum': 1}}}
             ])
             creditors_data = next(creditors_result, {})
             stats['total_creditors'] = creditors_data.get('count', 0)
             stats['total_creditors_amount'] = safe_to_float(creditors_data.get('total_amount', 0))
+            logger.debug(f"Creditors: total_creditors_amount = {stats['total_creditors_amount']} (type: {type(stats['total_creditors_amount'])})")
 
             # Inventory
             inventory_result = db.records.aggregate([
                 {'$match': {**query, 'type': 'inventory'}},
-                {'$group': {'_id': None, 'total_cost': {'$sum': '$cost'}, 'count': {'$sum': 1}}}
+                {'$group': {'_id': None, 'total_cost': {'$sum': {'$toDouble': '$cost'}}, 'count': {'$sum': 1}}}
             ])
             inventory_data = next(inventory_result, {})
             stats['total_inventory'] = inventory_data.get('count', 0)
             stats['total_inventory_cost'] = safe_to_float(inventory_data.get('total_cost', 0))
+            logger.debug(f"Inventory: total_inventory_cost = {stats['total_inventory_cost']} (type: {type(stats['total_inventory_cost'])})")
 
-            # Profits
+            # Calculate profits
             stats['gross_profit'] = stats['total_receipts_amount'] - stats['total_payments_amount']
             stats['true_profit'] = stats['gross_profit'] - stats['total_inventory_cost']
             stats['profit_only'] = stats['true_profit']  # Required by template
+            logger.debug(f"Profits: gross_profit = {stats['gross_profit']} (type: {type(stats['gross_profit'])}), true_profit = {stats['true_profit']} (type: {type(stats['true_profit'])})")
+
         except Exception as stats_error:
             logger.error(
                 f"Error calculating dashboard stats: {str(stats_error)}",
@@ -297,7 +315,6 @@ def index():
         # Calculate streak (example logic, adjust based on your requirements)
         try:
             streak = 0  # Placeholder: Implement actual streak calculation
-            # Example: Count consecutive days with at least one record
             records = db.cashflows.find({**query}).sort('created_at', -1).limit(100)
             last_date = None
             for record in records:
