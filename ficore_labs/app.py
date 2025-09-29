@@ -75,12 +75,14 @@ def custom_login_required(f):
                 'ip_address': request.remote_addr
             })
             return redirect(url_for('users.login', next=request.url))
-        if not current_user.is_trial_active():
-            logger.info(f"User {current_user.id} trial expired, redirecting to subscription", extra={
+        if not current_user.is_trial_active() and request.endpoint != 'business.home':
+            logger.info(f"User {current_user.id} trial expired, redirecting to home", extra={
                 'session_id': session.get('sid', 'no-session-id'),
+                'role': current_user.role,
                 'ip_address': request.remote_addr
             })
-            return redirect(url_for('subscribe_bp.subscription_required'))
+            flash('Please subscribe to access premium features.', 'info')
+            return redirect(url_for('business.home'))
         return f(*args, **kwargs)
     return decorated_function
 
@@ -422,7 +424,7 @@ def create_app():
                 trial_end = user.get('trial_end')
                 subscription_start = user.get('subscription_start')
                 subscription_end = user.get('subscription_end')
-                if trial_start and trial_start.tzinfo is None:
+                if trial_start and trial_end.tzinfo is None:
                     trial_start = trial_start.replace(tzinfo=ZoneInfo("UTC"))
                 if trial_end and trial_end.tzinfo is None:
                     trial_end = trial_end.replace(tzinfo=ZoneInfo("UTC"))
@@ -479,7 +481,6 @@ def create_app():
     from blueprints.admin.routes import admin_bp
     from blueprints.dashboard.routes import dashboard_bp
     from blueprints.general.routes import general_bp
-    from notifications.routes import notifications
     from blueprints.business.routes import business
     from blueprints.subscribe.routes import subscribe_bp
     from blueprints.kyc.routes import kyc_bp
@@ -524,7 +525,6 @@ def create_app():
                 if amount is None or amount == '':
                     amount = 0
                 if isinstance(amount, str):
-                    # Assuming clean_currency is defined in utils; if not, replace with appropriate cleaning logic
                     from utils import clean_currency
                     amount = clean_currency(amount)
                 else:
@@ -604,6 +604,17 @@ def create_app():
     # Before request handlers
     @app.before_request
     def before_request_handler():
+        # Add redirect counter to prevent loops
+        session['redirect_count'] = session.get('redirect_count', 0) + 1
+        if session['redirect_count'] > 10:
+            logger.error(f"Redirect loop detected for user {current_user.id if current_user.is_authenticated else 'anonymous'} [path: {request.path}, ip: {request.remote_addr}]")
+            flash('Redirect loop detected. Please clear your cookies or contact support.', 'danger')
+            session.clear()
+            session['lang'] = session.get('lang', 'en')
+            session['sid'] = str(uuid.uuid4())
+            session['is_anonymous'] = True
+            session['last_activity'] = datetime.now(timezone.utc).isoformat()
+            return render_template('error/508.html', error_message="Redirect loop detected"), 508
 
         # Exempt endpoints that should not trigger subscription enforcement
         exempt_endpoints = [
@@ -614,13 +625,13 @@ def create_app():
             'users.verify_2fa',
             'users.logout',
             'subscribe_bp.subscribe',
-            'subscribe_bp.subscription_required',
             'subscribe_bp.initiate_payment',
             'subscribe_bp.callback',
             'subscribe_bp.status',
             'subscribe_bp.manage_subscription',
             'subscribe_bp.upload_receipt',
             'subscribe_bp.subscription_status',
+            'business.home',  # Added to prevent redirect loops
             'static',
             'health',
             'google_site_verification',
@@ -631,6 +642,7 @@ def create_app():
                 'session_id': session.get('sid', 'no-session-id'),
                 'ip_address': request.remote_addr
             })
+            session['redirect_count'] = 0  # Reset counter for exempt endpoints
             return
 
         # Ensure language in session
@@ -669,12 +681,15 @@ def create_app():
 
         # Enforce subscription for non-admins
         if current_user.is_authenticated and not getattr(current_user, 'is_admin', False):
-            if not current_user.is_trial_active():
-                logger.info(f"User {current_user.id} trial expired, redirecting to subscription", extra={
+            if not current_user.is_trial_active() and request.endpoint != 'business.home':
+                logger.info(f"User {current_user.id} trial expired, redirecting to home", extra={
                     'session_id': session.get('sid', 'no-session-id'),
+                    'role': current_user.role,
                     'ip_address': request.remote_addr
                 })
-                return redirect(url_for('subscribe_bp.subscription_required'))
+                flash('Please subscribe to access premium features.', 'info')
+                return redirect(url_for('business.home'))
+            session['redirect_count'] = 0  # Reset counter for valid users
 
         # Check session timeout
         if current_user.is_authenticated and 'last_activity' in session:
@@ -829,7 +844,8 @@ def create_app():
             )
             if current_user.is_authenticated:
                 if hasattr(current_user, 'is_trial_active') and not current_user.is_trial_active():
-                    return redirect(url_for('subscribe_bp.subscription_required'))
+                    flash('Please subscribe to access premium features.', 'info')
+                    return redirect(url_for('business.home'))
                 return redirect(get_post_login_redirect(current_user.role))
             return redirect(url_for('general_bp.landing'))
         except Exception as e:
@@ -909,7 +925,7 @@ def create_app():
                 'ip_address': request.remote_addr
             })
             flash('Error fetching your data.', 'danger')
-            return redirect(url_for('index'))
+            return redirect(url_for('business.home'))
 
     @app.route('/set_language/<lang>', methods=['POST'])
     @ensure_session_id
@@ -925,6 +941,16 @@ def create_app():
         })
         return jsonify({'success': True, 'lang': session['lang']})
 
+    # Temporary fallback for removed subscription-required route
+    @app.route('/subscribe/subscription-required')
+    def subscription_required_fallback():
+        logger.warning(f"Access to removed subscription-required route by user {current_user.id if current_user.is_authenticated else 'anonymous'}", extra={
+            'session_id': session.get('sid', 'no-session-id'),
+            'ip_address': request.remote_addr
+        })
+        flash('Please subscribe to access premium features.', 'info')
+        return redirect(url_for('business.home'))
+
     @app.errorhandler(403)
     def forbidden(e):
         logger.warning(f'Forbidden access: {request.url}', extra={
@@ -936,11 +962,12 @@ def create_app():
 
     @app.errorhandler(404)
     def page_not_found(e):
-        logger.error(f'Not found: {request.url}', extra={
+        logger.warning(f'Not found: {request.url}', extra={
             'session_id': session.get('sid', 'no-session-id'),
             'ip_address': request.remote_addr
         })
-        return render_template('error/404.html', error=str(e)), 404
+        flash('Page not found. Redirecting to dashboard.', 'info')
+        return redirect(url_for('business.home')), 404
 
     @app.errorhandler(500)
     def internal_server_error(e):
@@ -948,7 +975,8 @@ def create_app():
             'session_id': session.get('sid', 'no-session-id'),
             'ip_address': request.remote_addr
         })
-        return render_template('error/500.html', error=str(e)), 500
+        flash('An unexpected error occurred.', 'danger')
+        return redirect(url_for('business.home')), 500
 
     @app.errorhandler(CSRFError)
     def handle_csrf_error(e):
