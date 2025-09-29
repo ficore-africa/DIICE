@@ -168,17 +168,12 @@ def get_setup_wizard_route(role):
     raise ValueError(f"Invalid role: {role}")
 
 def get_post_login_redirect(role):
-    """Determine the redirect URL after login based on user role and trial/subscription status."""
+    """Determine the redirect URL after login based on user role."""
     try:
-        # Check if user has an active trial or subscription
-        if current_user.is_trial_active() or current_user.is_subscribed:
-            if role in ['trader', 'admin']:
-                return url_for('business.home')
-            logger.error(f"Invalid role '{role}' for post-login redirect")
-            raise ValueError(f"Invalid role: {role}")
-        else:
-            # Redirect to subscription page if trial expired and not subscribed
-            return url_for('subscribe_bp.subscribe')
+        if role in ['trader', 'admin']:
+            return url_for('business.home')
+        logger.error(f"Invalid role '{role}' for post-login redirect")
+        raise ValueError(f"Invalid role: {role}")
     except Exception as e:
         current_app.logger.error(
             f"Error determining post-login redirect for role {role}: {str(e)}",
@@ -288,8 +283,6 @@ def login():
                         if not user.get('setup_complete', False):
                             setup_route = get_setup_wizard_route(user.get('role', 'trader'))
                             return redirect(url_for(setup_route))
-                        if user.get('trial_end') and user.get('trial_end') < datetime.utcnow() and not user.get('is_subscribed', False):
-                            return redirect(url_for('subscribe_bp.subscription_required'))
                         return redirect(get_post_login_redirect(user.get('role', 'trader')))
                 user_obj = User(
                     id=user['_id'],
@@ -322,8 +315,6 @@ def login():
                 if not user.get('setup_complete', False):
                     setup_route = get_setup_wizard_route(user.get('role', 'trader'))
                     return redirect(url_for(setup_route))
-                if user.get('trial_end') and user.get('trial_end') < datetime.utcnow() and not user.get('is_subscribed', False):
-                    return redirect(url_for('subscribe_bp.subscription_required'))
                 return redirect(get_post_login_redirect(user.get('role', 'trader')))
             except pymongo.errors.PyMongoError as e:
                 logger.error(f"MongoDB error during login for {identifier}: {str(e)}")
@@ -401,8 +392,6 @@ def verify_2fa():
                 if not user.get('setup_complete', False):
                     setup_route = get_setup_wizard_route(user.get('role', 'trader'))
                     return redirect(url_for(setup_route))
-                if user.get('trial_end') and user.get('trial_end') < datetime.utcnow() and not user.get('is_subscribed', False):
-                    return redirect(url_for('subscribe_bp.subscription_required'))
                 return redirect(get_post_login_redirect(user.get('role', 'trader')))
             flash(trans('general_invalid_otp', default='Invalid or expired OTP'), 'danger')
             logger.warning(f"Failed 2FA attempt for username: {username}")
@@ -651,8 +640,6 @@ def setup_wizard():
             return redirect(url_for('users.logout'))
 
         if user.get('setup_complete', False):
-            if user.get('trial_end') and user.get('trial_end') < datetime.utcnow() and not user.get('is_subscribed', False):
-                return redirect(url_for('subscribe_bp.subscription_required'))
             return redirect(get_post_login_redirect(user.get('role', 'trader')))
 
         if user.get('role') not in ['trader', 'startup', 'admin']:
@@ -686,8 +673,6 @@ def setup_wizard():
             log_audit_action('complete_setup_wizard', {'user_id': user_id, 'updated_by': current_user.id})
             logger.info(f"Business setup completed for user: {user_id} by {current_user.id}, session_id: {session.get('session_id')}")
             flash(trans('general_business_setup_success', default='Business setup completed'), 'success')
-            if user.get('trial_end') and user.get('trial_end') < datetime.utcnow() and not user.get('is_subscribed', False):
-                return redirect(url_for('subscribe_bp.subscription_required'))
             return redirect(url_for('settings.profile', user_id=user_id) if utils.is_admin() else get_post_login_redirect(user.get('role', 'trader')))
         else:
             for field, errors in form.errors.items():
