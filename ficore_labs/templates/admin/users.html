@@ -44,6 +44,9 @@
 {% block content %}
 <div class="container mt-5">
     <h1 class="mb-4">{{ trans('admin_manage_users', default='Manage Users') | escape }}</h1>
+    <div class="mb-2">
+        <span class="badge bg-info">{{ trans('admin_total_users', default='Total Users') }}: {{ users|length }}</span>
+    </div>
     <a href="{{ url_for('admin.dashboard') }}" class="btn btn-primary mb-4">{{ trans('general_back_to_dashboard', default='Back to Dashboard') | escape }}</a>
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
@@ -71,9 +74,10 @@
                         <th>{{ trans('general_role', default='Role') | escape }}</th>
                         <th>{{ trans('subscription_status', default='Subscription Status') | escape }}</th>
                         <th>{{ trans('general_status', default='Status') | escape }}</th>
-                           <th>{{ trans('user_joined', default='Joined') | escape }}</th>
-                           <th>{{ trans('trial_or_subscription_start', default='Trial/Subscription Start') | escape }}</th>
-                           <th>{{ trans('trial_or_subscription_expiry', default='Trial/Subscription Expiry') | escape }}</th>
+                        <th>{{ trans('user_joined', default='Joined') | escape }}</th>
+                        <th>{{ trans('trial_or_subscription_start', default='Trial/Subscription Start') | escape }}</th>
+                        <th>{{ trans('trial_or_subscription_expiry', default='Trial/Subscription Expiry') | escape }}</th>
+                        <th>{{ trans('admin_warnings', default='Warnings') | escape }}</th>
                         {% if current_user.is_trial_active or current_user.is_subscribed %}
                         <th>{{ trans('general_actions', default='Actions') | escape }}</th>
                         {% endif %}
@@ -87,9 +91,19 @@
                             <td>{{ trans('general_' + user.role, default=user.role.capitalize()) | escape }}</td>
                             <td>{{ 'Subscribed' if user.is_subscribed and user.is_trial_active else 'Trial' if user.is_trial and user.is_trial_active else 'Expired' | escape }}</td>
                             <td>{{ trans('admin_suspended', default='Suspended') if user.get('suspended') else trans('admin_active', default='Active') | escape }}</td>
-                               <td>{{ user.created_at.strftime('%Y-%m-%d') if user.get('created_at') else '-' }}</td>
-                               <td>{{ user.trial_start.strftime('%Y-%m-%d') if user.get('trial_start') else (user.subscription_start.strftime('%Y-%m-%d') if user.get('subscription_start') else '-') }}</td>
-                               <td>{{ user.trial_end.strftime('%Y-%m-%d') if user.get('trial_end') else (user.subscription_end.strftime('%Y-%m-%d') if user.get('subscription_end') else '-') }}</td>
+                            <td>{{ user.created_at.strftime('%Y-%m-%d') if user.get('created_at') else '-' }}</td>
+                            <td>{{ user.trial_start.strftime('%Y-%m-%d') if user.get('trial_start') else (user.subscription_start.strftime('%Y-%m-%d') if user.get('subscription_start') else '-') }}</td>
+                            <td>{{ user.trial_end.strftime('%Y-%m-%d') if user.get('trial_end') else (user.subscription_end.strftime('%Y-%m-%d') if user.get('subscription_end') else '-') }}</td>
+                            <td>
+                                {% if user.broken_dates %}
+                                    <span class="badge bg-danger">{{ trans('admin_broken_dates', default='Broken Dates') }}</span>
+                                    <form action="{{ url_for('admin.manage_user_subscriptions') }}" method="GET" class="d-inline">
+                                        <button type="submit" class="btn btn-outline-danger btn-sm">{{ trans('admin_fix_user', default='Fix User') }}</button>
+                                    </form>
+                                {% else %}
+                                    <span class="badge bg-success">{{ trans('admin_dates_ok', default='OK') }}</span>
+                                {% endif %}
+                            </td>
                             {% if current_user.is_trial_active or current_user.is_subscribed %}
                             <td>
                                 {% if not user.get('suspended') %}
