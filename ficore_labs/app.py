@@ -66,6 +66,9 @@ def admin_required(f):
 def custom_login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        if request.path.startswith('/admin'):
+            # Skip subscription check for admin routes
+            return f(*args, **kwargs)
         if not current_user.is_authenticated:
             logger.info("Redirecting unauthenticated user to login", extra={
                 'session_id': session.get('sid', 'no-session-id'),
@@ -158,7 +161,7 @@ def setup_logging(app):
     werkzeug_logger.addHandler(handler)
     pymongo_logger.addHandler(handler)
     flask_logger.setLevel(logging.INFO)
-    werkzeug_logger.setLevel(logging.INFO)
+    werkzeug_logger.setLevel-logging.INFO)
     pymongo_logger.setLevel(logging.INFO)
     logger.info('Logging setup complete', extra={
         'session_id': 'none',
