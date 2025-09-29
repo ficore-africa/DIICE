@@ -51,10 +51,10 @@
         <tr>
             <td>{{ user._id }}</td>
             <td>{{ user.email }}</td>
-            <td>{{ 'Subscribed' if user.is_subscribed and user.is_trial_active else 'Not Subscribed' }}</td>
+            <td>{{ 'Subscribed' if user.is_subscribed else 'Not Subscribed' }}</td>
             <td>{{ user.subscription_plan|capitalize or 'None' }}</td>
             <td>{{ user.subscription_end.strftime('%Y-%m-%d') if user.subscription_end else 'N/A' }}</td>
-            <td>{{ 'Active' if user.is_trial and user.is_trial_active else 'Inactive' }}</td>
+            <td>{{ 'Active' if user.is_trial and user.trial_end and user.trial_end >= now else 'Inactive' }}</td>
         </tr>
         {% endfor %}
     </tbody>
