@@ -28,6 +28,29 @@ logger = logging.getLogger(__name__)
 
 admin_bp = Blueprint('admin', __name__, template_folder='templates/admin', url_prefix='/admin')
 
+# Helper to ensure all datetimes are UTC-aware
+def to_utc_aware(dt):
+    """Convert a datetime or string to UTC-aware datetime."""
+    if not dt:
+        return None
+    if isinstance(dt, str):
+        try:
+            dt = datetime.fromisoformat(dt)
+        except ValueError:
+            try:
+                dt = datetime.strptime(dt, '%Y-%m-%d')
+            except ValueError:
+                logger.error(f"Invalid datetime string format: {dt}",
+                             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
+                return None
+    if isinstance(dt, datetime):
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
+    logger.error(f"Invalid datetime type: {type(dt)}",
+                 extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
+    return None
+
 # Form Definitions
 class RoleForm(FlaskForm):
     role = SelectField(trans('user_role', default='Role'), choices=[('trader', 'Trader'), ('admin', 'Admin')], validators=[DataRequired()], render_kw={'class': 'form-select'})
@@ -177,11 +200,12 @@ def dashboard():
             user['_id'] = str(user['_id'])
             trial_end = user.get('trial_end')
             subscription_end = user.get('subscription_end')
-            trial_end_aware = trial_end.replace(tzinfo=ZoneInfo("UTC")) if trial_end and trial_end.tzinfo is None else trial_end
-            subscription_end_aware = subscription_end.replace(tzinfo=ZoneInfo("UTC")) if subscription_end and subscription_end.tzinfo is None else subscription_end
+            trial_end_aware = to_utc_aware(trial_end)
+            subscription_end_aware = to_utc_aware(subscription_end)
+            now_aware = datetime.now(timezone.utc)
             user['is_trial_active'] = (
-                datetime.now(timezone.utc) <= trial_end_aware if user.get('is_trial') and trial_end_aware
-                else user.get('is_subscribed') and subscription_end_aware and datetime.now(timezone.utc) <= subscription_end_aware
+                now_aware <= trial_end_aware if user.get('is_trial') and trial_end_aware
+                else user.get('is_subscribed') and subscription_end_aware and now_aware <= subscription_end_aware
             )
         logger.info(f"Admin {current_user.id} accessed dashboard",
                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
@@ -214,11 +238,12 @@ def manage_users():
             user['username'] = user['_id']
             trial_end = user.get('trial_end')
             subscription_end = user.get('subscription_end')
-            trial_end_aware = trial_end.replace(tzinfo=ZoneInfo("UTC")) if trial_end and trial_end.tzinfo is None else trial_end
-            subscription_end_aware = subscription_end.replace(tzinfo=ZoneInfo("UTC")) if subscription_end and subscription_end.tzinfo is None else subscription_end
+            trial_end_aware = to_utc_aware(trial_end)
+            subscription_end_aware = to_utc_aware(subscription_end)
+            now_aware = datetime.now(timezone.utc)
             user['is_trial_active'] = (
-                datetime.now(timezone.utc) <= trial_end_aware if user.get('is_trial') and trial_end_aware
-                else user.get('is_subscribed') and subscription_end_aware and datetime.now(timezone.utc) <= subscription_end_aware
+                now_aware <= trial_end_aware if user.get('is_trial') and trial_end_aware
+                else user.get('is_subscribed') and subscription_end_aware and now_aware <= subscription_end_aware
             )
         return render_template('admin/users.html', users=users, title=trans('admin_manage_users_title', default='Manage Users'), now=datetime.now(timezone.utc))
     except Exception as e:
@@ -384,11 +409,12 @@ def manage_user_roles():
             user['_id'] = str(user['_id'])
             trial_end = user.get('trial_end')
             subscription_end = user.get('subscription_end')
-            trial_end_aware = trial_end.replace(tzinfo=ZoneInfo("UTC")) if trial_end and trial_end.tzinfo is None else trial_end
-            subscription_end_aware = subscription_end.replace(tzinfo=ZoneInfo("UTC")) if subscription_end and subscription_end.tzinfo is None else subscription_end
+            trial_end_aware = to_utc_aware(trial_end)
+            subscription_end_aware = to_utc_aware(subscription_end)
+            now_aware = datetime.now(timezone.utc)
             user['is_trial_active'] = (
-                datetime.now(timezone.utc) <= trial_end_aware if user.get('is_trial') and trial_end_aware
-                else user.get('is_subscribed') and subscription_end_aware and datetime.now(timezone.utc) <= subscription_end_aware
+                now_aware <= trial_end_aware if user.get('is_trial') and trial_end_aware
+                else user.get('is_subscribed') and subscription_end_aware and now_aware <= subscription_end_aware
             )
         return render_template('admin/user_roles.html', form=form, users=users, title=trans('admin_manage_user_roles_title', default='Manage User Roles'), now=datetime.now(timezone.utc))
     except Exception as e:
@@ -471,24 +497,14 @@ def manage_user_subscriptions():
             user['_id'] = str(user['_id'])
             trial_end = user.get('trial_end')
             subscription_end = user.get('subscription_end')
-            # Ensure timezone-aware datetimes
+            trial_end_aware = to_utc_aware(trial_end)
+            subscription_end_aware = to_utc_aware(subscription_end)
+            now_aware = datetime.now(timezone.utc)
             try:
-                trial_end_aware = (
-                    trial_end.replace(tzinfo=ZoneInfo("UTC"))
-                    if trial_end and isinstance(trial_end, datetime) and trial_end.tzinfo is None
-                    else trial_end
-                )
-                subscription_end_aware = (
-                    subscription_end.replace(tzinfo=ZoneInfo("UTC"))
-                    if subscription_end and isinstance(subscription_end, datetime) and subscription_end.tzinfo is None
-                    else subscription_end
-                )
-                # Calculate is_trial_active with safe checks
                 user['is_trial_active'] = False
-                now_aware = datetime.now(timezone.utc)
-                if user.get('is_trial') and trial_end_aware and isinstance(trial_end_aware, datetime):
+                if user.get('is_trial') and trial_end_aware:
                     user['is_trial_active'] = now_aware <= trial_end_aware
-                elif user.get('is_subscribed') and subscription_end_aware and isinstance(subscription_end_aware, datetime):
+                elif user.get('is_subscribed') and subscription_end_aware:
                     user['is_trial_active'] = now_aware <= subscription_end_aware
             except Exception as e:
                 logger.error(f"Error processing datetime for user {user['_id']}: {str(e)}",
@@ -587,11 +603,12 @@ def manage_user_trials():
             user['_id'] = str(user['_id'])
             trial_end = user.get('trial_end')
             subscription_end = user.get('subscription_end')
-            trial_end_aware = trial_end.replace(tzinfo=ZoneInfo("UTC")) if trial_end and trial_end.tzinfo is None else trial_end
-            subscription_end_aware = subscription_end.replace(tzinfo=ZoneInfo("UTC")) if subscription_end and subscription_end.tzinfo is None else subscription_end
+            trial_end_aware = to_utc_aware(trial_end)
+            subscription_end_aware = to_utc_aware(subscription_end)
+            now_aware = datetime.now(timezone.utc)
             user['is_trial_active'] = (
-                datetime.now(timezone.utc) <= trial_end_aware if user.get('is_trial') and trial_end_aware
-                else user.get('is_subscribed') and subscription_end_aware and datetime.now(timezone.utc) <= subscription_end_aware
+                now_aware <= trial_end_aware if user.get('is_trial') and trial_end_aware
+                else user.get('is_subscribed') and subscription_end_aware and now_aware <= subscription_end_aware
             )
         return render_template('admin/user_trials.html', form=form, users=users, title=trans('admin_manage_user_trials_title', default='Manage User Trials'), now=datetime.now(timezone.utc))
     except Exception as e:
@@ -921,11 +938,12 @@ def customer_reports():
             user['_id'] = str(user['_id'])
             trial_end = user.get('trial_end')
             subscription_end = user.get('subscription_end')
-            trial_end_aware = trial_end.replace(tzinfo=ZoneInfo("UTC")) if trial_end and trial_end.tzinfo is None else trial_end
-            subscription_end_aware = subscription_end.replace(tzinfo=ZoneInfo("UTC")) if subscription_end and subscription_end.tzinfo is None else subscription_end
+            trial_end_aware = to_utc_aware(trial_end)
+            subscription_end_aware = to_utc_aware(subscription_end)
+            now_aware = datetime.now(timezone.utc)
             user['is_trial_active'] = (
-                datetime.now(timezone.utc) <= trial_end_aware if user.get('is_trial') and trial_end_aware
-                else user.get('is_subscribed') and subscription_end_aware and datetime.now(timezone.utc) <= subscription_end_aware
+                now_aware <= trial_end_aware if user.get('is_trial') and trial_end_aware
+                else user.get('is_subscribed') and subscription_end_aware and now_aware <= subscription_end_aware
             )
         if format == 'pdf':
             return generate_customer_report_pdf(users)
