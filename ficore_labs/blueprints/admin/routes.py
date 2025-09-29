@@ -482,19 +482,22 @@ def manage_user_subscriptions():
                 'updated_at': datetime.now(timezone.utc)
             }
             # Handle subscription_end from form
-            if form.subscription_end.data:
-                try:
+            try:
+                if form.subscription_end.data:
                     # Convert form date to timezone-aware datetime using helper
                     subscription_end_dt = datetime.combine(form.subscription_end.data, datetime.min.time())
                     update_data['subscription_end'] = to_utc_aware(subscription_end_dt)
-                except Exception as e:
-                    logger.error(f"Error converting subscription_end date for user {user_id}: {str(e)}",
-                                 extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-                    flash(trans('admin_invalid_date', default='Invalid subscription end date'), 'danger')
-                    return redirect(url_for('admin.manage_user_subscriptions'))
-            elif form.is_subscribed.data == 'True' and form.subscription_plan.data:
-                duration = plan_durations.get(form.subscription_plan.data, 30)
-                update_data['subscription_end'] = datetime.now(timezone.utc) + timedelta(days=duration)
+                elif form.is_subscribed.data == 'True' and form.subscription_plan.data:
+                    duration = plan_durations.get(form.subscription_plan.data, 30)
+                    update_data['subscription_end'] = datetime.now(timezone.utc) + timedelta(days=duration)
+                # Defensive: always normalize before DB update
+                if update_data['subscription_end']:
+                    update_data['subscription_end'] = to_utc_aware(update_data['subscription_end'])
+            except Exception as e:
+                logger.error(f"Error processing subscription_end for user {user_id}: {str(e)}",
+                             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
+                flash(trans('admin_invalid_date', default='Invalid subscription end date'), 'danger')
+                return redirect(url_for('admin.manage_user_subscriptions'))
             result = db.users.update_one(
                 user_query,
                 {'$set': update_data}
