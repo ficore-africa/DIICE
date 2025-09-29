@@ -161,7 +161,7 @@ def setup_logging(app):
     werkzeug_logger.addHandler(handler)
     pymongo_logger.addHandler(handler)
     flask_logger.setLevel(logging.INFO)
-    werkzeug_logger.setLevel-logging.INFO)
+    werkzeug_logger.setLevel(logging.INFO)
     pymongo_logger.setLevel(logging.INFO)
     logger.info('Logging setup complete', extra={
         'session_id': 'none',
