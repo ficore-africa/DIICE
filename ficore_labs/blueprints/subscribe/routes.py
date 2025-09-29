@@ -57,7 +57,7 @@ def subscribe():
         )
         flash(trans('general_error', default='An error occurred while loading the subscription page'), 'danger')
         # CHANGE: Redirect to the now unprotected business home page on error
-        return redirect(url_for('business.home'))
+        return redirect(url_for('subscribe/subscription_required.html', title="Subscription Required"))
 
 @subscribe_bp.route('/initiate-payment', methods=['POST'])
 @login_required
@@ -73,7 +73,7 @@ def initiate_payment():
             )
             flash(trans('general_error', default='Payment configuration error'), 'danger')
             # CHANGE: Redirect to the now unprotected business home page on error
-            return redirect(url_for('business.home'))
+            return redirect(url_for('subscribe/subscription_required.html', title="Subscription Required"))
 
         plan_code = utils.sanitize_input(request.form.get('plan_code'), max_length=20)
         if plan_code not in ['monthly', 'yearly']:
@@ -83,7 +83,7 @@ def initiate_payment():
             )
             flash(trans('subscribe_invalid_plan', default='Invalid plan selected'), 'danger')
             # CHANGE: Redirect to the now unprotected business home page on error
-            return redirect(url_for('business.home'))
+            return redirect(url_for('subscribe/subscription_required.html', title="Subscription Required"))
         
         amount = 100000 if plan_code == 'monthly' else 1000000  # Amounts in kobo
         reference = utils.sanitize_input(f"ficore_{current_user.id}_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}", max_length=100)
@@ -113,7 +113,7 @@ def initiate_payment():
             )
             flash(trans('subscribe_payment_init_error', default='Failed to initiate payment'), 'danger')
             # CHANGE: Redirect to the now unprotected business home page on error
-            return redirect(url_for('business.home'))
+            return redirect(url_for('subscribe/subscription_required.html', title="Subscription Required"))
 
         logger.info(
             f"Payment initiated for user {current_user.id}, reference: {reference}, plan: {plan_code}",
@@ -134,7 +134,7 @@ def initiate_payment():
         )
         flash(trans('subscribe_csrf_error', default='Invalid CSRF token. Please try again.'), 'danger')
         # CHANGE: Redirect to the now unprotected business home page on error
-        return redirect(url_for('business.home'))
+        return redirect(url_for('subscribe/subscription_required.html', title="Subscription Required"))
     except requests.RequestException as e:
         logger.error(
             f"Paystack API request error for user {current_user.id}: {str(e)}",
@@ -142,7 +142,7 @@ def initiate_payment():
         )
         flash(trans('subscribe_payment_init_error', default='Failed to initiate payment'), 'danger')
         # CHANGE: Redirect to the now unprotected business home page on error
-        return redirect(url_for('business.home'))
+        return redirect(url_for('subscribe/subscription_required.html', title="Subscription Required"))
     except Exception as e:
         logger.error(
             f"Error initiating payment for user {current_user.id}: {str(e)}",
@@ -150,7 +150,7 @@ def initiate_payment():
         )
         flash(trans('general_error', default='An error occurred during payment initiation'), 'danger')
         # CHANGE: Redirect to the now unprotected business home page on error
-        return redirect(url_for('business.home'))
+        return redirect(url_for('subscribe/subscription_required.html', title="Subscription Required"))
 
 @subscribe_bp.route('/callback')
 @login_required
@@ -169,7 +169,7 @@ def callback():
             flash(trans('subscribe_invalid_reference', default='Invalid payment reference'), 'danger')
             session.pop('pending_transaction', None)
             # CHANGE: Redirect to the now unprotected business home page on error
-            return redirect(url_for('business.home'))
+            return redirect(url_for('subscribe/subscription_required.html', title="Subscription Required"))
 
         headers = {
             'Authorization': f"Bearer {os.getenv('PAYSTACK_SECRET_KEY')}",
@@ -189,7 +189,7 @@ def callback():
             flash(trans('subscribe_payment_failed', default='Payment verification failed'), 'danger')
             session.pop('pending_transaction', None)
             # CHANGE: Redirect to the now unprotected business home page on error
-            return redirect(url_for('business.home'))
+            return redirect(url_for('subscribe/subscription_required.html', title="Subscription Required"))
 
         # --- FIX START: Update MongoDB and explicitly update current_user ---
         db = get_mongo_db()
@@ -240,7 +240,7 @@ def callback():
         flash(trans('subscribe_payment_failed', default='Payment verification failed'), 'danger')
         session.pop('pending_transaction', None)
         # CHANGE: Redirect to the now unprotected business home page on error
-        return redirect(url_for('business.home'))
+        return redirect(url_for('subscribe/subscription_required.html', title="Subscription Required"))
     except Exception as e:
         logger.error(
             f"Error processing callback for user {current_user.id}: {str(e)}",
@@ -249,7 +249,7 @@ def callback():
         flash(trans('general_error', default='An error occurred during payment processing'), 'danger')
         session.pop('pending_transaction', None)
         # CHANGE: Redirect to the now unprotected business home page on error
-        return redirect(url_for('business.home'))
+        return redirect(url_for('subscribe/subscription_required.html', title="Subscription Required"))
 
 @subscribe_bp.route('/subscription-required')
 @login_required
@@ -291,7 +291,7 @@ def subscription_status():
         )
         flash(trans('general_error', default='An error occurred while loading the subscription status page'), 'danger')
         # CHANGE: Redirect to the now unprotected business home page on error
-        return redirect(url_for('business.home'))
+        return redirect(url_for('subscribe/subscription_required.html', title="Subscription Required"))
 
 @subscribe_bp.route('/manage')
 @login_required
@@ -326,7 +326,7 @@ def manage_subscription():
         )
         flash(trans('general_error', default='An error occurred while loading the subscription management page'), 'danger')
         # CHANGE: Redirect to the now unprotected business home page on error
-        return redirect(url_for('business.home'))
+        return redirect(url_for('subscribe/subscription_required.html', title="Subscription Required"))
 
 @subscribe_bp.route('/upload-receipt', methods=['POST'])
 @login_required
