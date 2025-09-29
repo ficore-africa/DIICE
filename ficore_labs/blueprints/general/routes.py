@@ -12,7 +12,6 @@ from models import create_feedback, get_mongo_db, get_user, create_waitlist_entr
 from flask import current_app
 import utils
 from blueprints.users.routes import get_post_login_redirect
-
 from utils import limiter
 
 def exempt_crawlers():
@@ -42,8 +41,7 @@ def landing():
                 extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
             )
             flash(trans('general_error', default='An error occurred. Please try again.'), 'danger')
-            # The redirect to subscription_required on error has been REMOVED
-            return redirect(url_for('general_bp.home')) # Fallback to home instead of an infinite loop risk
+            return redirect(url_for('general_bp.home'))
     try:
         current_app.logger.info(
             f"Accessing general.landing - User: {current_user.id if current_user.is_authenticated else 'anonymous'}, Authenticated: {current_user.is_authenticated}, Session: {dict(session)}",
@@ -93,14 +91,6 @@ def home():
     try:
         user = get_user(get_mongo_db(), current_user.id)
         
-        # Original subscription/trial check block has been REMOVED:
-        # if not user.is_trial_active() and not user.is_subscribed:
-        #     current_app.logger.info(
-        #         f"Redirecting user {current_user.id} to subscribe due to expired trial",
-        #         extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
-        #     )
-        #     return redirect(url_for('subscribe_bp.subscription_required'))
-        
         if user.trial_end and user.trial_end.tzinfo is None:
             user.trial_end = user.trial_end.replace(tzinfo=ZoneInfo("UTC"))
 
@@ -133,8 +123,7 @@ def home():
             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
         )
         flash(trans('general_error', default='An error occurred'), 'danger')
-        # Defaulting to a safe, authenticated-only redirect in case of error
-        return redirect(url_for('general_bp.landing')) 
+        return redirect(url_for('general_bp.landing'))
 
 @general_bp.route('/about')
 def about():
@@ -276,17 +265,6 @@ def feedback():
                 )
                 flash(trans('general_invalid_input', default='Please provide a rating between 1 and 5'), 'danger')
                 return render_template('general/feedback.html', tool_options=tool_options, title=trans('general_feedback', lang=lang))
-            
-            if current_user.is_authenticated:
-                user = get_user(get_mongo_db(), current_user.id)
-                # Subscription/trial check in feedback submission has been REMOVED
-                # if not user.is_trial_active() and not user.is_subscribed:
-                #     current_app.logger.info(
-                #         f"Redirecting user {current_user.id} to subscribe due to expired trial from feedback",
-                #         extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
-                #     )
-                #     flash(trans('general_subscription_required', default='Your trial has expired. Please subscribe to submit feedback.'), 'warning')
-                #     return redirect(url_for('subscribe_bp.subscription_required'))
             
             with current_app.app_context():
                 db = get_mongo_db()
