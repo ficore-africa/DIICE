@@ -12,13 +12,17 @@ from models import create_feedback, get_mongo_db, get_user, create_waitlist_entr
 from flask import current_app
 import utils
 from blueprints.users.routes import get_post_login_redirect
+
+# Use the existing limiter from utils
 from utils import limiter
 
+# Exempt crawlers from rate limiting
 def exempt_crawlers():
     user_agent = request.user_agent.string
     return user_agent.startswith("facebookexternalhit") or \
            user_agent.startswith("Mozilla/5.0+(compatible; UptimeRobot")
 
+# Define WaitlistForm class within this file
 class WaitlistForm(FlaskForm):
     full_name = StringField('Full Name', validators=[DataRequired(), Length(min=2, max=100)])
     whatsapp_number = StringField('WhatsApp Number', validators=[DataRequired(), Length(max=20)])
@@ -41,7 +45,7 @@ def landing():
                 extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
             )
             flash(trans('general_error', default='An error occurred. Please try again.'), 'danger')
-            return redirect(url_for('general_bp.home'))
+            return redirect(url_for('users.login')), 500
     try:
         current_app.logger.info(
             f"Accessing general.landing - User: {current_user.id if current_user.is_authenticated else 'anonymous'}, Authenticated: {current_user.is_authenticated}, Session: {dict(session)}",
@@ -87,9 +91,12 @@ def landing():
 @general_bp.route('/home')
 @login_required
 def home():
-    """Trader homepage."""
+    """Trader homepage with trial/subscription check."""
     try:
         user = get_user(get_mongo_db(), current_user.id)
+        if not user.is_trial_active():
+            flash(trans('general_subscription_required', default='Your trial has expired. Please subscribe to continue.'), 'warning')
+            return redirect(url_for('subscribe_bp.subscribe'))
         
         if user.trial_end and user.trial_end.tzinfo is None:
             user.trial_end = user.trial_end.replace(tzinfo=ZoneInfo("UTC"))
@@ -123,7 +130,7 @@ def home():
             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
         )
         flash(trans('general_error', default='An error occurred'), 'danger')
-        return redirect(url_for('general_bp.landing'))
+        return redirect(url_for('dashboard.index'))
 
 @general_bp.route('/about')
 def about():
@@ -240,6 +247,7 @@ def feedback():
         ['receipts', trans('receipts_dashboard', default='Receipts')],
         ['payment', trans('payments_dashboard', default='Payments')],
         ['report', trans('reports_dashboard', default='Business Reports')],
+
     ]
 
     if request.method == 'POST':
@@ -265,6 +273,12 @@ def feedback():
                 )
                 flash(trans('general_invalid_input', default='Please provide a rating between 1 and 5'), 'danger')
                 return render_template('general/feedback.html', tool_options=tool_options, title=trans('general_feedback', lang=lang))
+            
+            if current_user.is_authenticated:
+                user = get_user(get_mongo_db(), current_user.id)
+                if not user.is_trial_active():
+                    flash(trans('general_subscription_required', default='Your trial has expired. Please subscribe to submit feedback.'), 'warning')
+                    return redirect(url_for('subscribe_bp.subscribe'))
             
             with current_app.app_context():
                 db = get_mongo_db()
@@ -295,7 +309,7 @@ def feedback():
             )
             flash(trans('general_thank_you', default='Thank you for your feedback!'), 'success')
             return redirect(url_for('general_bp.home'))
-            
+        
         except CSRFError as e:
             current_app.logger.error(
                 f'CSRF error in feedback submission: {str(e)}',
@@ -308,7 +322,7 @@ def feedback():
                 f'Error processing feedback: {str(e)}',
                 extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id if current_user.is_authenticated else 'anonymous', 'ip_address': request.remote_addr}
             )
-            flash(trans('general_invalid_input', default='Error occurred during feedback submission'), 'danger')
+            flash(trans('general_error', default='Error occurred during feedback submission'), 'danger')
             return render_template('general/feedback.html', tool_options=tool_options, title=trans('general_feedback', lang=lang)), 400
         except TemplateNotFound as e:
             current_app.logger.error(
@@ -340,16 +354,18 @@ def waitlist():
         extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id if current_user.is_authenticated else 'anonymous', 'ip_address': request.remote_addr}
     )
 
-    form = WaitlistForm()
+    form = WaitlistForm()  # Instantiate the form
 
     if request.method == 'POST':
         if form.validate_on_submit():
             try:
+                # Get form data
                 full_name = form.full_name.data
                 whatsapp_number = form.whatsapp_number.data
                 email = form.email.data
                 business_type = form.business_type.data or None
 
+                # Check for uniqueness of email and WhatsApp number
                 with current_app.app_context():
                     db = get_mongo_db()
                     if get_waitlist_entries(db, {'email': email}):
@@ -359,6 +375,7 @@ def waitlist():
                         flash(trans('general_waitlist_duplicate_error', default='WhatsApp number already exists in waitlist'), 'danger')
                         return render_template('general/waitlist.html', title=trans('general_waitlist', lang=lang, default='Join Our Waitlist'), form=form)
 
+                # Store waitlist entry
                 with current_app.app_context():
                     db = get_mongo_db()
                     waitlist_entry = {
@@ -373,6 +390,7 @@ def waitlist():
                     }
                     create_waitlist_entry(db, waitlist_entry)
                     
+                    # Log audit entry
                     db.audit_logs.insert_one({
                         'admin_id': 'system',
                         'action': 'submit_waitlist',
@@ -390,7 +408,7 @@ def waitlist():
                 )
                 flash(trans('general_thank_you_waitlist', default='Thank you for joining our waitlist! We’ll be in touch soon.'), 'success')
                 return redirect(url_for('general_bp.landing'))
-                
+            
             except Exception as e:
                 current_app.logger.error(
                     f'Error processing waitlist: {str(e)}',
@@ -399,7 +417,9 @@ def waitlist():
                 flash(trans('general_error', default='Error occurred during waitlist submission'), 'danger')
                 return render_template('general/waitlist.html', title=trans('general_waitlist', lang=lang, default='Join Our Waitlist'), form=form), 500
         else:
+            # Form validation failed
             flash(trans('general_invalid_input', default='Please correct the errors in the form'), 'danger')
             return render_template('general/waitlist.html', title=trans('general_waitlist', lang=lang, default='Join Our Waitlist'), form=form)
     
     return render_template('general/waitlist.html', title=trans('general_waitlist', lang=lang, default='Join Our Waitlist'), form=form)
+

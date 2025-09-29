@@ -18,8 +18,8 @@ def home():
         user_id = current_user.id
         lang = session.get('lang', 'en')
 
-        # No trial or subscription check; all users can access
-        is_read_only = False  # Read-only mode disabled since trial check is removed
+        # Check trial/subscription status
+        is_read_only = not current_user.is_subscribed and not current_user.is_trial_active()
 
         # Fetch debt summary
         creditors_pipeline = [
