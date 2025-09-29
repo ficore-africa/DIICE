@@ -210,14 +210,6 @@ def refresh_dashboard_data():
 def index():
     """Display the user's dashboard with recent activity and role-specific content."""
     try:
-        # Check if trial is active
-        if not current_user.is_trial_active():
-            return render_template(
-                'subscribe/subscription_required.html',
-                title=trans('subscribe_required_title', default='Subscription Required'),
-                can_interact=False
-            )
-
         # Initialize database and query parameters
         db = utils.get_mongo_db()
         query = {'user_id': str(current_user.id)}
@@ -246,7 +238,7 @@ def index():
             logger.debug(f"Payments: total_payments_amount = {stats['total_payments_amount']} (type: {type(stats['total_payments_amount'])})")
 
             # Debtors
-            debtors_result = db.records.aggregate([
+            debtors_result = db.cashflows.aggregate([
                 {'$match': {**query, 'type': 'debtor'}},
                 {'$group': {'_id': None, 'total_amount': {'$sum': {'$toDouble': '$amount_owed'}}, 'count': {'$sum': 1}}}
             ])
@@ -256,7 +248,7 @@ def index():
             logger.debug(f"Debtors: total_debtors_amount = {stats['total_debtors_amount']} (type: {type(stats['total_debtors_amount'])})")
 
             # Creditors
-            creditors_result = db.records.aggregate([
+            creditors_result = db.cashflows.aggregate([
                 {'$match': {**query, 'type': 'creditor'}},
                 {'$group': {'_id': None, 'total_amount': {'$sum': {'$toDouble': '$amount_owed'}}, 'count': {'$sum': 1}}}
             ])
@@ -266,7 +258,7 @@ def index():
             logger.debug(f"Creditors: total_creditors_amount = {stats['total_creditors_amount']} (type: {type(stats['total_creditors_amount'])})")
 
             # Inventory
-            inventory_result = db.records.aggregate([
+            inventory_result = db.cashflows.aggregate([
                 {'$match': {**query, 'type': 'inventory'}},
                 {'$group': {'_id': None, 'total_cost': {'$sum': {'$toDouble': '$cost'}}, 'count': {'$sum': 1}}}
             ])
