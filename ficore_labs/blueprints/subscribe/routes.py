@@ -265,7 +265,7 @@ def subscription_required():
         extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
     )
     # CHANGE: Unconditional redirect to the now unprotected business home page
-    return redirect(url_for('business.home'))
+    return redirect(url_for('subscribe/subscription_required.html', title="Subscription Required"))
 
 @subscribe_bp.route('/status')
 @login_required
