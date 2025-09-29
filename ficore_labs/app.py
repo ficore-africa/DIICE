@@ -601,8 +601,25 @@ def create_app():
     # Before request handlers
     @app.before_request
     def before_request_handler():
-        # Skip static and subscription endpoints
-        if request.path.startswith('/static/') or request.endpoint in ['subscribe_bp.subscribe', 'subscribe_bp.subscription_required']:
+
+        # Exempt endpoints that should not trigger subscription enforcement
+        exempt_endpoints = [
+            'users.login',
+            'users.signup',
+            'users.forgot_password',
+            'users.reset_password',
+            'users.verify_2fa',
+            'users.logout',
+            'subscribe_bp.subscribe',
+            'subscribe_bp.subscription_required',
+            'subscribe_bp.initiate_payment',
+            'subscribe_bp.callback',
+            'subscribe_bp.status',
+            'subscribe_bp.manage',
+            'subscribe_bp.upload_receipt',
+            'static'
+        ]
+        if request.endpoint in exempt_endpoints or (request.path and request.path.startswith('/static/')):
             logger.debug(f"Skipping trial check for endpoint: {request.endpoint}", extra={
                 'session_id': session.get('sid', 'no-session-id'),
                 'ip_address': request.remote_addr
@@ -646,13 +663,11 @@ def create_app():
         # Enforce subscription for non-admins
         if current_user.is_authenticated and not getattr(current_user, 'is_admin', False):
             if not current_user.is_trial_active():
-                allowed_endpoints = ['users.login', 'subscribe_bp.subscribe', 'subscribe_bp.subscription_required', 'static']
-                if request.endpoint not in allowed_endpoints:
-                    logger.info(f"User {current_user.id} trial expired, redirecting to subscription", extra={
-                        'session_id': session.get('sid', 'no-session-id'),
-                        'ip_address': request.remote_addr
-                    })
-                    return redirect(url_for('subscribe_bp.subscribe'))
+                logger.info(f"User {current_user.id} trial expired, redirecting to subscription", extra={
+                    'session_id': session.get('sid', 'no-session-id'),
+                    'ip_address': request.remote_addr
+                })
+                return redirect(url_for('subscribe_bp.subscription_required'))
 
         # Check session timeout
         if current_user.is_authenticated and 'last_activity' in session:

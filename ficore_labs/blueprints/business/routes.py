@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, render_template, session, request
+from flask import Blueprint, jsonify, render_template, session, request, redirect, url_for
 from flask_login import current_user, login_required
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
@@ -113,7 +113,7 @@ def view_data():
         )
 
         return render_template(
-            'general教科:general/view_data.html',
+            'general/view_data.html',
             debt_records=debt_records,
             cashflows=cashflows,
             title=trans('view_data_title', lang=lang, default='View Financial Data'),

@@ -325,11 +325,12 @@ def index():
             )
             unpaid_debtors = unpaid_creditors = []
 
+
         # Determine tax prep mode
         tax_prep_mode = request.args.get('tax_prep') == '1'
 
         # Determine if daily log reminder should be shown
-        show_daily_log_reminder = reminders.should_show_daily_reminder(db, str(current_user.id))
+        show_daily_log_reminder = reminders.needs_daily_log_reminder(db, str(current_user.id))
 
         # Format stats for template
         formatted_stats = utils.format_stats_for_template(stats)
