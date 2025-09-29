@@ -25,11 +25,11 @@
         <div class="accordion" id="whoWeServeAccordion">
             <div class="accordion-item">
                 <h2 class="accordion-header" id="headingBusinessOwners">
-                    <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseBusinessOwners" aria-expanded="true" aria-controls="collapseBusinessOwners">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseBusinessOwners" aria-expanded="false" aria-controls="collapseBusinessOwners">
                         {{ t('general_trader', default='Business Owners') | e }}
                     </button>
                 </h2>
-                <div id="collapseBusinessOwners" class="accordion-collapse collapse show" aria-labelledby="headingBusinessOwners" data-bs-parent="#whoWeServeAccordion">
+                <div id="collapseBusinessOwners" class="accordion-collapse collapse" aria-labelledby="headingBusinessOwners" data-bs-parent="#whoWeServeAccordion">
                     <div class="accordion-body">
                         <a href="{{ url_for('users.signup') }}" class="tool-card-link">
                             <h5>{{ t('general_trader', default='Business Owners') | e }}</h5>
@@ -105,11 +105,11 @@
         <div class="accordion" id="whyFicoreAccordion">
             <div class="accordion-item">
                 <h2 class="accordion-header" id="headingLocalized">
-                    <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseLocalized" aria-expanded="true" aria-controls="collapseLocalized">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseLocalized" aria-expanded="false" aria-controls="collapseLocalized">
                         {{ t('general_localized', default='Localized for Nigeria') | e }}
                     </button>
                 </h2>
-                <div id="collapseLocalized" class="accordion-collapse collapse show" aria-labelledby="headingLocalized" data-bs-parent="#whyFicoreAccordion">
+                <div id="collapseLocalized" class="accordion-collapse collapse" aria-labelledby="headingLocalized" data-bs-parent="#whyFicoreAccordion">
                     <div class="accordion-body">
                         {{ t('general_localized', default='Built for Nigeria with Naira support and regional insights') | e }}
                     </div>
@@ -210,11 +210,11 @@
         <div class="accordion" id="faqAccordion">
             <div class="accordion-item">
                 <h2 class="accordion-header" id="headingFundHandling">
-                    <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFundHandling" aria-expanded="true" aria-controls="collapseFundHandling">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFundHandling" aria-expanded="false" aria-controls="collapseFundHandling">
                         {{ t('general_faq_fund_handling', default='Does Ficore Africa store or manage my money?') | e }}
                     </button>
                 </h2>
-                <div id="collapseFundHandling" class="accordion-collapse collapse show" aria-labelledby="headingFundHandling" data-bs-parent="#faqAccordion">
+                <div id="collapseFundHandling" class="accordion-collapse collapse" aria-labelledby="headingFundHandling" data-bs-parent="#faqAccordion">
                     <div class="accordion-body">
                         {{ t('general_faq_fund_handling_answer', default='No. Ficore Africa provides advisory and tracking tools only. Your money stays with you.') | e }}
                     </div>
