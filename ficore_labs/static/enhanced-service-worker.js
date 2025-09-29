@@ -299,7 +299,7 @@ function createOfflineResponse() {
                     margin-bottom: 1rem;
                 }
                 .retry-btn {
-                    background: #007bff;
+                    background: #22488d;
                     color: white;
                     border: none;
                     padding: 0.75rem 1.5rem;

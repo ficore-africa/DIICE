@@ -539,7 +539,7 @@ const offlineStyles = `
     position: fixed;
     bottom: 20px;
     left: 20px;
-    background: #007bff;
+    background: #22488d;
     color: white;
     padding: 0.5rem 1rem;
     border-radius: 25px;
