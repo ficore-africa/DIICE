@@ -420,6 +420,14 @@ ADMIN_NAV = [
         "description_key": "admin_manage_users_desc",
         "tooltip_key": "admin_manage_users_tooltip",
         "icon": "bi-people"
+    },
+     {
+        "endpoint": "settings.profile",
+        "label": "Settings",
+        "label_key": "profile_settings",
+        "description_key": "profile_settings_desc",
+        "tooltip_key": "profile_tooltip",
+        "icon": "bi-person"
     }
 ]
 
@@ -2906,6 +2914,7 @@ def create_dashboard_safe_response(stats, recent_data, additional_data=None):
             'timestamp': datetime.now(timezone.utc).isoformat()
 
         }
+
 
 
 
