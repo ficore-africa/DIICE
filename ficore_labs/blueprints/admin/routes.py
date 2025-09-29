@@ -885,59 +885,6 @@ def manage_cashflows():
         flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
         return render_template('error/500.html'), 500
 
-@admin_bp.route('/invalid', methods=['GET'])
-@login_required
-@utils.requires_role('admin')
-@utils.limiter.limit("50 per hour")
-def invalid_payments():
-    """View invalid payments."""
-    try:
-        db = utils.get_mongo_db()
-        if db is None:
-            raise Exception("Failed to connect to MongoDB")
-        payments = list(db.cashflows.find({'status': 'invalid'}))
-        error_log_path = os.path.join(os.path.dirname(__file__), 'skipped_payments.log')
-        error_logs = {}
-        if os.path.exists(error_log_path):
-            with open(error_log_path, 'r', encoding='utf-8') as f:
-                for line in f:
-                    if '| Skipped payment ID:' in line:
-                        parts = line.split('|')
-                        if len(parts) > 2:
-                            pid = parts[1].split(':')[-1].strip()
-                            error_logs[pid] = line.strip()
-        for p in payments:
-            p['id'] = str(p.get('_id', ''))
-            p['error_log'] = error_logs.get(p['id'], None)
-        return render_template('admin/invalid.html', payments=payments, title=trans('admin_invalid_payments_title', default='Invalid Payments'))
-    except Exception as e:
-        logger.error(f"Error fetching invalid payments for admin {current_user.id}: {str(e)}",
-                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-        flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
-        return render_template('error/500.html'), 500
-
-@admin_bp.route('/clean_invalid', methods=['POST'])
-@login_required
-@utils.requires_role('admin')
-@utils.limiter.limit("10 per hour")
-def clean_invalid_payments():
-    """Clean up invalid payment records."""
-    try:
-        db = utils.get_mongo_db()
-        if db is None:
-            raise Exception("Failed to connect to MongoDB")
-        result = db.cashflows.delete_many({'status': 'invalid'})
-        flash(f"Cleaned up {result.deleted_count} invalid/skipped payment records.", 'success')
-        logger.info(f"Admin {current_user.id} cleaned {result.deleted_count} invalid payments",
-                    extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-        log_audit_action('clean_invalid_payments', {'deleted_count': result.deleted_count})
-        return redirect(url_for('admin.invalid_payments'))
-    except Exception as e:
-        logger.error(f"Error cleaning invalid payments for admin {current_user.id}: {str(e)}",
-                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-        flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
-        return render_template('error/500.html'), 500
-
 @admin_bp.route('/kyc', methods=['GET'])
 @login_required
 @utils.requires_role('admin')
@@ -1591,7 +1538,3 @@ def system_health_monitor():
         logger.error(f"Error loading system health: {str(e)}")
         flash(trans('admin_health_error', default='Error loading system health data'), 'danger')
         return redirect(url_for('admin.dashboard'))
-
-
-
-
