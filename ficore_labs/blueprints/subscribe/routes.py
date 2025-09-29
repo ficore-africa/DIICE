@@ -56,7 +56,7 @@ def subscribe():
             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
         )
         flash(trans('general_error', default='An error occurred while loading the subscription page'), 'danger')
-        return redirect(url_for('subscribe_bp.subscription_required'))
+        return render_template('subscribe/subscription_required.html')
 
 @subscribe_bp.route('/initiate-payment', methods=['POST'])
 @login_required
@@ -71,7 +71,7 @@ def initiate_payment():
                 extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
             )
             flash(trans('general_error', default='Payment configuration error'), 'danger')
-            return redirect(url_for('subscribe_bp.subscription_required'))
+            return render_template('subscribe/subscription_required.html')
 
         plan_code = utils.sanitize_input(request.form.get('plan_code'), max_length=20)
         if plan_code not in ['monthly', 'yearly']:
@@ -80,7 +80,7 @@ def initiate_payment():
                 extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
             )
             flash(trans('subscribe_invalid_plan', default='Invalid plan selected'), 'danger')
-            return redirect(url_for('subscribe_bp.subscription_required'))
+            return render_template('subscribe/subscription_required.html')
         
         amount = 100000 if plan_code == 'monthly' else 1000000  # Amounts in kobo
         reference = utils.sanitize_input(f"ficore_{current_user.id}_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}", max_length=100)
@@ -109,7 +109,7 @@ def initiate_payment():
                 extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
             )
             flash(trans('subscribe_payment_init_error', default='Failed to initiate payment'), 'danger')
-            return redirect(url_for('subscribe_bp.subscription_required'))
+            return render_template('subscribe/subscription_required.html')
 
         logger.info(
             f"Payment initiated for user {current_user.id}, reference: {reference}, plan: {plan_code}",
@@ -129,21 +129,21 @@ def initiate_payment():
             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
         )
         flash(trans('subscribe_csrf_error', default='Invalid CSRF token. Please try again.'), 'danger')
-        return redirect(url_for('subscribe_bp.subscription_required'))
+        return render_template('subscribe/subscription_required.html')
     except requests.RequestException as e:
         logger.error(
             f"Paystack API request error for user {current_user.id}: {str(e)}",
             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
         )
         flash(trans('subscribe_payment_init_error', default='Failed to initiate payment'), 'danger')
-        return redirect(url_for('subscribe_bp.subscription_required'))
+        return render_template('subscribe/subscription_required.html')
     except Exception as e:
         logger.error(
             f"Error initiating payment for user {current_user.id}: {str(e)}",
             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
         )
         flash(trans('general_error', default='An error occurred during payment initiation'), 'danger')
-        return redirect(url_for('subscribe_bp.subscription_required'))
+        return render_template('subscribe/subscription_required.html')
 
 @subscribe_bp.route('/callback')
 @login_required
@@ -161,7 +161,7 @@ def callback():
             )
             flash(trans('subscribe_invalid_reference', default='Invalid payment reference'), 'danger')
             session.pop('pending_transaction', None)
-            return redirect(url_for('subscribe_bp.subscription_required'))
+            return render_template('subscribe/subscription_required.html')
 
         headers = {
             'Authorization': f"Bearer {os.getenv('PAYSTACK_SECRET_KEY')}",
@@ -180,7 +180,7 @@ def callback():
             )
             flash(trans('subscribe_payment_failed', default='Payment verification failed'), 'danger')
             session.pop('pending_transaction', None)
-            return redirect(url_for('subscribe_bp.subscription_required'))
+            return render_template('subscribe/subscription_required.html')
 
         db = get_mongo_db()
         subscription_end_date = datetime.now(timezone.utc) + timedelta(days=30 if pending_transaction['plan_code'] == 'monthly' else 365)
@@ -226,7 +226,7 @@ def callback():
         )
         flash(trans('subscribe_payment_failed', default='Payment verification failed'), 'danger')
         session.pop('pending_transaction', None)
-        return redirect(url_for('subscribe_bp.subscription_required'))
+        return render_template('subscribe/subscription_required.html')
     except Exception as e:
         logger.error(
             f"Error processing callback for user {current_user.id}: {str(e)}",
@@ -234,19 +234,22 @@ def callback():
         )
         flash(trans('general_error', default='An error occurred during payment processing'), 'danger')
         session.pop('pending_transaction', None)
-        return redirect(url_for('subscribe_bp.subscription_required'))
+        return render_template('subscribe/subscription_required.html')
 
 @subscribe_bp.route('/subscription-required')
 @login_required
 @utils.requires_role(['trader', 'startup', 'admin'])
 def subscription_required():
-    """Redirect to the business dashboard as subscription is no longer required."""
+    """Render the subscription required page."""
     lang = session.get('lang', 'en')
     logger.info(
-        f"User {current_user.id} accessed /subscription-required. Redirecting to business.home.",
+        f"User {current_user.id} accessed /subscribe/subscription-required.",
         extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
     )
-    return redirect(url_for('business.home'))
+    return render_template(
+        'subscribe/subscription_required.html',
+        title=trans('subscribe_required_title', lang=lang, default='Subscription Required')
+    )
 
 @subscribe_bp.route('/status')
 @login_required
@@ -271,7 +274,7 @@ def subscription_status():
             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
         )
         flash(trans('general_error', default='An error occurred while loading the subscription status page'), 'danger')
-        return redirect(url_for('subscribe_bp.subscription_required'))
+        return render_template('subscribe/subscription_required.html')
 
 @subscribe_bp.route('/manage')
 @login_required
@@ -305,7 +308,7 @@ def manage_subscription():
             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
         )
         flash(trans('general_error', default='An error occurred while loading the subscription management page'), 'danger')
-        return redirect(url_for('subscribe_bp.subscription_required'))
+        return render_template('subscribe/subscription_required.html')
 
 @subscribe_bp.route('/upload-receipt', methods=['POST'])
 @login_required
@@ -316,17 +319,17 @@ def upload_receipt():
     try:
         if 'receipt' not in request.files:
             flash(trans('subscribe_no_file', default='No file selected'), 'danger')
-            return redirect(url_for('subscribe_bp.manage_subscription'))
+            return render_template('subscribe/manage_subscription.html')
         
         file = request.files['receipt']
         if file.filename == '':
             flash(trans('subscribe_no_file', default='No file selected'), 'danger')
-            return redirect(url_for('subscribe_bp.manage_subscription'))
+            return render_template('subscribe/manage_subscription.html')
         
         allowed_extensions = {'png', 'jpg', 'jpeg', 'pdf'}
         if not ('.' in file.filename and file.filename.rsplit('.', 1)[1].lower() in allowed_extensions):
             flash(trans('subscribe_invalid_file', default='Invalid file type. Please upload PNG, JPG, JPEG, or PDF files only.'), 'danger')
-            return redirect(url_for('subscribe_bp.manage_subscription'))
+            return render_template('subscribe/manage_subscription.html')
         
         plan_type = utils.sanitize_input(request.form.get('plan_type'), max_length=20)
         amount_paid = utils.sanitize_input(request.form.get('amount_paid'), max_length=20)
@@ -334,22 +337,22 @@ def upload_receipt():
         
         if not all([plan_type, amount_paid, payment_date]):
             flash(trans('subscribe_missing_info', default='Please fill in all required fields'), 'danger')
-            return redirect(url_for('subscribe_bp.manage_subscription'))
+            return render_template('subscribe/manage_subscription.html')
         
         valid_plans = {'monthly': 1000, 'yearly': 10000}
         if plan_type not in valid_plans:
             flash(trans('subscribe_invalid_plan', default='Invalid plan selected'), 'danger')
-            return redirect(url_for('subscribe_bp.manage_subscription'))
+            return render_template('subscribe/manage_subscription.html')
         
         try:
             amount_paid_float = float(amount_paid)
             expected_amount = valid_plans[plan_type]
             if amount_paid_float < expected_amount:
                 flash(trans('subscribe_insufficient_amount', default=f'Amount paid is less than required for {plan_type} plan (₦{expected_amount:,})'), 'danger')
-                return redirect(url_for('subscribe_bp.manage_subscription'))
+                return render_template('subscribe/manage_subscription.html')
         except ValueError:
             flash(trans('subscribe_invalid_amount', default='Invalid amount format'), 'danger')
-            return redirect(url_for('subscribe_bp.manage_subscription'))
+            return render_template('subscribe/manage_subscription.html')
         
         filename = f"{current_user.id}_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{file.filename}"
         upload_folder = os.path.join(current_app.root_path, 'Uploads', 'receipts')
@@ -383,11 +386,11 @@ def upload_receipt():
         )
         
         flash(trans('subscribe_receipt_uploaded', default='Receipt uploaded successfully! Admin will review and activate your subscription.'), 'success')
-        return redirect(url_for('subscribe_bp.manage_subscription'))
+        return render_template('subscribe/manage_subscription.html')
     except Exception as e:
         logger.error(
             f"Error uploading receipt for user {current_user.id}: {str(e)}",
             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
         )
         flash(trans('general_error', default='An error occurred while uploading the receipt'), 'danger')
-        return redirect(url_for('subscribe_bp.manage_subscription'))
+        return render_template('subscribe/manage_subscription.html')
