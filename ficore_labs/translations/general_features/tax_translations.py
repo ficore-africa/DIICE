@@ -12,6 +12,18 @@ TAX_TRANSLATIONS = {
         'tax_education': 'Tax Education',
     'tax_calculator_desc': 'Tax calculator for Nigeria.',
     'tax_calculator_description': 'Tax calculator for Nigeria.',
+        'tax_entity_sole_description': 'Sole Proprietorship Description',
+            'tax_type_pit': 'Personal Income Tax (PIT)',
+            'tax_pit_details': 'Personal Income Tax Details',
+            'tax_entity_limited_description': 'Limited Company Description',
+            'tax_type_cit': 'Corporate Income Tax (CIT)',
+            'tax_cit_details': 'Corporate Income Tax Details',
+            'tax_category_statutory_contributions': 'Statutory Contributions',
+            'tax_rent_expenses_max': 'Maximum Rent Expenses',
+            'tax_pension_hint': 'Pension Contribution Hint',
+            'tax_pension_max': 'Maximum Pension Contribution',
+            'tax_entity_type_required': 'Entity Type Required',
+            'tax_entity_type_length': 'Entity Type Length',
     'tax_dashboard': 'Tax Dashboard',
     'tax_dashboard_description': 'Your tax overview.',
     'tax_history': 'Tax History',
@@ -579,6 +591,18 @@ TAX_TRANSLATIONS = {
         'tax_annual_income': 'Kudaden Shiga na Shekara (NGN)',
         'tax_annual_rent_expenses': 'Kudaden Haya na Shekara (NGN)',
         'tax_pension_contribution': 'Gudummawar Fansho na Shekara (NGN)',
+        'tax_entity_sole_description': 'Bayani Kan Mallakar Kai',
+            'tax_type_pit': 'Harajin Kudin Shiga na Mutum (PIT)',
+            'tax_pit_details': 'Bayanai Kan Harajin Kudin Shiga na Mutum',
+            'tax_entity_limited_description': 'Bayani Kan Kamfani Mai Iyakance',
+            'tax_type_cit': 'Harajin Kudin Shiga na Kamfani (CIT)',
+            'tax_cit_details': 'Bayanai Kan Harajin Kudin Shiga na Kamfani',
+            'tax_category_statutory_contributions': 'Gudummawa ta Dokoki',
+            'tax_rent_expenses_max': 'Matsakaicin Kashe-kashen Haya',
+            'tax_pension_hint': 'Alamar Gudummawar Fensho',
+            'tax_pension_max': 'Matsakaicin Gudummawar Fensho',
+            'tax_entity_type_required': 'Nau\'in Kamfani da ake Bukata',
+            'tax_entity_type_length': 'Tsawon Nau\'in Kamfani',
         
         # New keys from latest warnings
         'general_personal_finance_tools': 'Kayan Aikin Kuɗi na Kai',
@@ -596,4 +620,5 @@ TAX_TRANSLATIONS = {
         'tax_category_statutory_legal': 'Gudummawa ta Dokoki da Shari\'a'
     }
 }
+
 
