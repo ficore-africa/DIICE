@@ -847,9 +847,6 @@ def create_app():
                 extra={'session_id': session.get('sid', 'no-session-id'), 'ip_address': request.remote_addr}
             )
             if current_user.is_authenticated:
-                if hasattr(current_user, 'is_trial_active') and not current_user.is_trial_active():
-                    flash('Please subscribe to access premium features.', 'info')
-                    return redirect(url_for('business.home'))
                 return redirect(get_post_login_redirect(current_user.role))
             return redirect(url_for('general_bp.landing'))
         except Exception as e:
