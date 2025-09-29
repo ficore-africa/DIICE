@@ -66,26 +66,12 @@ def admin_required(f):
 def custom_login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if request.path.startswith('/admin'):
-            # Skip subscription check for admin routes
-            return f(*args, **kwargs)
         if not current_user.is_authenticated:
             logger.info("Redirecting unauthenticated user to login", extra={
                 'session_id': session.get('sid', 'no-session-id'),
                 'ip_address': request.remote_addr
             })
             return redirect(url_for('users.login', next=request.url))
-        # Skip trial check for business.home to prevent redirect loop
-        if request.endpoint == 'business.home' or request.endpoint == 'subscribe_bp.subscription_required':
-            return f(*args, **kwargs)
-        if not current_user.is_trial_active():
-            logger.info(f"User {current_user.id} trial expired, redirecting to subscription", extra={
-                'session_id': session.get('sid', 'no-session-id'),
-                'role': current_user.role,
-                'ip_address': request.remote_addr
-            })
-            flash('Please subscribe to access premium features.', 'info')
-            return redirect(url_for('subscribe_bp.subscription_required'))
         return f(*args, **kwargs)
     return decorated_function
 
@@ -620,7 +606,7 @@ def create_app():
             session['last_activity'] = datetime.now(timezone.utc).isoformat()
             return render_template('error/508.html', error_message="Redirect loop detected"), 508
 
-        # Exempt endpoints that should not trigger subscription enforcement
+        # Exempt endpoints that should not trigger checks
         exempt_endpoints = [
             'users.login',
             'users.signup',
@@ -635,14 +621,14 @@ def create_app():
             'subscribe_bp.manage_subscription',
             'subscribe_bp.upload_receipt',
             'subscribe_bp.subscription_status',
-            'business.home',  # Added to prevent redirect loops
+            'business.home',
             'static',
             'health',
             'google_site_verification',
             'google_site_verification_new'
         ]
         if request.endpoint in exempt_endpoints or (request.path and request.path.startswith('/static/')):
-            logger.debug(f"Skipping trial check for endpoint: {request.endpoint}", extra={
+            logger.debug(f"Skipping checks for endpoint: {request.endpoint}", extra={
                 'session_id': session.get('sid', 'no-session-id'),
                 'ip_address': request.remote_addr
             })
@@ -682,18 +668,6 @@ def create_app():
                 'session_id': session.get('sid', 'no-session-id'),
                 'ip_address': request.remote_addr
             })
-
-        # Enforce subscription for non-admins
-        if current_user.is_authenticated and not getattr(current_user, 'is_admin', False):
-            if not current_user.is_trial_active() and request.endpoint != 'business.home':
-                logger.info(f"User {current_user.id} trial expired, redirecting to home", extra={
-                    'session_id': session.get('sid', 'no-session-id'),
-                    'role': current_user.role,
-                    'ip_address': request.remote_addr
-                })
-                flash('Please subscribe to access premium features.', 'info')
-                return redirect(url_for('business.home'))
-            session['redirect_count'] = 0  # Reset counter for valid users
 
         # Check session timeout
         if current_user.is_authenticated and 'last_activity' in session:
