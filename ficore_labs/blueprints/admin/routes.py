@@ -1209,45 +1209,6 @@ def manage_tax_exemptions():
         flash(trans('admin_tax_exemptions_error', default='An error occurred while managing tax exemptions'), 'danger')
         return render_template('error/500.html'), 500
 
-@admin_bp.route('/language/toggle/<user_id>/<language>', methods=['POST'])
-@login_required
-@utils.requires_role('admin')
-@utils.limiter.limit("10 per hour")
-def toggle_user_language(user_id, language):
-    """Toggle user language between English and Hausa."""
-    try:
-        if language not in ['en', 'ha']:
-            flash(trans('admin_invalid_language', default='Invalid language selected'), 'danger')
-            return redirect(url_for('admin.manage_users'))
-        db = utils.get_mongo_db()
-        if db is None:
-            raise Exception("Failed to connect to MongoDB")
-        try:
-            user_query = {'_id': ObjectId(user_id)}
-        except errors.InvalidId:
-            user_query = {'user_id': user_id}
-        result = db.users.update_one(
-            user_query,
-            {'$set': {
-                'language': language,
-                'updated_at': datetime.now(timezone.utc)
-            }}
-        )
-        if result.modified_count > 0:
-            log_audit_action('toggle_user_language', {
-                'user_id': user_id,
-                'language': language
-            })
-            flash(trans('admin_language_updated', default=f'User language updated to {language.upper()}'), 'success')
-        else:
-            flash(trans('admin_user_not_found', default='User not found'), 'danger')
-        return redirect(url_for('admin.manage_users'))
-    except Exception as e:
-        logger.error(f"Error toggling user language for {user_id}: {str(e)}",
-                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-        flash(trans('admin_database_error', default='An error occurred while updating language'), 'danger')
-        return redirect(url_for('admin.manage_users'))
-
 @admin_bp.route('/bulk/operations', methods=['GET', 'POST'])
 @login_required
 @utils.requires_role('admin')
