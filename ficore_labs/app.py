@@ -3,8 +3,6 @@ import sys
 import logging
 from datetime import datetime, timedelta, timezone
 import uuid
-from datetime import datetime, timedelta
-import locale
 from zoneinfo import ZoneInfo
 from flask import (
     Flask, jsonify, request, render_template, redirect, url_for, flash,
@@ -39,18 +37,28 @@ flask_session = Session()
 csrf = CSRFProtect()
 babel = Babel()
 compress = Compress()
-limiter = Limiter(key_func=get_remote_address, default_limits=['200 per day', '50 per hour'], storage_uri=os.getenv('REDIS_URI', 'memory://'))
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=['200 per day', '50 per hour'],
+    storage_uri=os.getenv('REDIS_URI', 'memory://')
+)
 
 # Decorators
 def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if not current_user.is_authenticated:
-            logger.warning("Unauthorized access attempt to admin route", extra={'session_id': session.get('sid', 'no-session-id'), 'ip_address': request.remote_addr})
+            logger.warning("Unauthorized access attempt to admin route", extra={
+                'session_id': session.get('sid', 'no-session-id'),
+                'ip_address': request.remote_addr
+            })
             return redirect(url_for('users.login'))
         if current_user.role != 'admin':
             flash('You do not have permission to access this page.', 'danger')
-            logger.warning(f"Non-admin user {current_user.id} attempted access", extra={'session_id': session.get('sid', 'no-session-id'), 'ip_address': request.remote_addr})
+            logger.warning(f"Non-admin user {current_user.id} attempted access", extra={
+                'session_id': session.get('sid', 'no-session-id'),
+                'ip_address': request.remote_addr
+            })
             return redirect(url_for('index'))
         return f(*args, **kwargs)
     return decorated_function
@@ -58,12 +66,21 @@ def admin_required(f):
 def custom_login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        if request.path.startswith('/admin'):
+            # Skip subscription check for admin routes
+            return f(*args, **kwargs)
         if not current_user.is_authenticated:
-            logger.info("Redirecting unauthenticated user to login", extra={'session_id': session.get('sid', 'no-session-id'), 'ip_address': request.remote_addr})
+            logger.info("Redirecting unauthenticated user to login", extra={
+                'session_id': session.get('sid', 'no-session-id'),
+                'ip_address': request.remote_addr
+            })
             return redirect(url_for('users.login', next=request.url))
         if not current_user.is_trial_active():
-            logger.info(f"User {current_user.id} trial expired, redirecting to subscription", extra={'session_id': session.get('sid', 'no-session-id'), 'ip_address': request.remote_addr})
-            return redirect(url_for('subscribe_bp.subscribe'))
+            logger.info(f"User {current_user.id} trial expired, redirecting to subscription", extra={
+                'session_id': session.get('sid', 'no-session-id'),
+                'ip_address': request.remote_addr
+            })
+            return redirect(url_for('subscribe_bp.subscription_required'))
         return f(*args, **kwargs)
     return decorated_function
 
@@ -76,13 +93,19 @@ def ensure_session_id(f):
                 session['is_anonymous'] = not current_user.is_authenticated
                 session['last_activity'] = datetime.now(timezone.utc).isoformat()
                 session.modified = True
-                logger.info(f'New session ID generated: {session["sid"]}', extra={'session_id': session["sid"], 'ip_address': request.remote_addr})
+                logger.info(f'New session ID generated: {session["sid"]}', extra={
+                    'session_id': session["sid"],
+                    'ip_address': request.remote_addr
+                })
             else:
                 session_id = session.get('sid')
                 db = get_mongo_db()
                 mongo_session = db.sessions.find_one({'_id': session_id})
                 if not mongo_session and current_user.is_authenticated:
-                    logger.info(f'Invalid session {session_id} for user {current_user.id}, logging out', extra={'session_id': session_id, 'ip_address': request.remote_addr})
+                    logger.info(f'Invalid session {session_id} for user {current_user.id}, logging out', extra={
+                        'session_id': session_id,
+                        'ip_address': request.remote_addr
+                    })
                     logout_user()
                     session.clear()
                     session['lang'] = session.get('lang', 'en')
@@ -102,7 +125,10 @@ def ensure_session_id(f):
             session['last_activity'] = datetime.now(timezone.utc).isoformat()
             session.modified = True
         except Exception as e:
-            logger.error(f'Session operation failed: {str(e)}', extra={'session_id': session.get('sid', 'no-session-id'), 'ip_address': request.remote_addr})
+            logger.error(f'Session operation failed: {str(e)}', extra={
+                'session_id': session.get('sid', 'no-session-id'),
+                'ip_address': request.remote_addr
+            })
             flash('An error occurred with your session. Please log in again.', 'danger')
             response = make_response(redirect(url_for('users.login')))
             response.set_cookie(
@@ -119,7 +145,9 @@ def ensure_session_id(f):
 def setup_logging(app):
     handler = logging.StreamHandler(sys.stderr)
     handler.setLevel(logging.INFO)
-    handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s [session: %(session_id)s, role: %(user_role)s, ip: %(ip_address)s]'))
+    handler.setFormatter(logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s [session: %(session_id)s, role: %(user_role)s, ip: %(ip_address)s]'
+    ))
     root_logger = logging.getLogger('bizcore_app')
     root_logger.handlers = []
     root_logger.addHandler(handler)
@@ -135,16 +163,28 @@ def setup_logging(app):
     flask_logger.setLevel(logging.INFO)
     werkzeug_logger.setLevel(logging.INFO)
     pymongo_logger.setLevel(logging.INFO)
-    logger.info('Logging setup complete', extra={'session_id': 'none', 'user_role': 'none', 'ip_address': 'none'})
+    logger.info('Logging setup complete', extra={
+        'session_id': 'none',
+        'user_role': 'none',
+        'ip_address': 'none'
+    })
 
 def check_mongodb_connection(app):
     try:
         client = app.extensions['mongo']
         client.admin.command('ping')
-        logger.info('MongoDB connection verified', extra={'session_id': 'none', 'user_role': 'none', 'ip_address': 'none'})
+        logger.info('MongoDB connection verified', extra={
+            'session_id': 'none',
+            'user_role': 'none',
+            'ip_address': 'none'
+        })
         return True
     except Exception as e:
-        logger.error(f'MongoDB connection failed: {str(e)}', extra={'session_id': 'none', 'user_role': 'none', 'ip_address': 'none'})
+        logger.error(f'MongoDB connection failed: {str(e)}', extra={
+            'session_id': 'none',
+            'user_role': 'none',
+            'ip_address': 'none'
+        })
         return False
 
 def setup_session(app):
@@ -164,20 +204,41 @@ def setup_session(app):
                 flask_session.init_app(app)
                 db = app.extensions['mongo']['bizdb']
                 db.sessions.create_index("created_at", expireAfterSeconds=1800)
-                logger.info(f'Session configured: type={app.config["SESSION_TYPE"]}', extra={'session_id': 'none', 'user_role': 'none', 'ip_address': 'none'})
+                logger.info(f'Session configured: type={app.config["SESSION_TYPE"]}', extra={
+                    'session_id': 'none',
+                    'user_role': 'none',
+                    'ip_address': 'none'
+                })
                 return
-            logger.error('MongoDB connection failed, falling back to filesystem session', extra={'session_id': 'none', 'user_role': 'none', 'ip_address': 'none'})
+            logger.error('MongoDB connection failed, falling back to filesystem session', extra={
+                'session_id': 'none',
+                'user_role': 'none',
+                'ip_address': 'none'
+            })
             app.config['SESSION_TYPE'] = 'filesystem'
             flask_session.init_app(app)
-            logger.info('Session configured with filesystem fallback', extra={'session_id': 'none', 'user_role': 'none', 'ip_address': 'none'})
+            logger.info('Session configured with filesystem fallback', extra={
+                'session_id': 'none',
+                'user_role': 'none',
+                'ip_address': 'none'
+            })
     except Exception as e:
-        logger.error(f'Failed to configure session: {str(e)}', extra={'session_id': 'none', 'user_role': 'none', 'ip_address': 'none'})
+        logger.error(f'Failed to configure session: {str(e)}', extra={
+            'session_id': 'none',
+            'user_role': 'none',
+            'ip_address': 'none'
+        })
         app.config['SESSION_TYPE'] = 'filesystem'
         flask_session.init_app(app)
-        logger.info('Session configured with filesystem fallback', extra={'session_id': 'none', 'user_role': 'none', 'ip_address': 'none'})
+        logger.info('Session configured with filesystem fallback', extra={
+            'session_id': 'none',
+            'user_role': 'none',
+            'ip_address': 'none'
+        })
 
 class User(UserMixin):
-    def __init__(self, id, email, display_name=None, role='trader', is_trial=True, trial_start=None, trial_end=None, is_subscribed=False, subscription_plan=None, subscription_start=None, subscription_end=None, annual_rent=None):
+    def __init__(self, id, email, display_name=None, role='trader', is_trial=True, trial_start=None, trial_end=None,
+                 is_subscribed=False, subscription_plan=None, subscription_start=None, subscription_end=None, annual_rent=None):
         self.id = id
         self.email = email
         self.display_name = display_name or id
@@ -197,7 +258,10 @@ class User(UserMixin):
                 user = current_app.extensions['mongo']['bizdb'].users.find_one({'_id': self.id})
                 return user.get(key, default) if user else default
         except Exception as e:
-            logger.error(f'Error fetching user data for {self.id}: {str(e)}', extra={'session_id': session.get('sid', 'no-session-id'), 'ip_address': request.remote_addr})
+            logger.error(f'Error fetching user data for {self.id}: {str(e)}', extra={
+                'session_id': session.get('sid', 'no-session-id'),
+                'ip_address': request.remote_addr
+            })
             return default
 
     @property
@@ -214,7 +278,10 @@ class User(UserMixin):
                     'activity_sidebar_enabled': True
                 }
         except Exception as e:
-            logger.error(f'Error fetching user settings for {self.id}: {str(e)}', extra={'session_id': session.get('sid', 'no-session-id'), 'ip_address': request.remote_addr})
+            logger.error(f'Error fetching user settings for {self.id}: {str(e)}', extra={
+                'session_id': session.get('sid', 'no-session-id'),
+                'ip_address': request.remote_addr
+            })
             return {
                 'show_kobo': True,
                 'incognito_mode': False,
@@ -229,7 +296,10 @@ class User(UserMixin):
                 user = current_app.extensions['mongo']['bizdb'].users.find_one({'_id': self.id})
                 return user.get('is_active', True) if user else False
         except Exception as e:
-            logger.error(f'Error checking active status for user {self.id}: {str(e)}', extra={'session_id': session.get('sid', 'no-session-id'), 'ip_address': request.remote_addr})
+            logger.error(f'Error checking active status for user {self.id}: {str(e)}', extra={
+                'session_id': session.get('sid', 'no-session-id'),
+                'ip_address': request.remote_addr
+            })
             return False
 
     def get_id(self):
@@ -259,18 +329,27 @@ class User(UserMixin):
         return self.role == 'admin'
 
 def create_app():
+    # Initialize Flask app
     app = Flask(__name__, template_folder='templates', static_folder='static')
     CORS(app, resources={r"/api/*": {"origins": "*"}})
 
     # Load configuration
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
     if not app.config['SECRET_KEY']:
-        logger.error('SECRET_KEY environment variable is not set', extra={'session_id': 'none', 'user_role': 'none', 'ip_address': 'none'})
+        logger.error('SECRET_KEY environment variable is not set', extra={
+            'session_id': 'none',
+            'user_role': 'none',
+            'ip_address': 'none'
+        })
         raise ValueError('SECRET_KEY must be set')
 
     app.config['MONGO_URI'] = os.getenv('MONGO_URI')
     if not app.config['MONGO_URI']:
-        logger.error('MONGO_URI environment variable is not set', extra={'session_id': 'none', 'user_role': 'none', 'ip_address': 'none'})
+        logger.error('MONGO_URI environment variable is not set', extra={
+            'session_id': 'none',
+            'user_role': 'none',
+            'ip_address': 'none'
+        })
         raise ValueError('MONGO_URI must be set')
 
     # Configure upload folder for KYC
@@ -295,9 +374,17 @@ def create_app():
         app.extensions = getattr(app, 'extensions', {})
         app.extensions['mongo'] = client
         client.admin.command('ping')
-        logger.info('MongoDB client initialized successfully', extra={'session_id': 'none', 'user_role': 'none', 'ip_address': 'none'})
+        logger.info('MongoDB client initialized successfully', extra={
+            'session_id': 'none',
+            'user_role': 'none',
+            'ip_address': 'none'
+        })
     except Exception as e:
-        logger.error(f'MongoDB connection failed: {str(e)}', extra={'session_id': 'none', 'user_role': 'none', 'ip_address': 'none'})
+        logger.error(f'MongoDB connection failed: {str(e)}', extra={
+            'session_id': 'none',
+            'user_role': 'none',
+            'ip_address': 'none'
+        })
         raise RuntimeError(f'Failed to connect to MongoDB: {str(e)}')
 
     # Initialize extensions
@@ -358,7 +445,10 @@ def create_app():
                     annual_rent=user.get('annual_rent', 0)
                 )
         except Exception as e:
-            logger.error(f"Error loading user {user_id}: {str(e)}", extra={'session_id': session.get('sid', 'no-session-id'), 'ip_address': request.remote_addr})
+            logger.error(f"Error loading user {user_id}: {str(e)}", extra={
+                'session_id': session.get('sid', 'no-session-id'),
+                'ip_address': request.remote_addr
+            })
             return None
 
     # Initialize database
@@ -366,9 +456,17 @@ def create_app():
         with app.app_context():
             from models import initialize_app_data
             initialize_app_data(app)
-            logger.info('Database initialized successfully', extra={'session_id': 'none', 'user_role': 'none', 'ip_address': 'none'})
+            logger.info('Database initialized successfully', extra={
+                'session_id': 'none',
+                'user_role': 'none',
+                'ip_address': 'none'
+            })
     except Exception as e:
-        logger.error(f'Error in database initialization: {str(e)}', extra={'session_id': 'none', 'user_role': 'none', 'ip_address': 'none'})
+        logger.error(f'Error in database initialization: {str(e)}', extra={
+            'session_id': 'none',
+            'user_role': 'none',
+            'ip_address': 'none'
+        })
         raise
 
     # Register blueprints
@@ -411,7 +509,11 @@ def create_app():
     app.register_blueprint(tax_bp, url_prefix='/tax')
     app.register_blueprint(education_bp, url_prefix='/education')
     app.register_blueprint(api_bp, url_prefix='/api')
-    logger.info('Registered all blueprints including KYC, Settings, Rewards, Tax Calculator, Education, and API', extra={'session_id': 'none', 'user_role': 'none', 'ip_address': 'none'})
+    logger.info('Registered all blueprints including KYC, Settings, Rewards, Tax Calculator, Education, and API', extra={
+        'session_id': 'none',
+        'user_role': 'none',
+        'ip_address': 'none'
+    })
 
     # Define format_currency filter
     def format_currency(amount, currency='₦', lang=None, include_symbol=True):
@@ -422,6 +524,8 @@ def create_app():
                 if amount is None or amount == '':
                     amount = 0
                 if isinstance(amount, str):
+                    # Assuming clean_currency is defined in utils; if not, replace with appropriate cleaning logic
+                    from utils import clean_currency
                     amount = clean_currency(amount)
                 else:
                     amount = float(amount)
@@ -431,7 +535,10 @@ def create_app():
                     formatted = f"{amount:,.2f}"
                 return f"{currency}{formatted}" if include_symbol else formatted
         except Exception as e:
-            logger.warning(f"Error formatting currency {amount}: {str(e)}", extra={'session_id': session.get('sid', 'no-session-id')})
+            logger.warning(f"Error formatting currency {amount}: {str(e)}", extra={
+                'session_id': session.get('sid', 'no-session-id'),
+                'ip_address': request.remote_addr if has_request_context() else 'none'
+            })
             return f"{currency}0" if include_symbol else "0"
 
     # Define format_percentage filter
@@ -439,7 +546,10 @@ def create_app():
         try:
             return "{:.2f}%".format(float(value) * 100)
         except (ValueError, TypeError) as e:
-            logger.warning(f'Error formatting percentage {value}: {str(e)}', extra={'session_id': session.get('sid', 'no-session-id'), 'ip_address': request.remote_addr})
+            logger.warning(f'Error formatting percentage {value}: {str(e)}', extra={
+                'session_id': session.get('sid', 'no-session-id'),
+                'ip_address': request.remote_addr if has_request_context() else 'none'
+            })
             return "0.00%"
 
     app.jinja_env.filters['format_currency'] = format_currency
@@ -452,7 +562,10 @@ def create_app():
         try:
             return format_date(value, lang=session.get('lang', 'en'), format_type='short')
         except Exception as e:
-            logger.warning(f'Error formatting date {value}: {str(e)}', extra={'session_id': session.get('sid', 'no-session-id'), 'ip_address': request.remote_addr})
+            logger.warning(f'Error formatting date {value}: {str(e)}', extra={
+                'session_id': session.get('sid', 'no-session-id'),
+                'ip_address': request.remote_addr if has_request_context() else 'none'
+            })
             return str(value)
 
     app.jinja_env.globals['format_date'] = format_date_wrapper
@@ -475,52 +588,146 @@ def create_app():
                 return datetime.now(timezone.utc) > trial_end_aware
             return True
         except Exception as e:
-            logger.error(
-                f"Error checking trial expiration: {str(e)}",
-                extra={'session_id': session.get('sid', 'no-session-id'), 'ip_address': request.remote_addr}
-            )
+            logger.error(f"Error checking trial expiration: {str(e)}", extra={
+                'session_id': session.get('sid', 'no-session-id'),
+                'ip_address': request.remote_addr if has_request_context() else 'none'
+            })
             return True
 
     app.jinja_env.globals['is_trial_expired'] = is_trial_expired
-    logger.info("Registered is_trial_expired Jinja global", extra={'session_id': 'none', 'user_role': 'none', 'ip_address': 'none'})
+    logger.info("Registered is_trial_expired Jinja global", extra={
+        'session_id': 'none',
+        'user_role': 'none',
+        'ip_address': 'none'
+    })
 
-    # Initialize tools and navigation after blueprints
+    # Before request handlers
     @app.before_request
-    def initialize_navigation():
-        with app.app_context():
-            try:
-                initialize_tools_with_urls(app)
-                logger.info('Navigation initialized after blueprint registration', extra={'session_id': session.get('sid', 'no-session-id'), 'ip_address': request.remote_addr})
-            except Exception as e:
-                logger.error(f'Failed to initialize navigation: {str(e)}', extra={'session_id': session.get('sid', 'no-session-id'), 'ip_address': request.remote_addr})
-                raise
+    def before_request_handler():
 
-    # Ensure session['lang'] is set early and respected
-    @app.before_request
-    def ensure_lang_in_session():
+        # Exempt endpoints that should not trigger subscription enforcement
+        exempt_endpoints = [
+            'users.login',
+            'users.signup',
+            'users.forgot_password',
+            'users.reset_password',
+            'users.verify_2fa',
+            'users.logout',
+            'subscribe_bp.subscribe',
+            'subscribe_bp.subscription_required',
+            'subscribe_bp.initiate_payment',
+            'subscribe_bp.callback',
+            'subscribe_bp.status',
+            'subscribe_bp.manage_subscription',
+            'subscribe_bp.upload_receipt',
+            'subscribe_bp.subscription_status',
+            'static',
+            'health',
+            'google_site_verification',
+            'google_site_verification_new'
+        ]
+        if request.endpoint in exempt_endpoints or (request.path and request.path.startswith('/static/')):
+            logger.debug(f"Skipping trial check for endpoint: {request.endpoint}", extra={
+                'session_id': session.get('sid', 'no-session-id'),
+                'ip_address': request.remote_addr
+            })
+            return
+
+        # Ensure language in session
         if 'lang' not in session:
             session['lang'] = 'en'
+            session.modified = True
+            logger.info(f"Set default language to en for session {session.get('sid', 'no-session-id')}", extra={
+                'session_id': session.get('sid', 'no-session-id'),
+                'ip_address': request.remote_addr
+            })
 
-    # Redirect from onrender.com to custom domain
-    @app.before_request
-    def handle_redirects():
+        # Handle domain redirects
         host = request.host
-
-        # Redirect onrender.com to custom domain
         if host.endswith("onrender.com"):
             new_url = request.url.replace("onrender.com", "business.ficoreafrica.com")
             return redirect(new_url, code=301)
-
-        # Redirect www to root domain
         if host.startswith("www."):
             new_url = request.url.replace("www.", "", 1)
             return redirect(new_url, code=301)
-
-        # Redirect ficoreafrica.com to business.ficoreafrica.com
         if host == 'ficoreafrica.com':
             new_url = request.url.replace('ficoreafrica.com', 'business.ficoreafrica.com')
             return redirect(new_url, code=301)
 
+        # Initialize navigation
+        try:
+            initialize_tools_with_urls(app)
+            logger.debug('Navigation initialized', extra={
+                'session_id': session.get('sid', 'no-session-id'),
+                'ip_address': request.remote_addr
+            })
+        except Exception as e:
+            logger.error(f'Failed to initialize navigation: {str(e)}', extra={
+                'session_id': session.get('sid', 'no-session-id'),
+                'ip_address': request.remote_addr
+            })
+
+        # Enforce subscription for non-admins
+        if current_user.is_authenticated and not getattr(current_user, 'is_admin', False):
+            if not current_user.is_trial_active():
+                logger.info(f"User {current_user.id} trial expired, redirecting to subscription", extra={
+                    'session_id': session.get('sid', 'no-session-id'),
+                    'ip_address': request.remote_addr
+                })
+                return redirect(url_for('subscribe_bp.subscription_required'))
+
+        # Check session timeout
+        if current_user.is_authenticated and 'last_activity' in session:
+            last_activity = session.get('last_activity')
+            if isinstance(last_activity, str):
+                try:
+                    last_activity = datetime.fromisoformat(last_activity.replace(' ', 'T'))
+                    if last_activity.tzinfo is None:
+                        last_activity = last_activity.replace(tzinfo=timezone.utc)
+                except ValueError:
+                    last_activity = datetime.now(timezone.utc)
+                    session['last_activity'] = last_activity.isoformat()
+                    session.modified = True
+            if (datetime.now(timezone.utc) - last_activity).total_seconds() > 1800:
+                user_id = current_user.id
+                sid = session.get('sid', 'no-session-id')
+                logger.info(f"Session timeout for user {user_id}", extra={
+                    'session_id': sid,
+                    'ip_address': request.remote_addr
+                })
+                logout_user()
+                if current_app.config.get('SESSION_TYPE') == 'mongodb':
+                    try:
+                        db = get_mongo_db()
+                        db.sessions.delete_one({'_id': sid})
+                        logger.info(f"Deleted MongoDB session {sid} for user {user_id}", extra={
+                            'session_id': sid,
+                            'ip_address': request.remote_addr
+                        })
+                    except Exception as e:
+                        logger.error(f"Failed to delete MongoDB session {sid}: {str(e)}", extra={
+                            'session_id': sid,
+                            'ip_address': request.remote_addr
+                        })
+                session.clear()
+                session['lang'] = session.get('lang', 'en')
+                session['sid'] = str(uuid.uuid4())
+                session['is_anonymous'] = True
+                session['last_activity'] = datetime.now(timezone.utc).isoformat()
+                flash('Your session has timed out.', 'warning')
+                response = make_response(redirect(url_for('users.login')))
+                response.set_cookie(
+                    current_app.config['SESSION_COOKIE_NAME'],
+                    '',
+                    expires=0,
+                    httponly=True,
+                    secure=current_app.config.get('SESSION_COOKIE_SECURE', True)
+                )
+                return response
+            session['last_activity'] = datetime.now(timezone.utc).isoformat()
+            session.modified = True
+
+    # Inject globals into Jinja environment
     app.jinja_env.globals.update(
         FACEBOOK_URL=app.config.get('FACEBOOK_URL', 'https://facebook.com/ficoreafrica'),
         TWITTER_URL=app.config.get('TWITTER_URL', 'https://x.com/ficoreafrica'),
@@ -540,7 +747,10 @@ def create_app():
                 return f'{float(value):,.2f}'
             return str(value)
         except (ValueError, TypeError) as e:
-            logger.warning(f'Error formatting number {value}: {str(e)}', extra={'session_id': session.get('sid', 'no-session-id'), 'ip_address': request.remote_addr})
+            logger.warning(f'Error formatting number {value}: {str(e)}', extra={
+                'session_id': session.get('sid', 'no-session-id'),
+                'ip_address': request.remote_addr if has_request_context() else 'none'
+            })
             return str(value)
 
     @app.template_filter('format_datetime')
@@ -553,7 +763,10 @@ def create_app():
                 return value_aware.strftime(format_str)
             return str(value)
         except Exception as e:
-            logger.warning(f'Error formatting datetime {value}: {str(e)}', extra={'session_id': session.get('sid', 'no-session-id'), 'ip_address': request.remote_addr})
+            logger.warning(f'Error formatting datetime {value}: {str(e)}', extra={
+                'session_id': session.get('sid', 'no-session-id'),
+                'ip_address': request.remote_addr if has_request_context() else 'none'
+            })
             return str(value)
 
     @app.context_processor
@@ -562,27 +775,34 @@ def create_app():
             try:
                 return generate_tools_with_urls(nav_template)
             except Exception as e:
-                logger.error(f"Error building nav: {e}")
+                logger.error(f"Error building nav: {e}", extra={
+                    'session_id': session.get('sid', 'no-session-id'),
+                    'ip_address': request.remote_addr if has_request_context() else 'none'
+                })
                 return []
-        nav = []
-        tools = []
+
+        bottom_nav_items = []
+        tools_for_quick = []
         breadcrumb_items = []
 
         if current_user.is_authenticated:
             role = getattr(current_user, 'role', 'trader')
             if role == 'admin':
-                nav = build_nav(ADMIN_NAV)
-                tools = build_nav(ADMIN_TOOLS)
+                bottom_nav_items = build_nav(ADMIN_NAV)
+                tools_for_quick = build_nav(ADMIN_TOOLS)
             else:
-                nav = build_nav(TRADER_NAV)
-                tools = build_nav(TRADER_TOOLS)
+                bottom_nav_items = build_nav(TRADER_NAV)
+                tools_for_quick = build_nav(TRADER_TOOLS)
 
             # Generate breadcrumb items
             try:
                 from helpers.breadcrumb_helper import get_breadcrumb_items
                 breadcrumb_items = get_breadcrumb_items()
             except Exception as e:
-                logger.error(f"Error generating breadcrumb items: {e}")
+                logger.error(f"Error generating breadcrumb items: {e}", extra={
+                    'session_id': session.get('sid', 'no-session-id'),
+                    'ip_address': request.remote_addr if has_request_context() else 'none'
+                })
                 breadcrumb_items = []
 
         return {
@@ -593,8 +813,8 @@ def create_app():
                 {'code': 'en', 'name': 'English'},
                 {'code': 'ha', 'name': 'Hausa'}
             ],
-            'navigation': nav,
-            'tools': tools,
+            'bottom_nav_items': bottom_nav_items,
+            'tools_for_quick': tools_for_quick,
             'breadcrumb_items': breadcrumb_items,
         }
 
@@ -608,24 +828,35 @@ def create_app():
                 extra={'session_id': session.get('sid', 'no-session-id'), 'ip_address': request.remote_addr}
             )
             if current_user.is_authenticated:
+                if hasattr(current_user, 'is_trial_active') and not current_user.is_trial_active():
+                    return redirect(url_for('subscribe_bp.subscription_required'))
                 return redirect(get_post_login_redirect(current_user.role))
             return redirect(url_for('general_bp.landing'))
         except Exception as e:
-            current_app.logger.error(f"Error in root route: {str(e)}", extra={'session_id': session.get('sid', 'no-session-id'), 'ip_address': request.remote_addr})
+            current_app.logger.error(f"Error in root route: {str(e)}", extra={
+                'session_id': session.get('sid', 'no-session-id'),
+                'ip_address': request.remote_addr
+            })
             flash(trans('general_error', default='An error occurred'), 'danger')
             return render_template('error/500.html', error_message="Unable to process request.", title="Error"), 500
 
     @app.route('/health')
     @limiter.limit('10 per minute')
     def health():
-        logger.info('Performing health check', extra={'session_id': session.get('sid', 'no-session-id'), 'ip_address': request.remote_addr})
+        logger.info('Performing health check', extra={
+            'session_id': session.get('sid', 'no-session-id'),
+            'ip_address': request.remote_addr
+        })
         status = {'status': 'healthy'}
         try:
             with app.app_context():
                 app.extensions['mongo'].admin.command('ping')
             return jsonify(status), 200
         except Exception as e:
-            logger.error(f'Health check failed: {str(e)}', extra={'session_id': session.get('sid', 'no-session-id'), 'ip_address': request.remote_addr})
+            logger.error(f'Health check failed: {str(e)}', extra={
+                'session_id': session.get('sid', 'no-session-id'),
+                'ip_address': request.remote_addr
+            })
             status['status'] = 'unhealthy'
             status['details'] = str(e)
             return jsonify(status), 500
@@ -637,6 +868,21 @@ def create_app():
             'google489486b6f031d46f.html',
             mimetype='text/html'
         )
+
+    @app.route('/googlebd814b9b37c7a0c9.html')
+    def google_site_verification_new():
+        try:
+            return send_from_directory(
+                os.path.join(app.root_path, 'google_verification'),
+                'googlebd814b9b37c7a0c9.html',
+                mimetype='text/html'
+            )
+        except Exception as e:
+            logger.error(f'Failed to serve googlebd814b9b37c7a0c9.html: {str(e)}', extra={
+                'session_id': session.get('sid', 'no-session-id'),
+                'ip_address': request.remote_addr
+            })
+            return render_template('error/404.html', error="Google verification file not found"), 404
 
     @app.route('/sitemap.xml')
     def sitemap():
@@ -658,7 +904,10 @@ def create_app():
                                  cashflows=list(cashflows),
                                  is_trial_active=current_user.is_trial_active())
         except Exception as e:
-            logger.error(f'Error fetching data for user {current_user.id}: {str(e)}', extra={'session_id': session.get('sid', 'no-session-id'), 'ip_address': request.remote_addr})
+            logger.error(f'Error fetching data for user {current_user.id}: {str(e)}', extra={
+                'session_id': session.get('sid', 'no-session-id'),
+                'ip_address': request.remote_addr
+            })
             flash('Error fetching your data.', 'danger')
             return redirect(url_for('index'))
 
@@ -670,75 +919,45 @@ def create_app():
         session['lang'] = lang
         session['last_activity'] = datetime.now(timezone.utc).isoformat()
         session.modified = True
-        logger.info(f"Language set to {session['lang']} for session {session.get('sid', 'no-session-id')}", extra={'session_id': session.get('sid', 'no-session-id'), 'ip_address': request.remote_addr})
+        logger.info(f"Language set to {session['lang']} for session {session.get('sid', 'no-session-id')}", extra={
+            'session_id': session.get('sid', 'no-session-id'),
+            'ip_address': request.remote_addr
+        })
         return jsonify({'success': True, 'lang': session['lang']})
 
     @app.errorhandler(403)
     def forbidden(e):
-        logger.warning(f'Forbidden access: {request.url}', extra={'session_id': session.get('sid', 'no-session-id'), 'ip_address': request.remote_addr})
+        logger.warning(f'Forbidden access: {request.url}', extra={
+            'session_id': session.get('sid', 'no-session-id'),
+            'ip_address': request.remote_addr
+        })
         flash(trans('access_denied', default='Access denied'), 'danger')
         return render_template('error/403.html', error=str(e)), 403
 
     @app.errorhandler(404)
     def page_not_found(e):
-        logger.error(f'Not found: {request.url}', extra={'session_id': session.get('sid', 'no-session-id'), 'ip_address': request.remote_addr})
+        logger.error(f'Not found: {request.url}', extra={
+            'session_id': session.get('sid', 'no-session-id'),
+            'ip_address': request.remote_addr
+        })
         return render_template('error/404.html', error=str(e)), 404
 
     @app.errorhandler(500)
     def internal_server_error(e):
-        logger.error(f'Server error: {str(e)}', extra={'session_id': session.get('sid', 'no-session-id'), 'ip_address': request.remote_addr})
+        logger.error(f'Server error: {str(e)}', extra={
+            'session_id': session.get('sid', 'no-session-id'),
+            'ip_address': request.remote_addr
+        })
         return render_template('error/500.html', error=str(e)), 500
 
     @app.errorhandler(CSRFError)
     def handle_csrf_error(e):
-        logger.error(f'CSRF error: {str(e)}', extra={'session_id': session.get('sid', 'no-session-id'), 'ip_address': request.remote_addr})
+        logger.error(f'CSRF error: {str(e)}', extra={
+            'session_id': session.get('sid', 'no-session-id'),
+            'ip_address': request.remote_addr
+        })
         flash('Invalid CSRF token. Please try again.', 'danger')
         return redirect(url_for('users.login'))
-
-    @app.before_request
-    def check_session_timeout():
-        if request.path.startswith('/static/') or request.path == url_for('subscribe_bp.subscribe'):
-            return
-        if current_user.is_authenticated and 'last_activity' in session:
-            last_activity = session.get('last_activity')
-            if isinstance(last_activity, str):
-                try:
-                    last_activity = datetime.fromisoformat(last_activity.replace(' ', 'T'))
-                    if last_activity.tzinfo is None:
-                        last_activity = last_activity.replace(tzinfo=timezone.utc)
-                except ValueError:
-                    last_activity = datetime.now(timezone.utc)
-                    session['last_activity'] = last_activity.isoformat()
-            if (datetime.now(timezone.utc) - last_activity).total_seconds() > 1800:
-                user_id = current_user.id
-                sid = session.get('sid', 'no-session-id')
-                logger.info(f"Session timeout for user {user_id}", extra={'session_id': sid, 'ip_address': request.remote_addr})
-                logout_user()
-                if current_app.config.get('SESSION_TYPE') == 'mongodb':
-                    try:
-                        db = get_mongo_db()
-                        db.sessions.delete_one({'_id': sid})
-                        logger.info(f"Deleted MongoDB session {sid} for user {user_id}", extra={'session_id': sid, 'ip_address': request.remote_addr})
-                    except Exception as e:
-                        logger.error(f"Failed to delete MongoDB session {sid}: {str(e)}", extra={'session_id': sid, 'ip_address': request.remote_addr})
-                session.clear()
-                session['lang'] = session.get('lang', 'en')
-                session['sid'] = str(uuid.uuid4())
-                session['is_anonymous'] = True
-                session['last_activity'] = datetime.now(timezone.utc).isoformat()
-                flash('Your session has timed out.', 'warning')
-                response = make_response(redirect(url_for('users.login')))
-                response.set_cookie(
-                    current_app.config['SESSION_COOKIE_NAME'],
-                    '',
-                    expires=0,
-                    httponly=True,
-                    secure=current_app.config.get('SESSION_COOKIE_SECURE', True)
-                )
-                return response
-        if current_user.is_authenticated:
-            session['last_activity'] = datetime.now(timezone.utc).isoformat()
-            session.modified = True
 
     return app
 
@@ -746,5 +965,9 @@ app = create_app()
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    logger.info(f'Starting Flask application on port {port}', extra={'session_id': 'none', 'user_role': 'none', 'ip_address': 'none'})
+    logger.info(f'Starting Flask application on port {port}', extra={
+        'session_id': 'none',
+        'user_role': 'none',
+        'ip_address': 'none'
+    })
     app.run(host='0.0.0.0', port=port, debug=os.getenv('FLASK_ENV', 'development') == 'development')

@@ -3,7 +3,7 @@ from reportlab.lib.utils import ImageReader
 from reportlab.lib import colors
 
 # Colors from your CSS
-FICORE_PRIMARY_COLOR = "#b88a44"
+FICORE_PRIMARY_COLOR = "#22488d"
 FICORE_HEADER_BG = "#F2EFEA"
 FICORE_TEXT_COLOR = "#1e293b"
 FICORE_LOGO_PATH = "img/ficore_logo.png"  # relative to static folder

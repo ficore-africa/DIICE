@@ -385,7 +385,9 @@ def initialize_default_tax_config():
         return False
 
 # Initialize default configuration on import
-initialize_default_tax_config()
+from app import app
+with app.app_context():
+    initialize_default_tax_config()
 
 if __name__ == "__main__":
     print("Tax Configuration Management Module")

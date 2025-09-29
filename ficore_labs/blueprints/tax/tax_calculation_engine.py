@@ -318,17 +318,20 @@ def calculate_net_business_profit(user_id, tax_year, db):
 def apply_statutory_deductions(net_business_profit, user_id, tax_year, db):
     try:
         statutory_expenses = get_expenses_by_categories(user_id, tax_year, ['statutory_contributions'], db)
-        statutory_amount = statutory_expenses.get('statutory_contributions', 0.0)
-        adjusted_profit = net_business_profit - statutory_amount
+        # Pension is now truly optional: only included if provided, else 0
+        pension_contribution = statutory_expenses.get('statutory_contributions', 0.0)
+        if pension_contribution is None:
+            pension_contribution = 0.0
+        adjusted_profit = net_business_profit - pension_contribution
         breakdown = {
             'step': 2,
             'step_name': trans('tax_step2_statutory_deductions', default='Statutory Deductions'),
             'net_business_profit_input': net_business_profit,
-            'statutory_contributions_expenses': statutory_amount,
+            'pension_contribution': pension_contribution,
             'adjusted_profit_after_statutory': adjusted_profit,
-            'calculation_formula': trans('tax_step2_formula', default='Net Business Profit - Statutory Contributions')
+            'calculation_formula': trans('tax_step2_formula', default='Net Business Profit - Pension Contribution (if any)')
         }
-        logger.info(f"Applied statutory deductions for user {user_id} in {tax_year}: {statutory_amount}, adjusted profit: {adjusted_profit}")
+        logger.info(f"Applied statutory deductions for user {user_id} in {tax_year}: pension {pension_contribution}, adjusted profit: {adjusted_profit}")
         return breakdown
     except Exception as e:
         logger.error(f"Error applying statutory deductions for user {user_id} in {tax_year}: {str(e)}")
@@ -336,7 +339,7 @@ def apply_statutory_deductions(net_business_profit, user_id, tax_year, db):
             'step': 2,
             'step_name': trans('tax_step2_statutory_deductions', default='Statutory Deductions'),
             'net_business_profit_input': net_business_profit,
-            'statutory_contributions_expenses': 0.0,
+            'pension_contribution': 0.0,
             'adjusted_profit_after_statutory': net_business_profit,
             'error': str(e)
         }

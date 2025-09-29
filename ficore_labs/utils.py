@@ -16,6 +16,14 @@ from wtforms import ValidationError
 from flask_login import current_user
 import re
 
+INVENTORY_CATEGORIES = [
+    'Food', 'Beverage', 'Service', 'Electronics', 'Stationery', 'Clothing', 'Other'
+]
+
+INVENTORY_UNITS = [
+    'piece', 'carton', 'litre', 'kg', 'pack', 'box', 'set', 'unit', 'other'
+]
+
 # Import performance monitoring (will be created)
 try:
     from query_performance_monitor import monitor_query_performance
@@ -187,14 +195,6 @@ TRADER_NAV = [
 
 ADMIN_TOOLS = [
     {
-        "endpoint": "dashboard.index",
-        "label": "Dashboard",
-        "label_key": "dashboard_summary",
-        "description_key": "dashboard_summary_desc",
-        "tooltip_key": "dashboard_tooltip",
-        "icon": "bi-bar-chart-line"
-    },
-    {
         "endpoint": "admin.dashboard",
         "label": "Dashboard",
         "label_key": "admin_dashboard",
@@ -209,6 +209,198 @@ ADMIN_TOOLS = [
         "description_key": "admin_manage_users_desc",
         "tooltip_key": "admin_manage_users_tooltip",
         "icon": "bi-people"
+    },
+    {
+        "endpoint": "admin.manage_user_roles",
+        "label": "User Roles",
+        "label_key": "admin_manage_user_roles",
+        "description_key": "admin_manage_user_roles_desc",
+        "tooltip_key": "admin_manage_user_roles_tooltip",
+        "icon": "bi-person-badge"
+    },
+    {
+        "endpoint": "admin.manage_user_subscriptions",
+        "label": "User Subscriptions",
+        "label_key": "admin_manage_user_subscriptions",
+        "description_key": "admin_manage_user_subscriptions_desc",
+        "tooltip_key": "admin_manage_user_subscriptions_tooltip",
+        "icon": "bi-credit-card"
+    },
+    {
+        "endpoint": "admin.manage_user_trials",
+        "label": "User Trials",
+        "label_key": "admin_manage_user_trials",
+        "description_key": "admin_manage_user_trials_desc",
+        "tooltip_key": "admin_manage_user_trials_tooltip",
+        "icon": "bi-hourglass-split"
+    },
+    {
+        "endpoint": "admin.bulk_operations",
+        "label": "Bulk Operations",
+        "label_key": "admin_bulk_operations",
+        "description_key": "admin_bulk_operations_desc",
+        "tooltip_key": "admin_bulk_operations_tooltip",
+        "icon": "bi-list-check"
+    },
+    {
+        "endpoint": "admin.manage_receipts",
+        "label": "Manage Receipts",
+        "label_key": "admin_manage_receipts",
+        "description_key": "admin_manage_receipts_desc",
+        "tooltip_key": "admin_manage_receipts_tooltip",
+        "icon": "bi-receipt"
+    },
+    {
+        "endpoint": "admin.manage_debtors",
+        "label": "Manage Debtors",
+        "label_key": "admin_debtors",
+        "description_key": "admin_debtors_desc",
+        "tooltip_key": "admin_debtors_tooltip",
+        "icon": "bi-person-dash"
+    },
+    {
+        "endpoint": "admin.manage_creditors",
+        "label": "Manage Creditors",
+        "label_key": "admin_creditors",
+        "description_key": "admin_creditors_desc",
+        "tooltip_key": "admin_creditors_tooltip",
+        "icon": "bi-person-plus"
+    },
+    {
+        "endpoint": "admin.manage_records",
+        "label": "Income Records",
+        "label_key": "admin_records",
+        "description_key": "admin_records_desc",
+        "tooltip_key": "admin_records_tooltip",
+        "icon": "bi-journal-richtext"
+    },
+    {
+        "endpoint": "admin.manage_cashflows",
+        "label": "Payment Outflows",
+        "label_key": "admin_cashflows",
+        "description_key": "admin_cashflows_desc",
+        "tooltip_key": "admin_cashflows_tooltip",
+        "icon": "bi-arrow-left-right"
+    },
+    {
+        "endpoint": "admin.manage_kyc",
+        "label": "KYC Submissions",
+        "label_key": "admin_kyc",
+        "description_key": "admin_kyc_desc",
+        "tooltip_key": "admin_kyc_tooltip",
+        "icon": "bi-shield-check"
+    },
+    {
+        "endpoint": "admin.customer_reports",
+        "label": "Customer Reports",
+        "label_key": "admin_customer_reports",
+        "description_key": "admin_customer_reports_desc",
+        "tooltip_key": "admin_customer_reports_tooltip",
+        "icon": "bi-file-earmark-bar-graph"
+    },
+    {
+        "endpoint": "admin.view_waitlist",
+        "label": "Waitlist",
+        "label_key": "admin_waitlist",
+        "description_key": "admin_waitlist_desc",
+        "tooltip_key": "admin_waitlist_tooltip",
+        "icon": "bi-clock-history"
+    },
+    {
+        "endpoint": "admin.export_waitlist",
+        "label": "Export Waitlist",
+        "label_key": "admin_export_waitlist",
+        "description_key": "admin_export_waitlist_desc",
+        "tooltip_key": "admin_export_waitlist_tooltip",
+        "icon": "bi-file-earmark-arrow-down"
+    },
+    {
+        "endpoint": "admin.tax_config",
+        "label": "Tax Configuration",
+        "label_key": "admin_tax_config",
+        "description_key": "admin_tax_config_desc",
+        "tooltip_key": "admin_tax_config_tooltip",
+        "icon": "bi-percent"
+    },
+    {
+        "endpoint": "admin.manage_tax_rates",
+        "label": "Tax Rates",
+        "label_key": "admin_manage_tax_rates",
+        "description_key": "admin_manage_tax_rates_desc",
+        "tooltip_key": "admin_manage_tax_rates_tooltip",
+        "icon": "bi-graph-up"
+    },
+    {
+        "endpoint": "admin.manage_tax_bands",
+        "label": "Tax Bands",
+        "label_key": "admin_manage_tax_bands",
+        "description_key": "admin_manage_tax_bands_desc",
+        "tooltip_key": "admin_manage_tax_bands_tooltip",
+        "icon": "bi-sliders"
+    },
+    {
+        "endpoint": "admin.manage_tax_exemptions",
+        "label": "Tax Exemptions",
+        "label_key": "admin_manage_tax_exemptions",
+        "description_key": "admin_manage_tax_exemptions_desc",
+        "tooltip_key": "admin_manage_tax_exemptions_tooltip",
+        "icon": "bi-x-circle"
+    },
+    {
+        "endpoint": "admin.system_settings",
+        "label": "System Settings",
+        "label_key": "admin_system_settings",
+        "description_key": "admin_system_settings_desc",
+        "tooltip_key": "admin_system_settings_tooltip",
+        "icon": "bi-gear"
+    },
+    {
+        "endpoint": "admin.audit",
+        "label": "Audit Logs",
+        "label_key": "admin_audit",
+        "description_key": "admin_audit_desc",
+        "tooltip_key": "admin_audit_tooltip",
+        "icon": "bi-journal-check"
+    },
+    {
+        "endpoint": "admin.manage_feedback",
+        "label": "Feedback",
+        "label_key": "admin_feedback",
+        "description_key": "admin_feedback_desc",
+        "tooltip_key": "admin_feedback_tooltip",
+        "icon": "bi-chat-dots"
+    },
+    {
+        "endpoint": "admin.analytics_dashboard",
+        "label": "Analytics Dashboard",
+        "label_key": "admin_analytics_dashboard",
+        "description_key": "admin_analytics_dashboard_desc",
+        "tooltip_key": "admin_analytics_dashboard_tooltip",
+        "icon": "bi-bar-chart"
+    },
+    {
+        "endpoint": "admin.enhanced_analytics_dashboard",
+        "label": "Enhanced Analytics",
+        "label_key": "admin_enhanced_analytics",
+        "description_key": "admin_enhanced_analytics_desc",
+        "tooltip_key": "admin_enhanced_analytics_tooltip",
+        "icon": "bi-bar-chart-steps"
+    },
+    {
+        "endpoint": "admin.education_management",
+        "label": "Education Management",
+        "label_key": "admin_education_management",
+        "description_key": "admin_education_management_desc",
+        "tooltip_key": "admin_education_management_tooltip",
+        "icon": "bi-mortarboard"
+    },
+    {
+        "endpoint": "admin.system_health_monitor",
+        "label": "System Health Monitor",
+        "label_key": "admin_system_health_monitor",
+        "description_key": "admin_system_health_monitor_desc",
+        "tooltip_key": "admin_system_health_monitor_tooltip",
+        "icon": "bi-heart-pulse"
     }
 ]
 
@@ -228,6 +420,14 @@ ADMIN_NAV = [
         "description_key": "admin_manage_users_desc",
         "tooltip_key": "admin_manage_users_tooltip",
         "icon": "bi-people"
+    },
+     {
+        "endpoint": "settings.profile",
+        "label": "Settings",
+        "label_key": "profile_settings",
+        "description_key": "profile_settings_desc",
+        "tooltip_key": "profile_tooltip",
+        "icon": "bi-person"
     }
 ]
 
@@ -2714,6 +2914,7 @@ def create_dashboard_safe_response(stats, recent_data, additional_data=None):
             'timestamp': datetime.now(timezone.utc).isoformat()
 
         }
+
 
 
 

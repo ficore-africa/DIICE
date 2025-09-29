@@ -4,6 +4,7 @@ Flask-Cors==5.0.0
 pymongo==4.8.0
 Flask-WTF==1.2.1
 Flask-Login==0.6.3
+openai
 flask-mailman==1.0.0
 Flask-Babel==4.0.0
 Babel==2.16.0

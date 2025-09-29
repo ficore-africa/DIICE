@@ -35,7 +35,8 @@ try:
     from .trader.creditors_translations import CREDITORS_TRANSLATIONS
     from .trader.debtors_translations import DEBTORS_TRANSLATIONS
     from .trader.payments_translations import PAYMENTS_TRANSLATIONS
-    from .trader.receipts_translations import RECEIPTS_TRANSLATIONS    
+    from .trader.receipts_translations import RECEIPTS_TRANSLATIONS
+    from .trader.inventory_translations import INVENTORY_TRANSLATIONS
     # General Features
     from .general_features.general_translations import GENERAL_TRANSLATIONS
     from .general_features.admin_translations import ADMIN_TRANSLATIONS
@@ -52,6 +53,7 @@ translation_modules = {
     'debtors': DEBTORS_TRANSLATIONS,
     'payments': PAYMENTS_TRANSLATIONS,
     'receipts': RECEIPTS_TRANSLATIONS,
+    'inventory': INVENTORY_TRANSLATIONS,
     'admin': ADMIN_TRANSLATIONS,
     
     # General Features
@@ -66,6 +68,7 @@ KEY_PREFIX_TO_MODULE = {
     'debtors_': 'debtors',
     'payments_': 'payments',
     'receipts_': 'receipts',
+    'inventory_': 'inventory',
     'admin_': 'admin',
     
     # General Features prefixes
@@ -208,7 +211,7 @@ def get_module_translations(module_name: str, lang: Optional[str] = None) -> Dic
     Get translations for a specific module and language.
     
     Args:
-        module_name: Name of the translation module (e.g., 'general', 'funds').
+        module_name: Name of the translation module (e.g., 'general', 'inventory').
         lang: Language code ('en', 'ha'). Defaults to session['lang'] or 'en'.
     
     Returns:
@@ -230,6 +233,7 @@ def register_translation(app):
         app: Flask application instance.
     """
     app.jinja_env.globals['t'] = trans
+    app.jinja_env.globals['trans'] = trans  # Add both 't' and 'trans' for compatibility
 
     # Ensure session['lang'] is set before each request
     @app.before_request
