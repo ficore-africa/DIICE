@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, render_template, session, request, redirect, url_for
+from flask import Blueprint, jsonify, render_template, session, request
 from flask_login import current_user, login_required
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
@@ -18,15 +18,8 @@ def home():
         user_id = current_user.id
         lang = session.get('lang', 'en')
 
-        # Subscription/trial check REMOVED
-        # if not current_user.is_trial_active() and not current_user.is_subscribed:
-        #     return redirect(url_for('subscribe_bp.subscription_required'))
-
-        # is_read_only is now set to False as the subscription check is removed.
-        # If read-only mode should still be enforced for non-subscribed users, 
-        # the check below can be re-enabled without the redirect.
-        # is_read_only = not current_user.is_subscribed and not current_user.is_trial_active()
-        is_read_only = False 
+        # No trial or subscription check; all users can access
+        is_read_only = False  # Read-only mode disabled since trial check is removed
 
         # Fetch debt summary
         creditors_pipeline = [
