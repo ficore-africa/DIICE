@@ -431,10 +431,21 @@ def manage_user_subscriptions():
                 'is_subscribed': form.is_subscribed.data == 'True',
                 'subscription_plan': form.subscription_plan.data or None,
                 'subscription_start': datetime.now(timezone.utc) if form.is_subscribed.data == 'True' else None,
-                'subscription_end': form.subscription_end.data if form.subscription_end.data else None,
+                'subscription_end': None,
                 'updated_at': datetime.now(timezone.utc)
             }
-            if form.is_subscribed.data == 'True' and not form.subscription_end.data and form.subscription_plan.data:
+            # Handle subscription_end from form
+            if form.subscription_end.data:
+                try:
+                    # Convert form date to timezone-aware datetime
+                    subscription_end_naive = datetime.combine(form.subscription_end.data, datetime.min.time())
+                    update_data['subscription_end'] = subscription_end_naive.replace(tzinfo=ZoneInfo("UTC"))
+                except Exception as e:
+                    logger.error(f"Error converting subscription_end date for user {user_id}: {str(e)}",
+                                 extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
+                    flash(trans('admin_invalid_date', default='Invalid subscription end date'), 'danger')
+                    return redirect(url_for('admin.manage_user_subscriptions'))
+            elif form.is_subscribed.data == 'True' and form.subscription_plan.data:
                 duration = plan_durations.get(form.subscription_plan.data, 30)
                 update_data['subscription_end'] = datetime.now(timezone.utc) + timedelta(days=duration)
             result = db.users.update_one(
@@ -460,19 +471,36 @@ def manage_user_subscriptions():
             user['_id'] = str(user['_id'])
             trial_end = user.get('trial_end')
             subscription_end = user.get('subscription_end')
-            trial_end_aware = trial_end.replace(tzinfo=ZoneInfo("UTC")) if trial_end and trial_end.tzinfo is None else trial_end
-            subscription_end_aware = subscription_end.replace(tzinfo=ZoneInfo("UTC")) if subscription_end and subscription_end.tzinfo is None else subscription_end
-            user['is_trial_active'] = (
-                datetime.now(timezone.utc) <= trial_end_aware if user.get('is_trial') and trial_end_aware
-                else user.get('is_subscribed') and subscription_end_aware and datetime.now(timezone.utc) <= subscription_end_aware
-            )
+            # Ensure timezone-aware datetimes
+            try:
+                trial_end_aware = (
+                    trial_end.replace(tzinfo=ZoneInfo("UTC"))
+                    if trial_end and isinstance(trial_end, datetime) and trial_end.tzinfo is None
+                    else trial_end
+                )
+                subscription_end_aware = (
+                    subscription_end.replace(tzinfo=ZoneInfo("UTC"))
+                    if subscription_end and isinstance(subscription_end, datetime) and subscription_end.tzinfo is None
+                    else subscription_end
+                )
+                # Calculate is_trial_active with safe checks
+                user['is_trial_active'] = False
+                now_aware = datetime.now(timezone.utc)
+                if user.get('is_trial') and trial_end_aware and isinstance(trial_end_aware, datetime):
+                    user['is_trial_active'] = now_aware <= trial_end_aware
+                elif user.get('is_subscribed') and subscription_end_aware and isinstance(subscription_end_aware, datetime):
+                    user['is_trial_active'] = now_aware <= subscription_end_aware
+            except Exception as e:
+                logger.error(f"Error processing datetime for user {user['_id']}: {str(e)}",
+                             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
+                user['is_trial_active'] = False  # Fallback to False if datetime processing fails
         return render_template('admin/user_subscriptions.html', form=form, users=users, title=trans('admin_manage_user_subscriptions_title', default='Manage User Subscriptions'), now=datetime.now(timezone.utc))
     except Exception as e:
         logger.error(f"Error in manage_user_subscriptions for admin {current_user.id}: {str(e)}",
                      extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
         flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
         return render_template('error/500.html'), 500
-
+        
 @admin_bp.route('/users/trials', methods=['GET', 'POST'])
 @login_required
 @utils.requires_role('admin')
@@ -1563,6 +1591,7 @@ def system_health_monitor():
         logger.error(f"Error loading system health: {str(e)}")
         flash(trans('admin_health_error', default='Error loading system health data'), 'danger')
         return redirect(url_for('admin.dashboard'))
+
 
 
 
