@@ -16,8 +16,8 @@ logger.setLevel(logging.INFO)
 subscribe_bp = Blueprint('subscribe_bp', __name__, url_prefix='/subscribe')
 
 @subscribe_bp.route('/')
-@login_required
-@utils.requires_role(['trader', 'startup', 'admin'])
+
+
 def subscribe():
     """Render the subscription page with pricing plans."""
     try:
@@ -57,8 +57,8 @@ def subscribe():
         return redirect(url_for('general_bp.home'))
 
 @subscribe_bp.route('/initiate-payment', methods=['POST'])
-@login_required
-@utils.requires_role(['trader', 'startup', 'admin'])
+
+
 @utils.limiter.limit('10 per minute')
 def initiate_payment():
     """Initiate payment with Paystack."""
@@ -147,8 +147,7 @@ def initiate_payment():
         return redirect(url_for('subscribe_bp.subscribe'))
 
 @subscribe_bp.route('/callback')
-@login_required
-@utils.requires_role(['trader', 'startup', 'admin'])
+
 def callback():
     """Handle Paystack payment callback."""
     try:
@@ -232,8 +231,8 @@ def callback():
         return redirect(url_for('subscribe_bp.subscribe'))
 
 @subscribe_bp.route('/subscription-required')
-@login_required
-@utils.requires_role(['trader', 'startup', 'admin'])
+
+
 def subscription_required():
     """Render a page indicating that a subscription is required."""
     try:
@@ -256,8 +255,8 @@ def subscription_required():
         return redirect(url_for('general_bp.home'))
 
 @subscribe_bp.route('/status')
-@login_required
-@utils.requires_role(['trader', 'startup', 'admin'])
+
+
 def subscription_status():
     """Render the subscription status page."""
     try:
@@ -281,8 +280,8 @@ def subscription_status():
         return redirect(url_for('general_bp.home'))
 
 @subscribe_bp.route('/manage')
-@login_required
-@utils.requires_role(['trader', 'startup', 'admin'])
+
+
 def manage_subscription():
     """Render the subscription management page with payment info and receipt upload."""
     try:
@@ -319,8 +318,8 @@ def manage_subscription():
         return redirect(url_for('general_bp.home'))
 
 @subscribe_bp.route('/upload-receipt', methods=['POST'])
-@login_required
-@utils.requires_role(['trader', 'startup', 'admin'])
+
+
 @utils.limiter.limit('5 per minute')
 def upload_receipt():
     """Handle receipt upload for manual payment verification."""
