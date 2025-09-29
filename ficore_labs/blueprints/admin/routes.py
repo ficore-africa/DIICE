@@ -400,7 +400,6 @@ def manage_user_roles():
 @utils.requires_role('admin')
 @utils.limiter.limit("50 per hour")
 def manage_user_subscriptions():
-    """Manage user subscriptions: list all users and update their subscription status."""
     try:
         db = utils.get_mongo_db()
         if db is None:
@@ -409,37 +408,43 @@ def manage_user_subscriptions():
         form = SubscriptionForm()
         if request.method == 'POST' and form.validate_on_submit():
             user_id = request.form.get('user_id')
-            try:
-                from bson.objectid import ObjectId as BsonObjectId
-                is_objectid = False
-                try:
-                    BsonObjectId(str(user_id))
-                    is_objectid = True
-                except Exception:
-                    is_objectid = False
-                plan_durations = {'monthly': 30, 'yearly': 365}
-                update_data = {
-                    'is_subscribed': form.is_subscribed.data == 'True',
-                    'subscription_plan': form.subscription_plan.data or None,
-                    'subscription_start': datetime.now(timezone.utc) if form.is_subscribed.data == 'True' else None,
-                    'subscription_end': form.subscription_end.data if form.subscription_end.data else None,
-                    'updated_at': datetime.now(timezone.utc)
-                }
-                if form.is_subscribed.data == 'True' and not form.subscription_end.data and form.subscription_plan.data:
-                    duration = plan_durations.get(form.subscription_plan.data, 30)
-                    update_data['subscription_end'] = datetime.now(timezone.utc) + timedelta(days=duration)
-                if is_objectid:
-                    user_query = {'_id': BsonObjectId(user_id)}
-                else:
-                    user_query = {'user_id': user_id}
-                user = db.users.find_one(user_query)
-                if user is None:
-                    flash(trans('user_not_found', default='User not found'), 'danger')
-                    return redirect(url_for('admin.manage_user_subscriptions'))
-                db.users.update_one(
-                    user_query,
-                    {'$set': update_data}
-                )
+            if not user_id:
+                logger.error("No user_id provided in form submission",
+                             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
+                flash(trans('admin_no_user_id', default='No user ID provided'), 'danger')
+                return redirect(url_for('admin.manage_user_subscriptions'))
+            
+            # Normalize user_id to lowercase
+            user_id = user_id.lower()
+            logger.info(f"Attempting to update subscription for user_id: {user_id}",
+                        extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
+            
+            # Clear cache to ensure fresh data
+            utils.get_user.cache_clear()
+            user = utils.get_user(db, user_id)
+            if user is None:
+                logger.error(f"User not found for user_id: {user_id}",
+                             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
+                flash(trans('user_not_found', default='User not found'), 'danger')
+                return redirect(url_for('admin.manage_user_subscriptions'))
+            
+            plan_durations = {'monthly': 30, 'yearly': 365}
+            update_data = {
+                'is_subscribed': form.is_subscribed.data == 'True',
+                'subscription_plan': form.subscription_plan.data or None,
+                'subscription_start': datetime.now(timezone.utc) if form.is_subscribed.data == 'True' else None,
+                'subscription_end': form.subscription_end.data if form.subscription_end.data else None,
+                'updated_at': datetime.now(timezone.utc)
+            }
+            if form.is_subscribed.data == 'True' and not form.subscription_end.data and form.subscription_plan.data:
+                duration = plan_durations.get(form.subscription_plan.data, 30)
+                update_data['subscription_end'] = datetime.now(timezone.utc) + timedelta(days=duration)
+            
+            result = db.users.update_one(
+                {'_id': user_id},
+                {'$set': update_data}
+            )
+            if result.modified_count > 0:
                 logger.info(f"User subscription updated: id={user_id}, subscribed={update_data['is_subscribed']}, plan={update_data['subscription_plan']}, admin={current_user.id}",
                             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
                 log_audit_action('update_user_subscription', {
@@ -449,12 +454,12 @@ def manage_user_subscriptions():
                     'subscription_end': update_data['subscription_end'].strftime('%Y-%m-%d') if update_data['subscription_end'] else None
                 })
                 flash(trans('subscription_updated', default='User subscription updated successfully'), 'success')
-                return redirect(url_for('admin.manage_user_subscriptions'))
-            except Exception as e:
-                logger.error(f"Error updating user subscription {user_id}: {str(e)}",
-                             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-                flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
-                return render_template('admin/user_subscriptions.html', form=form, users=users, title=trans('admin_manage_user_subscriptions_title', default='Manage User Subscriptions'))
+            else:
+                logger.info(f"No changes made to subscription for user_id: {user_id}",
+                            extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
+                flash(trans('admin_no_changes', default='No changes made to subscription'), 'info')
+            
+            return redirect(url_for('admin.manage_user_subscriptions'))
         
         for user in users:
             user['_id'] = str(user['_id'])
@@ -1712,3 +1717,4 @@ def system_health_monitor():
         logger.error(f"Error loading system health: {str(e)}")
         flash(trans('admin_health_error', default='Error loading system health data'), 'danger')
         return redirect(url_for('admin.dashboard'))
+
