@@ -1,82 +1,32 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request, session
-from flask_login import login_required, current_user
-from utils import get_mongo_db
-from bson import ObjectId
-import os
-
-admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
-
-@admin_bp.route('/invalid', methods=['GET'])
-@login_required
-def invalid_payments():
-    if not current_user.is_authenticated or current_user.role != 'admin':
-        flash('Admin access required.', 'danger')
-        return redirect(url_for('dashboard.index'))
-    db = get_mongo_db()
-    payments = list(db.cashflows.find({'status': 'invalid'}))
-    # Try to load error logs for each payment
-    error_log_path = os.path.join(os.path.dirname(__file__), 'skipped_payments.log')
-    error_logs = {}
-    if os.path.exists(error_log_path):
-        with open(error_log_path, 'r', encoding='utf-8') as f:
-            for line in f:
-                if '| Skipped payment ID:' in line:
-                    parts = line.split('|')
-                    if len(parts) > 2:
-                        pid = parts[1].split(':')[-1].strip()
-                        error_logs[pid] = line.strip()
-    for p in payments:
-        p['id'] = str(p.get('_id', ''))
-        p['error_log'] = error_logs.get(p['id'], None)
-    return render_template('admin/invalid.html', payments=payments)
-
-@admin_bp.route('/clean_invalid', methods=['POST'])
-@login_required
-def clean_invalid_payments():
-    if not current_user.is_authenticated or current_user.role != 'admin':
-        flash('Admin access required.', 'danger')
-        return redirect(url_for('dashboard.index'))
-    db = get_mongo_db()
-    result = db.cashflows.delete_many({'status': 'invalid'})
-    flash(f"Cleaned up {result.deleted_count} invalid/skipped payment records.", 'success')
-    return redirect(url_for('admin.invalid_payments'))
 import logging
-from bson import ObjectId, errors
-from flask import Blueprint, render_template, redirect, url_for, flash, request, session, Response, send_file
+import os
+from io import BytesIO
+import io
+import csv
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+from flask import Blueprint, render_template, redirect, url_for, flash, request, Response, send_file
 from flask_login import login_required, current_user
 from flask_wtf import FlaskForm
-from wtforms import StringField, FloatField, SelectField, SubmitField, DateField, validators
-from wtforms.validators import DataRequired, NumberRange
-from translations import trans
-import utils
-from datetime import datetime, timedelta, timezone
-from zoneinfo import ZoneInfo
+from wtforms import StringField, FloatField, SelectField, SubmitField, DateField
+from wtforms.validators import DataRequired, NumberRange, Optional
+from bson import ObjectId, errors
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import inch
-from io import BytesIO
-import csv
+from translations import trans
+import utils
 from models import get_records, get_cashflows, get_feedback, to_dict_feedback, get_waitlist_entries, to_dict_waitlist
-
-
-# Enhanced Admin Functionality Imports
 from admin_enhancement_implementation import (
     SystemSettingsForm, EducationModuleForm, NotificationTemplateForm, BulkUserOperationForm,
     get_system_settings, save_system_settings, get_education_modules, save_education_module,
     get_user_analytics, execute_bulk_operation, get_system_health
 )
+from admin_tax_config import TaxRateForm, TaxBandForm, TaxExemptionForm, get_tax_rates, get_tax_bands, get_tax_exemptions, save_tax_rate, save_tax_band, save_tax_exemption
+
 logger = logging.getLogger(__name__)
 
-admin_bp = Blueprint('admin', __name__, template_folder='templates/admin')
-
-# Error Handler
-@admin_bp.app_errorhandler(500)
-def error_500(error):
-    """Handle 500 Internal Server Error."""
-    logger.error(f"500 Internal Server Error: {str(error)}",
-                 extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id if current_user.is_authenticated else 'anonymous'})
-    flash(trans('admin_server_error', default='An unexpected error occurred. Please try again later.'), 'danger')
-    return render_template('error/500.html'), 500
+admin_bp = Blueprint('admin', __name__, template_folder='templates/admin', url_prefix='/admin')
 
 # Form Definitions
 class RoleForm(FlaskForm):
@@ -86,30 +36,29 @@ class RoleForm(FlaskForm):
 class SubscriptionForm(FlaskForm):
     is_subscribed = SelectField(trans('subscription_status', default='Subscription Status'), choices=[('True', 'Subscribed'), ('False', 'Not Subscribed')], validators=[DataRequired()], render_kw={'class': 'form-select'})
     subscription_plan = SelectField(trans('subscription_plan', default='Subscription Plan'), choices=[('', 'None'), ('monthly', 'Monthly (₦1k)'), ('yearly', 'Yearly (₦10k)')], render_kw={'class': 'form-select'})
-    subscription_end = DateField(trans('subscription_end', default='Subscription End Date'), format='%Y-%m-%d', validators=[validators.Optional()], render_kw={'class': 'form-control'})
+    subscription_end = DateField(trans('subscription_end', default='Subscription End Date'), format='%Y-%m-%d', validators=[Optional()], render_kw={'class': 'form-control'})
     submit = SubmitField(trans('subscription_update', default='Update Subscription'), render_kw={'class': 'btn btn-primary'})
 
 class TrialForm(FlaskForm):
     is_trial = SelectField(trans('trial_status', default='Trial Status'), choices=[('True', 'Active Trial'), ('False', 'No Trial')], validators=[DataRequired()], render_kw={'class': 'form-select'})
-    trial_end = DateField(trans('trial_end', default='Trial End Date'), format='%Y-%m-%d', validators=[validators.Optional()], render_kw={'class': 'form-control'})
+    trial_end = DateField(trans('trial_end', default='Trial End Date'), format='%Y-%m-%d', validators=[Optional()], render_kw={'class': 'form-control'})
     submit = SubmitField(trans('trial_update', default='Update Trial'), render_kw={'class': 'btn btn-primary'})
-    bulk_trial_days = SelectField(trans('bulk_trial_days', default='Extend Trial for New Users'), choices=[('', 'Select Days'), ('30', '30 Days'), ('60', '60 Days'), ('90', '90 Days')], validators=[validators.Optional()], render_kw={'class': 'form-select'})
-    bulk_trial_start = DateField(trans('bulk_trial_start', default='Registration Start Date'), format='%Y-%m-%d', validators=[validators.Optional()], render_kw={'class': 'form-control'})
-    bulk_trial_end = DateField(trans('bulk_trial_end', default='Registration End Date'), format='%Y-%m-%d', validators=[validators.Optional()], render_kw={'class': 'form-control'})
+    bulk_trial_days = SelectField(trans('bulk_trial_days', default='Extend Trial for New Users'), choices=[('', 'Select Days'), ('30', '30 Days'), ('60', '60 Days'), ('90', '90 Days')], validators=[Optional()], render_kw={'class': 'form-select'})
+    bulk_trial_start = DateField(trans('bulk_trial_start', default='Registration Start Date'), format='%Y-%m-%d', validators=[Optional()], render_kw={'class': 'form-control'})
+    bulk_trial_end = DateField(trans('bulk_trial_end', default='Registration End Date'), format='%Y-%m-%d', validators=[Optional()], render_kw={'class': 'form-control'})
     bulk_submit = SubmitField(trans('bulk_trial_update', default='Apply Bulk Trial'), render_kw={'class': 'btn btn-primary'})
 
 class DebtorForm(FlaskForm):
-    name = StringField(trans('debtor_name', default='Debtor Name'), validators=[DataRequired(), validators.Length(min=2, max=100)], render_kw={'class': 'form-control'})
+    name = StringField(trans('debtor_name', default='Debtor Name'), validators=[DataRequired(), NumberRange(min=2, max=100)], render_kw={'class': 'form-control'})
     amount = FloatField(trans('debtor_amount', default='Amount Owed'), validators=[DataRequired(), NumberRange(min=0)], render_kw={'class': 'form-control'})
     due_date = DateField(trans('debtor_due_date', default='Due Date'), validators=[DataRequired()], format='%Y-%m-%d', render_kw={'class': 'form-control'})
     submit = SubmitField(trans('debtor_add', default='Add Debtor'), render_kw={'class': 'btn btn-primary'})
 
 class CreditorForm(FlaskForm):
-    name = StringField(trans('creditor_name', default='Creditor Name'), validators=[DataRequired(), validators.Length(min=2, max=100)], render_kw={'class': 'form-control'})
+    name = StringField(trans('creditor_name', default='Creditor Name'), validators=[DataRequired(), NumberRange(min=2, max=100)], render_kw={'class': 'form-control'})
     amount = FloatField(trans('creditor_amount', default='Amount Owed'), validators=[DataRequired(), NumberRange(min=0)], render_kw={'class': 'form-control'})
     due_date = DateField(trans('creditor_due_date', default='Due Date'), validators=[DataRequired()], format='%Y-%m-%d', render_kw={'class': 'form-control'})
     submit = SubmitField(trans('creditor_add', default='Add Creditor'), render_kw={'class': 'btn btn-primary'})
-
 
 class FeedbackFilterForm(FlaskForm):
     tool_name = SelectField(trans('general_select_tool', default='Select Tool'), 
@@ -119,10 +68,9 @@ class FeedbackFilterForm(FlaskForm):
                                     ('creditors', trans('creditors_dashboard', default='Creditors')),
                                     ('receipts', trans('receipts_dashboard', default='Receipts')),
                                     ('payment', trans('payments_dashboard', default='Payments')),
-                                    ('report', trans('reports_dashboard', default='Business Reports')),
-                                    ],
-                           validators=[validators.Optional()], render_kw={'class': 'form-select'})
-    user_id = StringField(trans('admin_user_id', default='User ID'), validators=[validators.Optional()], render_kw={'class': 'form-control'})
+                                    ('report', trans('reports_dashboard', default='Business Reports'))],
+                           validators=[Optional()], render_kw={'class': 'form-select'})
+    user_id = StringField(trans('admin_user_id', default='User ID'), validators=[Optional()], render_kw={'class': 'form-control'})
     submit = SubmitField(trans('general_filter', default='Filter'), render_kw={'class': 'btn btn-primary'})
 
 # Helper Functions
@@ -141,6 +89,68 @@ def log_audit_action(action, details=None):
     except Exception as e:
         logger.error(f"Error logging audit action '{action}': {str(e)}",
                      extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
+
+def generate_customer_report_pdf(users):
+    """Generate a PDF report of customer data."""
+    try:
+        buffer = BytesIO()
+        p = canvas.Canvas(buffer, pagesize=A4)
+        p.setFont("Helvetica", 12)
+        p.drawString(1 * inch, 10.5 * inch, trans('admin_customer_report_title', default='Customer Report'))
+        p.drawString(1 * inch, 10.2 * inch, f"{trans('admin_generated_on', default='Generated on')}: {datetime.now(timezone.utc).strftime('%Y-%m-%d')}")
+        y = 9.5 * inch
+        p.drawString(1 * inch, y, trans('admin_username', default='Username'))
+        p.drawString(2.5 * inch, y, trans('admin_email', default='Email'))
+        p.drawString(4 * inch, y, trans('user_role', default='Role'))
+        p.drawString(5.5 * inch, y, trans('subscription_status', default='Subscription Status'))
+        y -= 0.3 * inch
+        for user in users:
+            status = 'Subscribed' if user.get('is_subscribed') and user.get('is_trial_active') else 'Trial' if user.get('is_trial') and user.get('is_trial_active') else 'Expired'
+            p.drawString(1 * inch, y, user['_id'])
+            p.drawString(2.5 * inch, y, user['email'])
+            p.drawString(4 * inch, y, user['role'])
+            p.drawString(5.5 * inch, y, status)
+            y -= 0.3 * inch
+            if y < 1 * inch:
+                p.showPage()
+                p.setFont("Helvetica", 12)
+                y = 10.5 * inch
+        p.showPage()
+        p.save()
+        buffer.seek(0)
+        return Response(buffer, mimetype='application/pdf', headers={'Content-Disposition': 'attachment;filename=customer_report.pdf'})
+    except Exception as e:
+        logger.error(f"Error generating customer report PDF: {str(e)}",
+                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
+        flash(trans('admin_report_error', default='An error occurred while generating the report'), 'danger')
+        return render_template('error/500.html'), 500
+
+def generate_customer_report_csv(users):
+    """Generate a CSV report of customer data."""
+    try:
+        output = [[trans('admin_username', default='Username'), trans('admin_email', default='Email'), trans('user_role', default='Role'), trans('subscription_status', default='Subscription Status')]]
+        for user in users:
+            status = 'Subscribed' if user.get('is_subscribed') and user.get('is_trial_active') else 'Trial' if user.get('is_trial') and user.get('is_trial_active') else 'Expired'
+            output.append([user['_id'], user['email'], user['role'], status])
+        buffer = BytesIO()
+        writer = csv.writer(buffer, lineterminator='\n')
+        writer.writerows(output)
+        buffer.seek(0)
+        return Response(buffer, mimetype='text/csv', headers={'Content-Disposition': 'attachment;filename=customer_report.csv'})
+    except Exception as e:
+        logger.error(f"Error generating customer report CSV: {str(e)}",
+                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
+        flash(trans('admin_report_error', default='An error occurred while generating the report'), 'danger')
+        return render_template('error/500.html'), 500
+
+# Error Handler
+@admin_bp.app_errorhandler(500)
+def error_500(error):
+    """Handle 500 Internal Server Error."""
+    logger.error(f"500 Internal Server Error: {str(error)}",
+                 extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id if current_user.is_authenticated else 'anonymous'})
+    flash(trans('admin_server_error', default='An unexpected error occurred. Please try again later.'), 'danger')
+    return render_template('error/500.html'), 500
 
 # Routes
 @admin_bp.route('/dashboard', methods=['GET'])
@@ -223,20 +233,12 @@ def manage_users():
 def suspend_user(user_id):
     """Suspend a user account."""
     try:
-        # Only treat as ObjectId if it looks like one
-        from bson.objectid import ObjectId as BsonObjectId
-        is_objectid = False
-        try:
-            BsonObjectId(str(user_id))
-            is_objectid = True
-        except Exception:
-            is_objectid = False
         db = utils.get_mongo_db()
         if db is None:
             raise Exception("Failed to connect to MongoDB")
-        if is_objectid:
-            user_query = {'_id': BsonObjectId(user_id)}
-        else:
+        try:
+            user_query = {'_id': ObjectId(user_id)}
+        except errors.InvalidId:
             user_query = {'user_id': user_id}
         user = db.users.find_one(user_query)
         if user is None:
@@ -267,11 +269,13 @@ def suspend_user(user_id):
 def delete_user(user_id):
     """Delete a user and their data."""
     try:
-        ObjectId(user_id)
         db = utils.get_mongo_db()
         if db is None:
             raise Exception("Failed to connect to MongoDB")
-        user_query = {'_id': ObjectId(user_id)}
+        try:
+            user_query = {'_id': ObjectId(user_id)}
+        except errors.InvalidId:
+            user_query = {'user_id': user_id}
         user = db.users.find_one(user_query)
         if user is None:
             flash(trans('admin_user_not_found', default='User not found'), 'danger')
@@ -291,11 +295,6 @@ def delete_user(user_id):
                         extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
             log_audit_action('delete_user', {'user_id': user_id})
         return redirect(url_for('admin.manage_users'))
-    except errors.InvalidId:
-        logger.error(f"Invalid user_id format: {user_id}",
-                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-        flash(trans('admin_invalid_user_id', default='Invalid user ID'), 'danger')
-        return redirect(url_for('admin.manage_users'))
     except Exception as e:
         logger.error(f"Error deleting user {user_id}: {str(e)}",
                      extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
@@ -313,7 +312,6 @@ def delete_item(collection, item_id):
         flash(trans('admin_invalid_collection', default='Invalid collection selected'), 'danger')
         return redirect(url_for('admin.dashboard'))
     try:
-        ObjectId(item_id)
         db = utils.get_mongo_db()
         if db is None:
             raise Exception("Failed to connect to MongoDB")
@@ -342,7 +340,7 @@ def delete_item(collection, item_id):
 @utils.requires_role('admin')
 @utils.limiter.limit("50 per hour")
 def manage_user_roles():
-    """Manage user roles: list all users and update their roles."""
+    """Manage user roles."""
     try:
         db = utils.get_mongo_db()
         if db is None:
@@ -351,33 +349,36 @@ def manage_user_roles():
         form = RoleForm()
         if request.method == 'POST' and form.validate_on_submit():
             user_id = request.form.get('user_id')
+            if not user_id:
+                logger.error("No user_id provided in form submission",
+                             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
+                flash(trans('admin_no_user_id', default='No user ID provided'), 'danger')
+                return redirect(url_for('admin.manage_user_roles'))
             try:
-                ObjectId(user_id)
-                user = db.users.find_one({'_id': ObjectId(user_id)})
-                if user is None:
-                    flash(trans('user_not_found', default='User not found'), 'danger')
-                    return redirect(url_for('admin.manage_user_roles'))
-                new_role = form.role.data
-                db.users.update_one(
-                    {'_id': ObjectId(user_id)},
-                    {'$set': {'role': new_role, 'updated_at': datetime.now(timezone.utc)}}
-                )
+                user_query = {'_id': ObjectId(user_id)}
+            except errors.InvalidId:
+                user_query = {'user_id': user_id}
+            user = db.users.find_one(user_query)
+            if user is None:
+                logger.error(f"User not found for user_id: {user_id}",
+                             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
+                flash(trans('user_not_found', default='User not found'), 'danger')
+                return redirect(url_for('admin.manage_user_roles'))
+            new_role = form.role.data
+            result = db.users.update_one(
+                user_query,
+                {'$set': {'role': new_role, 'updated_at': datetime.now(timezone.utc)}}
+            )
+            if result.modified_count > 0:
                 logger.info(f"User role updated: id={user_id}, new_role={new_role}, admin={current_user.id}",
                             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
                 log_audit_action('update_user_role', {'user_id': user_id, 'new_role': new_role})
                 flash(trans('user_role_updated', default='User role updated successfully'), 'success')
-                return redirect(url_for('admin.manage_user_roles'))
-            except errors.InvalidId:
-                logger.error(f"Invalid user_id format: {user_id}",
-                             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-                flash(trans('admin_invalid_user_id', default='Invalid user ID'), 'danger')
-                return redirect(url_for('admin.manage_user_roles'))
-            except Exception as e:
-                logger.error(f"Error updating user role {user_id}: {str(e)}",
-                             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-                flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
-                return render_template('admin/user_roles.html', form=form, users=users, title=trans('admin_manage_user_roles_title', default='Manage User Roles'))
-        
+            else:
+                logger.info(f"No changes made to role for user_id: {user_id}",
+                            extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
+                flash(trans('admin_no_changes', default='No changes made to role'), 'info')
+            return redirect(url_for('admin.manage_user_roles'))
         for user in users:
             user['_id'] = str(user['_id'])
             trial_end = user.get('trial_end')
@@ -388,7 +389,7 @@ def manage_user_roles():
                 datetime.now(timezone.utc) <= trial_end_aware if user.get('is_trial') and trial_end_aware
                 else user.get('is_subscribed') and subscription_end_aware and datetime.now(timezone.utc) <= subscription_end_aware
             )
-        return render_template('admin/user_roles.html', form=form, users=users, title=trans('admin_manage_user_roles_title', default='Manage User Roles'))
+        return render_template('admin/user_roles.html', form=form, users=users, title=trans('admin_manage_user_roles_title', default='Manage User Roles'), now=datetime.now(timezone.utc))
     except Exception as e:
         logger.error(f"Error in manage_user_roles for admin {current_user.id}: {str(e)}",
                      extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
@@ -400,6 +401,7 @@ def manage_user_roles():
 @utils.requires_role('admin')
 @utils.limiter.limit("50 per hour")
 def manage_user_subscriptions():
+    """Manage user subscriptions."""
     try:
         db = utils.get_mongo_db()
         if db is None:
@@ -413,21 +415,16 @@ def manage_user_subscriptions():
                              extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
                 flash(trans('admin_no_user_id', default='No user ID provided'), 'danger')
                 return redirect(url_for('admin.manage_user_subscriptions'))
-            
-            # Normalize user_id to lowercase
-            user_id = user_id.lower()
-            logger.info(f"Attempting to update subscription for user_id: {user_id}",
-                        extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-            
-            # Clear cache to ensure fresh data
-            utils.get_user.cache_clear()
-            user = utils.get_user(db, user_id)
+            try:
+                user_query = {'_id': ObjectId(user_id)}
+            except errors.InvalidId:
+                user_query = {'user_id': user_id}
+            user = db.users.find_one(user_query)
             if user is None:
                 logger.error(f"User not found for user_id: {user_id}",
                              extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
                 flash(trans('user_not_found', default='User not found'), 'danger')
                 return redirect(url_for('admin.manage_user_subscriptions'))
-            
             plan_durations = {'monthly': 30, 'yearly': 365}
             update_data = {
                 'is_subscribed': form.is_subscribed.data == 'True',
@@ -439,9 +436,8 @@ def manage_user_subscriptions():
             if form.is_subscribed.data == 'True' and not form.subscription_end.data and form.subscription_plan.data:
                 duration = plan_durations.get(form.subscription_plan.data, 30)
                 update_data['subscription_end'] = datetime.now(timezone.utc) + timedelta(days=duration)
-            
             result = db.users.update_one(
-                {'_id': user_id},
+                user_query,
                 {'$set': update_data}
             )
             if result.modified_count > 0:
@@ -458,9 +454,7 @@ def manage_user_subscriptions():
                 logger.info(f"No changes made to subscription for user_id: {user_id}",
                             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
                 flash(trans('admin_no_changes', default='No changes made to subscription'), 'info')
-            
             return redirect(url_for('admin.manage_user_subscriptions'))
-        
         for user in users:
             user['_id'] = str(user['_id'])
             trial_end = user.get('trial_end')
@@ -478,152 +472,12 @@ def manage_user_subscriptions():
         flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
         return render_template('error/500.html'), 500
 
-@admin_bp.route('/receipts', methods=['GET'])
-@login_required
-@utils.requires_role('admin')
-@utils.limiter.limit("50 per hour")
-def manage_receipts():
-    """View and manage payment receipts."""
-    try:
-        db = utils.get_mongo_db()
-        if db is None:
-            raise Exception("Failed to connect to MongoDB")
-        
-        # Get all payment receipts with user information
-        receipts = list(db.payment_receipts.find().sort('uploaded_at', -1))
-        
-        # Enrich receipts with user information
-        for receipt in receipts:
-            receipt['_id'] = str(receipt['_id'])
-            user = db.users.find_one({'_id': receipt['user_id']})
-            receipt['user_email'] = user.get('email', 'Unknown') if user else 'Unknown'
-            receipt['user_display_name'] = user.get('display_name', receipt['user_id']) if user else receipt['user_id']
-        
-        logger.info(f"Admin {current_user.id} accessed receipts management",
-                    extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-        
-        return render_template('admin/receipts.html', receipts=receipts, 
-                             title=trans('admin_manage_receipts_title', default='Manage Payment Receipts'))
-    except Exception as e:
-        logger.error(f"Error fetching receipts for admin {current_user.id}: {str(e)}",
-                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-        flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
-        return render_template('error/500.html'), 500
-
-@admin_bp.route('/receipts/approve/<receipt_id>', methods=['POST'])
-@login_required
-@utils.requires_role('admin')
-@utils.limiter.limit("10 per hour")
-def approve_receipt(receipt_id):
-    """Approve a payment receipt and activate user subscription."""
-    try:
-        from bson import ObjectId
-        db = utils.get_mongo_db()
-        if db is None:
-            raise Exception("Failed to connect to MongoDB")
-        
-        receipt = db.payment_receipts.find_one({'_id': ObjectId(receipt_id)})
-        if not receipt:
-            flash(trans('admin_receipt_not_found', default='Receipt not found'), 'danger')
-            return redirect(url_for('admin.manage_receipts'))
-        
-        # Update receipt status
-        db.payment_receipts.update_one(
-            {'_id': ObjectId(receipt_id)},
-            {'$set': {'status': 'approved', 'approved_by': current_user.id, 'approved_at': datetime.now(timezone.utc)}}
-        )
-        
-        # Activate user subscription
-        plan_duration = 30 if receipt['plan_type'] == 'monthly' else 365
-        subscription_end = datetime.now(timezone.utc) + timedelta(days=plan_duration)
-        
-        db.users.update_one(
-            {'_id': receipt['user_id']},
-            {'$set': {
-                'is_subscribed': True,
-                'subscription_plan': receipt['plan_type'],
-                'subscription_start': datetime.now(timezone.utc),
-                'subscription_end': subscription_end,
-                'updated_at': datetime.now(timezone.utc)
-            }}
-        )
-        
-        # Log the action
-        log_audit_action('approve_receipt', {
-            'receipt_id': receipt_id,
-            'user_id': receipt['user_id'],
-            'plan_type': receipt['plan_type'],
-            'amount': receipt['amount_paid']
-        })
-        
-        logger.info(f"Admin {current_user.id} approved receipt {receipt_id} for user {receipt['user_id']}",
-                    extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-        
-        flash(trans('admin_receipt_approved', default='Receipt approved and subscription activated'), 'success')
-        return redirect(url_for('admin.manage_receipts'))
-        
-    except Exception as e:
-        logger.error(f"Error approving receipt {receipt_id}: {str(e)}",
-                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-        flash(trans('admin_database_error', default='An error occurred while processing the request'), 'danger')
-        return redirect(url_for('admin.manage_receipts'))
-
-@admin_bp.route('/receipts/reject/<receipt_id>', methods=['POST'])
-@login_required
-@utils.requires_role('admin')
-@utils.limiter.limit("10 per hour")
-def reject_receipt(receipt_id):
-    """Reject a payment receipt."""
-    try:
-        from bson import ObjectId
-        db = utils.get_mongo_db()
-        if db is None:
-            raise Exception("Failed to connect to MongoDB")
-        
-        receipt = db.payment_receipts.find_one({'_id': ObjectId(receipt_id)})
-        if not receipt:
-            flash(trans('admin_receipt_not_found', default='Receipt not found'), 'danger')
-            return redirect(url_for('admin.manage_receipts'))
-        
-        # Get rejection reason
-        rejection_reason = request.form.get('rejection_reason', '').strip()
-        
-        # Update receipt status
-        db.payment_receipts.update_one(
-            {'_id': ObjectId(receipt_id)},
-            {'$set': {
-                'status': 'rejected',
-                'rejected_by': current_user.id,
-                'rejected_at': datetime.now(timezone.utc),
-                'rejection_reason': rejection_reason
-            }}
-        )
-        
-        # Log the action
-        log_audit_action('reject_receipt', {
-            'receipt_id': receipt_id,
-            'user_id': receipt['user_id'],
-            'rejection_reason': rejection_reason
-        })
-        
-        logger.info(f"Admin {current_user.id} rejected receipt {receipt_id} for user {receipt['user_id']}",
-                    extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-        
-        flash(trans('admin_receipt_rejected', default='Receipt rejected'), 'success')
-        return redirect(url_for('admin.manage_receipts'))
-        
-    except Exception as e:
-        logger.error(f"Error rejecting receipt {receipt_id}: {str(e)}",
-                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-        flash(trans('admin_database_error', default='An error occurred while processing the request'), 'danger')
-        return redirect(url_for('admin.manage_receipts'))
-
 @admin_bp.route('/users/trials', methods=['GET', 'POST'])
 @login_required
 @utils.requires_role('admin')
 @utils.limiter.limit("50 per hour")
 def manage_user_trials():
-    """Manage user trials: list all users and update their trial status, including bulk updates."""
+    """Manage user trials."""
     try:
         db = utils.get_mongo_db()
         if db is None:
@@ -631,26 +485,28 @@ def manage_user_trials():
         users = list(db.users.find())
         form = TrialForm()
         if request.method == 'POST' and form.validate_on_submit():
-            # Handle individual trial update
             user_id = request.form.get('user_id')
             if user_id:
                 try:
-                    ObjectId(user_id)
-                    user = db.users.find_one({'_id': ObjectId(user_id)})
-                    if user is None:
-                        flash(trans('user_not_found', default='User not found'), 'danger')
-                        return redirect(url_for('admin.manage_user_trials'))
-                    update_data = {
-                        'is_trial': form.is_trial.data == 'True',
-                        'trial_end': form.trial_end.data if form.trial_end.data else None,
-                        'updated_at': datetime.now(timezone.utc)
-                    }
-                    if form.is_trial.data == 'True' and not form.trial_end.data:
-                        update_data['trial_end'] = datetime.now(timezone.utc) + timedelta(days=30)
-                    db.users.update_one(
-                        {'_id': ObjectId(user_id)},
-                        {'$set': update_data}
-                    )
+                    user_query = {'_id': ObjectId(user_id)}
+                except errors.InvalidId:
+                    user_query = {'user_id': user_id}
+                user = db.users.find_one(user_query)
+                if user is None:
+                    flash(trans('user_not_found', default='User not found'), 'danger')
+                    return redirect(url_for('admin.manage_user_trials'))
+                update_data = {
+                    'is_trial': form.is_trial.data == 'True',
+                    'trial_end': form.trial_end.data if form.trial_end.data else None,
+                    'updated_at': datetime.now(timezone.utc)
+                }
+                if form.is_trial.data == 'True' and not form.trial_end.data:
+                    update_data['trial_end'] = datetime.now(timezone.utc) + timedelta(days=30)
+                result = db.users.update_one(
+                    user_query,
+                    {'$set': update_data}
+                )
+                if result.modified_count > 0:
                     logger.info(f"User trial updated: id={user_id}, is_trial={update_data['is_trial']}, trial_end={update_data['trial_end']}, admin={current_user.id}",
                                 extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
                     log_audit_action('update_user_trial', {
@@ -660,18 +516,6 @@ def manage_user_trials():
                     })
                     flash(trans('trial_updated', default='User trial updated successfully'), 'success')
                     return redirect(url_for('admin.manage_user_trials'))
-                except errors.InvalidId:
-                    logger.error(f"Invalid user_id format: {user_id}",
-                                 extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-                    flash(trans('admin_invalid_user_id', default='Invalid user ID'), 'danger')
-                    return redirect(url_for('admin.manage_user_trials'))
-                except Exception as e:
-                    logger.error(f"Error updating user trial {user_id}: {str(e)}",
-                                 extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-                    flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
-                    return render_template('admin/user_trials.html', form=form, users=users, title=trans('admin_manage_user_trials_title', default='Manage User Trials'))
-            
-            # Handle bulk trial update
             if form.bulk_trial_days.data and form.bulk_trial_start.data and form.bulk_trial_end.data:
                 try:
                     days = int(form.bulk_trial_days.data)
@@ -710,7 +554,6 @@ def manage_user_trials():
                                  extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
                     flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
                     return render_template('admin/user_trials.html', form=form, users=users, title=trans('admin_manage_user_trials_title', default='Manage User Trials'))
-        
         for user in users:
             user['_id'] = str(user['_id'])
             trial_end = user.get('trial_end')
@@ -727,6 +570,120 @@ def manage_user_trials():
                      extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
         flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
         return render_template('error/500.html'), 500
+
+@admin_bp.route('/receipts', methods=['GET'])
+@login_required
+@utils.requires_role('admin')
+@utils.limiter.limit("50 per hour")
+def manage_receipts():
+    """View and manage payment receipts."""
+    try:
+        db = utils.get_mongo_db()
+        if db is None:
+            raise Exception("Failed to connect to MongoDB")
+        receipts = list(db.payment_receipts.find().sort('uploaded_at', -1))
+        for receipt in receipts:
+            receipt['_id'] = str(receipt['_id'])
+            user = db.users.find_one({'_id': ObjectId(receipt['user_id'])} if utils.is_valid_objectid(receipt['user_id']) else {'user_id': receipt['user_id']})
+            receipt['user_email'] = user.get('email', 'Unknown') if user else 'Unknown'
+            receipt['user_display_name'] = user.get('display_name', receipt['user_id']) if user else receipt['user_id']
+        logger.info(f"Admin {current_user.id} accessed receipts management",
+                    extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
+        return render_template('admin/receipts.html', receipts=receipts, title=trans('admin_manage_receipts_title', default='Manage Payment Receipts'))
+    except Exception as e:
+        logger.error(f"Error fetching receipts for admin {current_user.id}: {str(e)}",
+                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
+        flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
+        return render_template('error/500.html'), 500
+
+@admin_bp.route('/receipts/approve/<receipt_id>', methods=['POST'])
+@login_required
+@utils.requires_role('admin')
+@utils.limiter.limit("10 per hour")
+def approve_receipt(receipt_id):
+    """Approve a payment receipt and activate user subscription."""
+    try:
+        db = utils.get_mongo_db()
+        if db is None:
+            raise Exception("Failed to connect to MongoDB")
+        receipt = db.payment_receipts.find_one({'_id': ObjectId(receipt_id)})
+        if not receipt:
+            flash(trans('admin_receipt_not_found', default='Receipt not found'), 'danger')
+            return redirect(url_for('admin.manage_receipts'))
+        db.payment_receipts.update_one(
+            {'_id': ObjectId(receipt_id)},
+            {'$set': {'status': 'approved', 'approved_by': current_user.id, 'approved_at': datetime.now(timezone.utc)}}
+        )
+        plan_duration = 30 if receipt['plan_type'] == 'monthly' else 365
+        subscription_end = datetime.now(timezone.utc) + timedelta(days=plan_duration)
+        try:
+            user_query = {'_id': ObjectId(receipt['user_id'])}
+        except errors.InvalidId:
+            user_query = {'user_id': receipt['user_id']}
+        db.users.update_one(
+            user_query,
+            {'$set': {
+                'is_subscribed': True,
+                'subscription_plan': receipt['plan_type'],
+                'subscription_start': datetime.now(timezone.utc),
+                'subscription_end': subscription_end,
+                'updated_at': datetime.now(timezone.utc)
+            }}
+        )
+        log_audit_action('approve_receipt', {
+            'receipt_id': receipt_id,
+            'user_id': receipt['user_id'],
+            'plan_type': receipt['plan_type'],
+            'amount': receipt['amount_paid']
+        })
+        logger.info(f"Admin {current_user.id} approved receipt {receipt_id} for user {receipt['user_id']}",
+                    extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
+        flash(trans('admin_receipt_approved', default='Receipt approved and subscription activated'), 'success')
+        return redirect(url_for('admin.manage_receipts'))
+    except Exception as e:
+        logger.error(f"Error approving receipt {receipt_id}: {str(e)}",
+                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
+        flash(trans('admin_database_error', default='An error occurred while processing the request'), 'danger')
+        return redirect(url_for('admin.manage_receipts'))
+
+@admin_bp.route('/receipts/reject/<receipt_id>', methods=['POST'])
+@login_required
+@utils.requires_role('admin')
+@utils.limiter.limit("10 per hour")
+def reject_receipt(receipt_id):
+    """Reject a payment receipt."""
+    try:
+        db = utils.get_mongo_db()
+        if db is None:
+            raise Exception("Failed to connect to MongoDB")
+        receipt = db.payment_receipts.find_one({'_id': ObjectId(receipt_id)})
+        if not receipt:
+            flash(trans('admin_receipt_not_found', default='Receipt not found'), 'danger')
+            return redirect(url_for('admin.manage_receipts'))
+        rejection_reason = request.form.get('rejection_reason', '').strip()
+        db.payment_receipts.update_one(
+            {'_id': ObjectId(receipt_id)},
+            {'$set': {
+                'status': 'rejected',
+                'rejected_by': current_user.id,
+                'rejected_at': datetime.now(timezone.utc),
+                'rejection_reason': rejection_reason
+            }}
+        )
+        log_audit_action('reject_receipt', {
+            'receipt_id': receipt_id,
+            'user_id': receipt['user_id'],
+            'rejection_reason': rejection_reason
+        })
+        logger.info(f"Admin {current_user.id} rejected receipt {receipt_id} for user {receipt['user_id']}",
+                    extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
+        flash(trans('admin_receipt_rejected', default='Receipt rejected'), 'success')
+        return redirect(url_for('admin.manage_receipts'))
+    except Exception as e:
+        logger.error(f"Error rejecting receipt {receipt_id}: {str(e)}",
+                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
+        flash(trans('admin_database_error', default='An error occurred while processing the request'), 'danger')
+        return redirect(url_for('admin.manage_receipts'))
 
 @admin_bp.route('/audit', methods=['GET'])
 @login_required
@@ -760,13 +717,11 @@ def manage_feedback():
             raise Exception("Failed to connect to MongoDB")
         form = FeedbackFilterForm()
         filter_kwargs = {}
-        
         if request.method == 'POST' and form.validate_on_submit():
             if form.tool_name.data:
                 filter_kwargs['tool_name'] = form.tool_name.data
             if form.user_id.data:
                 filter_kwargs['user_id'] = utils.sanitize_input(form.user_id.data, max_length=50)
-        
         feedback_list = [to_dict_feedback(fb) for fb in get_feedback(db, filter_kwargs)]
         for feedback in feedback_list:
             feedback['id'] = str(feedback['id'])
@@ -777,7 +732,6 @@ def manage_feedback():
                 if feedback['timestamp']
                 else ''
             )
-        
         return render_template(
             'admin/feedback.html',
             form=form,
@@ -795,7 +749,7 @@ def manage_feedback():
 @utils.requires_role('admin')
 @utils.limiter.limit("50 per hour")
 def manage_debtors():
-    """Manage debtors: list all and add new ones."""
+    """Manage debtors."""
     try:
         db = utils.get_mongo_db()
         if db is None:
@@ -816,7 +770,6 @@ def manage_debtors():
             log_audit_action('add_debtor', {'debtor_id': debtor_id, 'name': debtor['name']})
             flash(trans('debtor_added', default='Debtor added successfully'), 'success')
             return redirect(url_for('admin.manage_debtors'))
-        
         debtors = list(db.debtors.find().sort('created_at', -1))
         for debtor in debtors:
             debtor['_id'] = str(debtor['_id'])
@@ -832,7 +785,7 @@ def manage_debtors():
 @utils.requires_role('admin')
 @utils.limiter.limit("50 per hour")
 def manage_creditors():
-    """Manage creditors: list all and add new ones."""
+    """Manage creditors."""
     try:
         db = utils.get_mongo_db()
         if db is None:
@@ -853,7 +806,6 @@ def manage_creditors():
             log_audit_action('add_creditor', {'creditor_id': creditor_id, 'name': creditor['name']})
             flash(trans('creditor_added', default='Creditor added successfully'), 'success')
             return redirect(url_for('admin.manage_creditors'))
-        
         creditors = list(db.creditors.find().sort('created_at', -1))
         for creditor in creditors:
             creditor['_id'] = str(creditor['_id'])
@@ -904,7 +856,58 @@ def manage_cashflows():
         flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
         return render_template('error/500.html'), 500
 
+@admin_bp.route('/invalid', methods=['GET'])
+@login_required
+@utils.requires_role('admin')
+@utils.limiter.limit("50 per hour")
+def invalid_payments():
+    """View invalid payments."""
+    try:
+        db = utils.get_mongo_db()
+        if db is None:
+            raise Exception("Failed to connect to MongoDB")
+        payments = list(db.cashflows.find({'status': 'invalid'}))
+        error_log_path = os.path.join(os.path.dirname(__file__), 'skipped_payments.log')
+        error_logs = {}
+        if os.path.exists(error_log_path):
+            with open(error_log_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    if '| Skipped payment ID:' in line:
+                        parts = line.split('|')
+                        if len(parts) > 2:
+                            pid = parts[1].split(':')[-1].strip()
+                            error_logs[pid] = line.strip()
+        for p in payments:
+            p['id'] = str(p.get('_id', ''))
+            p['error_log'] = error_logs.get(p['id'], None)
+        return render_template('admin/invalid.html', payments=payments, title=trans('admin_invalid_payments_title', default='Invalid Payments'))
+    except Exception as e:
+        logger.error(f"Error fetching invalid payments for admin {current_user.id}: {str(e)}",
+                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
+        flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
+        return render_template('error/500.html'), 500
 
+@admin_bp.route('/clean_invalid', methods=['POST'])
+@login_required
+@utils.requires_role('admin')
+@utils.limiter.limit("10 per hour")
+def clean_invalid_payments():
+    """Clean up invalid payment records."""
+    try:
+        db = utils.get_mongo_db()
+        if db is None:
+            raise Exception("Failed to connect to MongoDB")
+        result = db.cashflows.delete_many({'status': 'invalid'})
+        flash(f"Cleaned up {result.deleted_count} invalid/skipped payment records.", 'success')
+        logger.info(f"Admin {current_user.id} cleaned {result.deleted_count} invalid payments",
+                    extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
+        log_audit_action('clean_invalid_payments', {'deleted_count': result.deleted_count})
+        return redirect(url_for('admin.invalid_payments'))
+    except Exception as e:
+        logger.error(f"Error cleaning invalid payments for admin {current_user.id}: {str(e)}",
+                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
+        flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
+        return render_template('error/500.html'), 500
 
 @admin_bp.route('/kyc', methods=['GET'])
 @login_required
@@ -919,7 +922,7 @@ def manage_kyc():
         kyc_records = list(db.kyc_records.find().sort('created_at', -1))
         for record in kyc_records:
             record['_id'] = str(record['_id'])
-        return render_template('kyc/admin.html', kyc_records=kyc_records, title=trans('admin_kyc_title', default='Manage KYC Submissions'))
+        return render_template('admin/kyc.html', kyc_records=kyc_records, title=trans('admin_kyc_title', default='Manage KYC Submissions'))
     except Exception as e:
         logger.error(f"Error fetching KYC records for admin {current_user.id}: {str(e)}",
                      extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
@@ -931,7 +934,7 @@ def manage_kyc():
 @utils.requires_role('admin')
 @utils.limiter.limit("50 per hour")
 def customer_reports():
-    """Generate customer reports in HTML, PDF, or CSV format."""
+    """Generate customer reports."""
     try:
         db = utils.get_mongo_db()
         if db is None:
@@ -948,12 +951,10 @@ def customer_reports():
                 datetime.now(timezone.utc) <= trial_end_aware if user.get('is_trial') and trial_end_aware
                 else user.get('is_subscribed') and subscription_end_aware and datetime.now(timezone.utc) <= subscription_end_aware
             )
-        
         if format == 'pdf':
             return generate_customer_report_pdf(users)
         elif format == 'csv':
             return generate_customer_report_csv(users)
-        
         return render_template('admin/customer_reports.html', users=users, title=trans('admin_customer_reports_title', default='Customer Reports'))
     except Exception as e:
         logger.error(f"Error in customer_reports for admin {current_user.id}: {str(e)}",
@@ -961,27 +962,34 @@ def customer_reports():
         flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
         return render_template('error/500.html'), 500
 
-
-
 @admin_bp.route('/waitlist', methods=['GET'])
 @login_required
 @utils.requires_role('admin')
+@utils.limiter.limit("50 per hour")
 def view_waitlist():
+    """View waitlist entries."""
     try:
         db = utils.get_mongo_db()
+        if db is None:
+            raise Exception("Failed to connect to MongoDB")
         entries = get_waitlist_entries(db, {})
-        return render_template('admin/waitlist.html', entries=[to_dict_waitlist(e) for e in entries])
+        return render_template('admin/waitlist.html', entries=[to_dict_waitlist(e) for e in entries], title=trans('admin_waitlist_title', default='Waitlist'))
     except Exception as e:
-        logger.error(f"Error viewing waitlist: {str(e)}", exc_info=True)
-        flash(trans('general_error', default='An error occurred while loading the waitlist'))
-        return redirect(url_for('home'))
+        logger.error(f"Error viewing waitlist: {str(e)}",
+                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
+        flash(trans('general_error', default='An error occurred while loading the waitlist'), 'danger')
+        return redirect(url_for('admin.dashboard'))
 
 @admin_bp.route('/waitlist/export', methods=['GET'])
 @login_required
 @utils.requires_role('admin')
+@utils.limiter.limit("10 per hour")
 def export_waitlist():
+    """Export waitlist entries as CSV."""
     try:
         db = utils.get_mongo_db()
+        if db is None:
+            raise Exception("Failed to connect to MongoDB")
         entries = get_waitlist_entries(db, {})
         output = io.StringIO()
         writer = csv.writer(output)
@@ -1005,61 +1013,62 @@ def export_waitlist():
             download_name=f'waitlist_{datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")}.csv'
         )
     except Exception as e:
-        logger.error(f"Error exporting waitlist: {str(e)}", exc_info=True)
-        flash(trans('general_error', default='An error occurred while exporting the waitlist'))
+        logger.error(f"Error exporting waitlist: {str(e)}",
+                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
+        flash(trans('general_error', default='An error occurred while exporting the waitlist'), 'danger')
         return redirect(url_for('admin.view_waitlist'))
 
 @admin_bp.route('/waitlist/contact/<string:entry_id>', methods=['GET', 'POST'])
 @login_required
 @utils.requires_role('admin')
+@utils.limiter.limit("10 per hour")
 def contact_waitlist_entry(entry_id):
     """Contact a waitlist entry."""
     try:
         db = utils.get_mongo_db()
         if db is None:
             raise Exception("Failed to connect to MongoDB")
-        
-        entry = db.waitlist.find_one({'_id': entry_id})
+        try:
+            entry_query = {'_id': ObjectId(entry_id)}
+        except errors.InvalidId:
+            entry_query = {'_id': entry_id}
+        entry = db.waitlist.find_one(entry_query)
         if not entry:
             flash(trans('admin_waitlist_entry_not_found', default='Waitlist entry not found'), 'danger')
             return redirect(url_for('admin.view_waitlist'))
-        
+        dict_entry = to_dict_waitlist(entry)
         if request.method == 'POST':
-            # Handle contact form submission
             message = request.form.get('message', '')
-            if message:
-                # Update entry with contact attempt
-                db.waitlist.update_one(
-                    {'_id': entry_id},
-                    {
-                        '$set': {
-                            'contacted': True,
-                            'contact_message': message,
-                            'contacted_by': current_user.id,
-                            'contacted_at': datetime.now(timezone.utc)
-                        }
+            method = request.form.get('method')
+            if not message or not method:
+                flash(trans('general_missing_fields', default='Missing required fields'), 'danger')
+                return render_template('admin/contact.html', entry=dict_entry, title=trans('admin_contact_waitlist_entry', default='Contact Waitlist Entry'))
+            db.waitlist.update_one(
+                entry_query,
+                {
+                    '$set': {
+                        'contacted': True,
+                        'contact_message': message,
+                        'contacted_by': current_user.id,
+                        'contacted_at': datetime.now(timezone.utc)
                     }
-                )
-                
-                log_audit_action('contact_waitlist_entry', {
-                    'entry_id': entry_id,
-                    'email': entry.get('email'),
-                    'message': message
-                })
-                
-                flash(trans('admin_waitlist_contact_sent', default='Contact message recorded successfully'), 'success')
-                return redirect(url_for('admin.view_waitlist'))
-        
-        return render_template('admin/contact.html', entry=entry, 
-                             title=trans('admin_contact_waitlist_entry', default='Contact Waitlist Entry'))
-    
+                }
+            )
+            log_audit_action('contact_waitlist_entry', {
+                'entry_id': entry_id,
+                'email': entry.get('email'),
+                'method': method,
+                'message': message
+            })
+            flash(trans('admin_waitlist_contact_sent', default='Contact message recorded successfully'), 'success')
+            return redirect(url_for('admin.view_waitlist'))
+        return render_template('admin/contact.html', entry=dict_entry, title=trans('admin_contact_waitlist_entry', default='Contact Waitlist Entry'))
     except Exception as e:
         logger.error(f"Error contacting waitlist entry {entry_id}: {str(e)}",
                      extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
         flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
         return redirect(url_for('admin.view_waitlist'))
 
-# Tax Configuration Management Routes
 @admin_bp.route('/tax/config', methods=['GET'])
 @login_required
 @utils.requires_role('admin')
@@ -1067,25 +1076,18 @@ def contact_waitlist_entry(entry_id):
 def tax_config():
     """Tax configuration management dashboard."""
     try:
-        from admin_tax_config import get_tax_rates, get_tax_bands, get_tax_exemptions
-        
         current_year = datetime.now().year
-        
-        # Get current tax configurations
         tax_rates = get_tax_rates(current_year)
         tax_bands = get_tax_bands(current_year)
         tax_exemptions = get_tax_exemptions(current_year)
-        
         logger.info(f"Admin {current_user.id} accessed tax configuration",
                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-        
         return render_template('admin/tax_config.html',
                              tax_rates=tax_rates,
                              tax_bands=tax_bands,
                              tax_exemptions=tax_exemptions,
                              current_year=current_year,
                              title=trans('admin_tax_config', default='Tax Configuration'))
-    
     except Exception as e:
         logger.error(f"Error loading tax configuration for admin {current_user.id}: {str(e)}",
                      extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
@@ -1099,10 +1101,7 @@ def tax_config():
 def manage_tax_rates():
     """Manage tax rates configuration."""
     try:
-        from admin_tax_config import TaxRateForm, get_tax_rates, save_tax_rate
-        
         form = TaxRateForm()
-        
         if request.method == 'POST' and form.validate_on_submit():
             success = save_tax_rate(
                 form.entity_type.data,
@@ -1111,7 +1110,6 @@ def manage_tax_rates():
                 form.description.data,
                 current_user.id
             )
-            
             if success:
                 flash(trans('admin_tax_rate_saved', default='Tax rate saved successfully'), 'success')
                 log_audit_action('update_tax_rate', {
@@ -1121,17 +1119,12 @@ def manage_tax_rates():
                 })
             else:
                 flash(trans('admin_tax_rate_error', default='Error saving tax rate'), 'danger')
-            
             return redirect(url_for('admin.manage_tax_rates'))
-        
-        # Get all tax rates for display
         tax_rates = get_tax_rates()
-        
         return render_template('admin/tax_rates.html',
                              form=form,
                              tax_rates=tax_rates,
                              title=trans('admin_manage_tax_rates', default='Manage Tax Rates'))
-    
     except Exception as e:
         logger.error(f"Error managing tax rates for admin {current_user.id}: {str(e)}",
                      extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
@@ -1145,10 +1138,7 @@ def manage_tax_rates():
 def manage_tax_bands():
     """Manage progressive tax bands configuration."""
     try:
-        from admin_tax_config import TaxBandForm, get_tax_bands, save_tax_band
-        
         form = TaxBandForm()
-        
         if request.method == 'POST' and form.validate_on_submit():
             success = save_tax_band(
                 form.tax_year.data,
@@ -1158,7 +1148,6 @@ def manage_tax_bands():
                 form.description.data,
                 current_user.id
             )
-            
             if success:
                 flash(trans('admin_tax_band_saved', default='Tax band saved successfully'), 'success')
                 log_audit_action('create_tax_band', {
@@ -1169,17 +1158,12 @@ def manage_tax_bands():
                 })
             else:
                 flash(trans('admin_tax_band_error', default='Error saving tax band'), 'danger')
-            
             return redirect(url_for('admin.manage_tax_bands'))
-        
-        # Get all tax bands for display
         tax_bands = get_tax_bands()
-        
         return render_template('admin/tax_bands.html',
                              form=form,
                              tax_bands=tax_bands,
                              title=trans('admin_manage_tax_bands', default='Manage Tax Bands'))
-    
     except Exception as e:
         logger.error(f"Error managing tax bands for admin {current_user.id}: {str(e)}",
                      extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
@@ -1193,10 +1177,7 @@ def manage_tax_bands():
 def manage_tax_exemptions():
     """Manage tax exemptions configuration."""
     try:
-        from admin_tax_config import TaxExemptionForm, get_tax_exemptions, save_tax_exemption
-        
         form = TaxExemptionForm()
-        
         if request.method == 'POST' and form.validate_on_submit():
             success = save_tax_exemption(
                 form.entity_type.data,
@@ -1206,7 +1187,6 @@ def manage_tax_exemptions():
                 form.description.data,
                 current_user.id
             )
-            
             if success:
                 flash(trans('admin_tax_exemption_saved', default='Tax exemption saved successfully'), 'success')
                 log_audit_action('update_tax_exemption', {
@@ -1217,128 +1197,136 @@ def manage_tax_exemptions():
                 })
             else:
                 flash(trans('admin_tax_exemption_error', default='Error saving tax exemption'), 'danger')
-            
             return redirect(url_for('admin.manage_tax_exemptions'))
-        
-        # Get all tax exemptions for display
         tax_exemptions = get_tax_exemptions()
-        
         return render_template('admin/tax_exemptions.html',
                              form=form,
                              tax_exemptions=tax_exemptions,
                              title=trans('admin_manage_tax_exemptions', default='Manage Tax Exemptions'))
-    
     except Exception as e:
         logger.error(f"Error managing tax exemptions for admin {current_user.id}: {str(e)}",
                      extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
         flash(trans('admin_tax_exemptions_error', default='An error occurred while managing tax exemptions'), 'danger')
         return render_template('error/500.html'), 500
 
+@admin_bp.route('/language/toggle/<user_id>/<language>', methods=['POST'])
+@login_required
+@utils.requires_role('admin')
+@utils.limiter.limit("10 per hour")
+def toggle_user_language(user_id, language):
+    """Toggle user language between English and Hausa."""
+    try:
+        if language not in ['en', 'ha']:
+            flash(trans('admin_invalid_language', default='Invalid language selected'), 'danger')
+            return redirect(url_for('admin.manage_users'))
+        db = utils.get_mongo_db()
+        if db is None:
+            raise Exception("Failed to connect to MongoDB")
+        try:
+            user_query = {'_id': ObjectId(user_id)}
+        except errors.InvalidId:
+            user_query = {'user_id': user_id}
+        result = db.users.update_one(
+            user_query,
+            {'$set': {
+                'language': language,
+                'updated_at': datetime.now(timezone.utc)
+            }}
+        )
+        if result.modified_count > 0:
+            log_audit_action('toggle_user_language', {
+                'user_id': user_id,
+                'language': language
+            })
+            flash(trans('admin_language_updated', default=f'User language updated to {language.upper()}'), 'success')
+        else:
+            flash(trans('admin_user_not_found', default='User not found'), 'danger')
+        return redirect(url_for('admin.manage_users'))
+    except Exception as e:
+        logger.error(f"Error toggling user language for {user_id}: {str(e)}",
+                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
+        flash(trans('admin_database_error', default='An error occurred while updating language'), 'danger')
+        return redirect(url_for('admin.manage_users'))
 
-def contact_signup(entry_id):
+@admin_bp.route('/bulk/operations', methods=['GET', 'POST'])
+@login_required
+@utils.requires_role('admin')
+@utils.limiter.limit("10 per hour")
+def bulk_operations():
+    """Bulk operations for user management."""
     try:
         db = utils.get_mongo_db()
-        entry = db.waitlist.find_one({'_id': ObjectId(entry_id)})
-        if not entry:
-            flash(trans('general_not_found', default='Waitlist entry not found'))
-            return redirect(url_for('admin.view_waitlist'))
-        
-        dict_entry = to_dict_waitlist(entry)
-        
+        if db is None:
+            raise Exception("Failed to connect to MongoDB")
         if request.method == 'POST':
-            message = request.form.get('message')
-            method = request.form.get('method')  # 'email' or 'whatsapp'
-            
-            if not message or not method:
-                flash(trans('general_missing_fields', default='Missing required fields'))
-                return render_template('admin/contact.html', entry=dict_entry)
-            
-            # Placeholder for sending message
-            # Implement actual sending logic here, e.g., using external services
-            # For email: send_email(dict_entry['email'], 'Message from Admin', message)
-            # For whatsapp: send_whatsapp(dict_entry['whatsapp_number'], message)
-            # Assuming send_email and send_whatsapp are defined in utils.py or similar
-            
-            # Log the action
-            audit_data = {
-                'admin_id': current_user.id,
-                'action': f'Contacted waitlist signup via {method}',
-                'details': {'entry_id': entry_id, 'method': method, 'message': message},
-                'timestamp': datetime.now(timezone.utc)
-            }
-            log_audit_action('contact_waitlist', audit_data['details'])
-            
-            flash(trans('general_message_sent', default='Message sent successfully'))
-            return redirect(url_for('admin.view_waitlist'))
-        
-        return render_template('admin/contact.html', entry=dict_entry)
-    except Exception as e:
-        logger.error(f"Error contacting waitlist signup {entry_id}: {str(e)}", exc_info=True)
-        flash(trans('general_error', default='An error occurred while contacting the signup'))
-        return redirect(url_for('admin.view_waitlist'))
-
-def generate_customer_report_pdf(users):
-    """Generate a PDF report of customer data."""
-    try:
-        buffer = BytesIO()
-        p = canvas.Canvas(buffer, pagesize=A4)
-        p.setFont("Helvetica", 12)
-        p.drawString(1 * inch, 10.5 * inch, trans('admin_customer_report_title', default='Customer Report'))
-        p.drawString(1 * inch, 10.2 * inch, f"{trans('admin_generated_on', default='Generated on')}: {datetime.now(timezone.utc).strftime('%Y-%m-%d')}")
-        y = 9.5 * inch
-        p.drawString(1 * inch, y, trans('admin_username', default='Username'))
-        p.drawString(2.5 * inch, y, trans('admin_email', default='Email'))
-        p.drawString(4 * inch, y, trans('user_role', default='Role'))
-        p.drawString(5.5 * inch, y, trans('subscription_status', default='Subscription Status'))
-        y -= 0.3 * inch
+            operation = request.form.get('operation')
+            user_ids = request.form.getlist('user_ids')
+            if not user_ids:
+                flash(trans('admin_no_users_selected', default='No users selected'), 'danger')
+                return redirect(url_for('admin.bulk_operations'))
+            results = {'success': 0, 'failed': 0}
+            for user_id in user_ids:
+                try:
+                    try:
+                        user_query = {'_id': ObjectId(user_id)}
+                    except errors.InvalidId:
+                        user_query = {'user_id': user_id}
+                    if operation == 'extend_trial':
+                        days = int(request.form.get('trial_days', 30))
+                        new_trial_end = datetime.now(timezone.utc) + timedelta(days=days)
+                        db.users.update_one(
+                            user_query,
+                            {'$set': {
+                                'is_trial': True,
+                                'trial_end': new_trial_end,
+                                'updated_at': datetime.now(timezone.utc)
+                            }}
+                        )
+                        results['success'] += 1
+                    elif operation == 'suspend_users':
+                        db.users.update_one(
+                            user_query,
+                            {'$set': {
+                                'suspended': True,
+                                'updated_at': datetime.now(timezone.utc)
+                            }}
+                        )
+                        results['success'] += 1
+                    elif operation == 'activate_users':
+                        db.users.update_one(
+                            user_query,
+                            {'$set': {
+                                'suspended': False,
+                                'updated_at': datetime.now(timezone.utc)
+                            }}
+                        )
+                        results['success'] += 1
+                except Exception as e:
+                    logger.error(f"Error in bulk operation {operation} for user {user_id}: {str(e)}",
+                                 extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
+                    results['failed'] += 1
+            log_audit_action('bulk_operation', {
+                'operation': operation,
+                'user_count': len(user_ids),
+                'success_count': results['success'],
+                'failed_count': results['failed']
+            })
+            flash(trans('admin_bulk_operation_complete',
+                       default=f'Bulk operation completed: {results["success"]} successful, {results["failed"]} failed'),
+                  'success' if results['failed'] == 0 else 'warning')
+            return redirect(url_for('admin.bulk_operations'))
+        users = list(db.users.find({'role': {'$ne': 'admin'}}).sort('created_at', -1))
         for user in users:
-            status = 'Subscribed' if user.get('is_subscribed') and user.get('is_trial_active') else 'Trial' if user.get('is_trial') and user.get('is_trial_active') else 'Expired'
-            p.drawString(1 * inch, y, user['_id'])
-            p.drawString(2.5 * inch, y, user['email'])
-            p.drawString(4 * inch, y, user['role'])
-            p.drawString(5.5 * inch, y, status)
-            y -= 0.3 * inch
-            if y < 1 * inch:
-                p.showPage()
-                p.setFont("Helvetica", 12)
-                y = 10.5 * inch
-        p.showPage()
-        p.save()
-        buffer.seek(0)
-        return Response(buffer, mimetype='application/pdf', headers={'Content-Disposition': 'attachment;filename=customer_report.pdf'})
+            user['_id'] = str(user['_id'])
+        return render_template('admin/bulk_operations.html',
+                             users=users,
+                             title=trans('admin_bulk_operations_title', default='Bulk Operations'))
     except Exception as e:
-        logger.error(f"Error generating customer report PDF: {str(e)}",
+        logger.error(f"Error in bulk_operations for admin {current_user.id}: {str(e)}",
                      extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-        flash(trans('admin_report_error', default='An error occurred while generating the report'), 'danger')
+        flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
         return render_template('error/500.html'), 500
 
-def generate_customer_report_csv(users):
-    """Generate a CSV report of customer data."""
-    try:
-        output = [[trans('admin_username', default='Username'), trans('admin_email', default='Email'), trans('user_role', default='Role'), trans('subscription_status', default='Subscription Status')]]
-        for user in users:
-            status = 'Subscribed' if user.get('is_subscribed') and user.get('is_trial_active') else 'Trial' if user.get('is_trial') and user.get('is_trial_active') else 'Expired'
-            output.append([user['_id'], user['email'], user['role'], status])
-        buffer = BytesIO()
-        writer = csv.writer(buffer, lineterminator='\n')
-        writer.writerows(output)
-        buffer.seek(0)
-        return Response(buffer, mimetype='text/csv', headers={'Content-Disposition': 'attachment;filename=customer_report.csv'})
-    except Exception as e:
-        logger.error(f"Error generating customer report CSV: {str(e)}",
-                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-        flash(trans('admin_report_error', default='An error occurred while generating the report'), 'danger')
-        return render_template('error/500.html'), 500
-
-
-
-
-
-
-
-
-
-# System Settings Management
 @admin_bp.route('/system/settings', methods=['GET', 'POST'])
 @login_required
 @utils.requires_role('admin')
@@ -1349,34 +1337,25 @@ def system_settings():
         db = utils.get_mongo_db()
         if db is None:
             raise Exception("Failed to connect to MongoDB")
-        
-        if request.method == 'POST':
-            # Handle system settings updates
+        form = SystemSettingsForm()
+        if request.method == 'POST' and form.validate_on_submit():
             settings_data = {
-                'maintenance_mode': request.form.get('maintenance_mode') == 'on',
-                'registration_enabled': request.form.get('registration_enabled') == 'on',
-                'trial_duration_days': int(request.form.get('trial_duration_days', 30)),
-                'max_users_per_trial': int(request.form.get('max_users_per_trial', 1000)),
+                'maintenance_mode': form.maintenance_mode.data,
+                'registration_enabled': form.registration_enabled.data,
+                'trial_duration_days': form.trial_duration_days.data,
+                'max_users_per_trial': form.max_users_per_trial.data,
                 'updated_by': current_user.id,
                 'updated_at': datetime.now(timezone.utc)
             }
-            
-            # Update or create system settings
             db.system_settings.update_one(
                 {'_id': 'global'},
                 {'$set': settings_data},
                 upsert=True
             )
-            
             log_audit_action('update_system_settings', settings_data)
             flash(trans('admin_system_settings_updated', default='System settings updated successfully'), 'success')
-            
             return redirect(url_for('admin.system_settings'))
-        
-        # Get current system settings
         settings = db.system_settings.find_one({'_id': 'global'}) or {}
-        
-        # Get system statistics
         stats = {
             'total_users': db.users.count_documents({}),
             'active_trials': db.users.count_documents({'is_trial': True}),
@@ -1385,13 +1364,12 @@ def system_settings():
             'total_feedback': db.feedback.count_documents({}),
             'database_size': len(db.list_collection_names())
         }
-        
         logger.info(f"Admin {current_user.id} accessed system settings",
                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-        
         return render_template('admin/system_settings.html',
                              settings=settings,
                              stats=stats,
+                             form=form,
                              title=trans('admin_system_settings_title', default='System Settings'))
     except Exception as e:
         logger.error(f"Error in system_settings for admin {current_user.id}: {str(e)}",
@@ -1695,10 +1673,6 @@ def education_management():
         flash(trans('admin_database_error', default='Database error occurred'), 'danger')
         return redirect(url_for('admin.dashboard'))
 
-
-
-
-
 @admin_bp.route('/system/health', methods=['GET'])
 @login_required
 @utils.requires_role('admin')
@@ -1717,4 +1691,3 @@ def system_health_monitor():
         logger.error(f"Error loading system health: {str(e)}")
         flash(trans('admin_health_error', default='Error loading system health data'), 'danger')
         return redirect(url_for('admin.dashboard'))
-
