@@ -961,7 +961,12 @@ def create_app():
 
     return app
 
+
 app = create_app()
+
+# Initialize default tax config after app is created
+from utils import initialize_default_tax_config_with_app
+initialize_default_tax_config_with_app(app)
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

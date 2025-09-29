@@ -1,3 +1,12 @@
+
+def initialize_default_tax_config_with_app(app):
+    """
+    Utility function to initialize default tax config with app context.
+    Import and call admin_tax_config.initialize_default_tax_config() safely.
+    """
+    from admin_tax_config import initialize_default_tax_config
+    with app.app_context():
+        return initialize_default_tax_config()
 import re
 import logging
 import uuid

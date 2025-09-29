@@ -384,15 +384,11 @@ def initialize_default_tax_config():
         logger.error(f"Error initializing default tax config: {str(e)}")
         return False
 
-# Initialize default configuration on import
-from app import app
-with app.app_context():
-    initialize_default_tax_config()
+
 
 if __name__ == "__main__":
     print("Tax Configuration Management Module")
     print("Initializing default tax configuration...")
-    
     success = initialize_default_tax_config()
     if success:
         print("✓ Default tax configuration initialized successfully")
