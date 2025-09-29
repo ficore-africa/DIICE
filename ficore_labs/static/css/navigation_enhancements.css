@@ -324,7 +324,6 @@
 /* Button Style Overrides */
 .btn-primary {
     background-color: var(--button-primary-bg);
-    border: 2px solid var(--button-secondary-border);
     color: #fff;
     transition: var(--transition-base), transform 0.2s;
 }
@@ -336,8 +335,8 @@
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 .btn-outline-primary {
-    border: 2px solid var(--button-primary-bg);
-    color: var(--button-primary-bg);
+    border: 2px solid var(--button-secondary-border);
+    color: var(--button-secondary-bg);
     box-shadow: 0 0 0 2px var(--button-secondary-border);
     background-color: transparent;
     transition: var(--transition-base), transform 0.2s;
@@ -345,8 +344,8 @@
 .btn-outline-primary:hover,
 .btn-outline-primary:focus {
     background-color: rgba(34, 72, 141, 0.1); /* Light primary fill on hover */
-    color: var(--button-primary-bg);
-    border-color: var(--button-primary-bg);
+    color: var(--button-secondary-bg);
+    border-color: var(--button-secondary-border);
     box-shadow: 0 0 0 2px var(--button-secondary-border), 0 4px 12px rgba(0, 0, 0, 0.15);
     transform: translateY(-2px);
 }
@@ -355,3 +354,4 @@
     font-size: 1.25rem;
     border-radius: 0.5rem;
 }
+
