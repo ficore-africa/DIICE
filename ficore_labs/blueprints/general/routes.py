@@ -42,7 +42,7 @@ def landing():
                 extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
             )
             flash(trans('general_error', default='An error occurred. Please try again.'), 'danger')
-            return redirect(url_for('subscribe_bp.subscribe', from_subscription_required='true'))
+            return redirect(url_for('subscribe_bp.subscription_required'))
     try:
         current_app.logger.info(
             f"Accessing general.landing - User: {current_user.id if current_user.is_authenticated else 'anonymous'}, Authenticated: {current_user.is_authenticated}, Session: {dict(session)}",
@@ -96,7 +96,7 @@ def home():
                 f"Redirecting user {current_user.id} to subscribe due to expired trial",
                 extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
             )
-            return redirect(url_for('subscribe_bp.subscribe', from_subscription_required='true'))
+            return redirect(url_for('subscribe_bp.subscription_required'))
         
         if user.trial_end and user.trial_end.tzinfo is None:
             user.trial_end = user.trial_end.replace(tzinfo=ZoneInfo("UTC"))
@@ -130,7 +130,7 @@ def home():
             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
         )
         flash(trans('general_error', default='An error occurred'), 'danger')
-        return redirect(url_for('subscribe_bp.subscribe', from_subscription_required='true'))
+        return redirect(url_for('subscribe_bp.subscription_required'))
 
 @general_bp.route('/about')
 def about():
@@ -281,7 +281,7 @@ def feedback():
                         extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
                     )
                     flash(trans('general_subscription_required', default='Your trial has expired. Please subscribe to submit feedback.'), 'warning')
-                    return redirect(url_for('subscribe_bp.subscribe', from_subscription_required='true'))
+                    return redirect(url_for('subscribe_bp.subscription_required'))
             
             with current_app.app_context():
                 db = get_mongo_db()

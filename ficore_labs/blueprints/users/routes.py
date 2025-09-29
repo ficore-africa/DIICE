@@ -288,6 +288,8 @@ def login():
                         if not user.get('setup_complete', False):
                             setup_route = get_setup_wizard_route(user.get('role', 'trader'))
                             return redirect(url_for(setup_route))
+                        if user.get('trial_end') and user.get('trial_end') < datetime.utcnow() and not user.get('is_subscribed', False):
+                            return redirect(url_for('subscribe_bp.subscription_required'))
                         return redirect(get_post_login_redirect(user.get('role', 'trader')))
                 user_obj = User(
                     id=user['_id'],
@@ -321,7 +323,7 @@ def login():
                     setup_route = get_setup_wizard_route(user.get('role', 'trader'))
                     return redirect(url_for(setup_route))
                 if user.get('trial_end') and user.get('trial_end') < datetime.utcnow() and not user.get('is_subscribed', False):
-                    return redirect(url_for('subscribe_bp.subscribe'))
+                    return redirect(url_for('subscribe_bp.subscription_required'))
                 return redirect(get_post_login_redirect(user.get('role', 'trader')))
             except pymongo.errors.PyMongoError as e:
                 logger.error(f"MongoDB error during login for {identifier}: {str(e)}")
@@ -400,7 +402,7 @@ def verify_2fa():
                     setup_route = get_setup_wizard_route(user.get('role', 'trader'))
                     return redirect(url_for(setup_route))
                 if user.get('trial_end') and user.get('trial_end') < datetime.utcnow() and not user.get('is_subscribed', False):
-                    return redirect(url_for('subscribe_bp.subscribe'))
+                    return redirect(url_for('subscribe_bp.subscription_required'))
                 return redirect(get_post_login_redirect(user.get('role', 'trader')))
             flash(trans('general_invalid_otp', default='Invalid or expired OTP'), 'danger')
             logger.warning(f"Failed 2FA attempt for username: {username}")
@@ -650,7 +652,7 @@ def setup_wizard():
 
         if user.get('setup_complete', False):
             if user.get('trial_end') and user.get('trial_end') < datetime.utcnow() and not user.get('is_subscribed', False):
-                return redirect(url_for('subscribe_bp.subscribe'))
+                return redirect(url_for('subscribe_bp.subscription_required'))
             return redirect(get_post_login_redirect(user.get('role', 'trader')))
 
         if user.get('role') not in ['trader', 'startup', 'admin']:
@@ -685,7 +687,7 @@ def setup_wizard():
             logger.info(f"Business setup completed for user: {user_id} by {current_user.id}, session_id: {session.get('session_id')}")
             flash(trans('general_business_setup_success', default='Business setup completed'), 'success')
             if user.get('trial_end') and user.get('trial_end') < datetime.utcnow() and not user.get('is_subscribed', False):
-                return redirect(url_for('subscribe_bp.subscribe'))
+                return redirect(url_for('subscribe_bp.subscription_required'))
             return redirect(url_for('settings.profile', user_id=user_id) if utils.is_admin() else get_post_login_redirect(user.get('role', 'trader')))
         else:
             for field, errors in form.errors.items():

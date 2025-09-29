@@ -80,7 +80,7 @@ def custom_login_required(f):
                 'session_id': session.get('sid', 'no-session-id'),
                 'ip_address': request.remote_addr
             })
-            return redirect(url_for('subscribe_bp.subscribe'))
+            return redirect(url_for('subscribe_bp.subscription_required'))
         return f(*args, **kwargs)
     return decorated_function
 
@@ -618,9 +618,13 @@ def create_app():
             'subscribe_bp.initiate_payment',
             'subscribe_bp.callback',
             'subscribe_bp.status',
-            'subscribe_bp.manage',
+            'subscribe_bp.manage_subscription',
             'subscribe_bp.upload_receipt',
-            'static'
+            'subscribe_bp.subscription_status',
+            'static',
+            'health',
+            'google_site_verification',
+            'google_site_verification_new'
         ]
         if request.endpoint in exempt_endpoints or (request.path and request.path.startswith('/static/')):
             logger.debug(f"Skipping trial check for endpoint: {request.endpoint}", extra={
@@ -825,11 +829,7 @@ def create_app():
             )
             if current_user.is_authenticated:
                 if hasattr(current_user, 'is_trial_active') and not current_user.is_trial_active():
-                    return render_template(
-                        'subscribe/subscription_required.html',
-                        title=trans('subscribe_required_title', default='Subscription Required'),
-                        can_interact=False
-                    )
+                    return redirect(url_for('subscribe_bp.subscription_required'))
                 return redirect(get_post_login_redirect(current_user.role))
             return redirect(url_for('general_bp.landing'))
         except Exception as e:

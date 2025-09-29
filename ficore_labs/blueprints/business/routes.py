@@ -20,7 +20,7 @@ def home():
 
         # Check trial/subscription status
         if not current_user.is_trial_active() and not current_user.is_subscribed:
-            return redirect(url_for('subscribe_bp.subscribe'))
+            return redirect(url_for('subscribe_bp.subscription_required'))
 
         is_read_only = not current_user.is_subscribed and not current_user.is_trial_active()
 
