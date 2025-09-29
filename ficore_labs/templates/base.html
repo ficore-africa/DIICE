@@ -59,7 +59,7 @@
                 <span class="help-text">{{ t('general_help', default='HELP') | e }}</span>
             </button>
             <div class="language-buttons d-flex">
-                <button class="btn btn-outline-primary language-btn {% if current_lang == 'en' %}active{% endif %}" id="langEnBtn" onclick="setLanguage('en')" data-bs-toggle="tooltip" data-bs-title="{{ t('general_language_english', default='Switch to English') | e }}">EN</button>
+                <button class="btn btn-primary language-btn {% if current_lang == 'en' %}active{% endif %}" id="langEnBtn" onclick="setLanguage('en')" data-bs-toggle="tooltip" data-bs-title="{{ t('general_language_english', default='Switch to English') | e }}">EN</button>
                 <button class="btn btn-outline-primary language-btn {% if current_lang == 'ha' %}active{% endif %}" id="langHaBtn" onclick="setLanguage('ha')" data-bs-toggle="tooltip" data-bs-title="{{ t('general_language_hausa', default='Switch to Hausa') | e }}">HA</button>
             </div>
             <button class="icon-btn" id="darkModeToggle" onclick="toggleDarkMode()" data-bs-toggle="tooltip" data-bs-title="{{ t('general_mode_toggle_tooltip_switch_to_dark', default='Switch to dark mode') | e }}">
