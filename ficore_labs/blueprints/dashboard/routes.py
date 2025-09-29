@@ -14,18 +14,6 @@ logger = logging.getLogger(__name__)
 
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
 
-def safe_to_float(value, default=0.0):
-    """Convert a value to float, return default if conversion fails."""
-    if value is None:
-        logger.warning(f"Received None value for conversion to float")
-        return default
-    try:
-        result = float(value)
-        return result
-    except (ValueError, TypeError) as e:
-        logger.warning(f"Failed to convert value to float: {value} (type: {type(value)}), error: {str(e)}")
-        return default
-
 def normalize_datetime(doc):
     """Convert created_at to timezone-aware datetime if it's a string or naive datetime."""
     if 'created_at' in doc:
