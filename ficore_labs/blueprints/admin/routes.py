@@ -463,9 +463,9 @@ def manage_user_subscriptions():
             # Handle subscription_end from form
             if form.subscription_end.data:
                 try:
-                    # Convert form date to timezone-aware datetime
-                    subscription_end_naive = datetime.combine(form.subscription_end.data, datetime.min.time())
-                    update_data['subscription_end'] = subscription_end_naive.replace(tzinfo=ZoneInfo("UTC"))
+                    # Convert form date to timezone-aware datetime using helper
+                    subscription_end_dt = datetime.combine(form.subscription_end.data, datetime.min.time())
+                    update_data['subscription_end'] = to_utc_aware(subscription_end_dt)
                 except Exception as e:
                     logger.error(f"Error converting subscription_end date for user {user_id}: {str(e)}",
                                  extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
