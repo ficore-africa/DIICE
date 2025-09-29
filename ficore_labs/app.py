@@ -562,27 +562,34 @@ def create_app():
             try:
                 return generate_tools_with_urls(nav_template)
             except Exception as e:
-                logger.error(f"Error building nav: {e}")
+                logger.error(f"Error building nav: {e}", extra={
+                    'session_id': session.get('sid', 'no-session-id'),
+                    'ip_address': request.remote_addr if has_request_context() else 'none'
+                })
                 return []
-        nav = []
-        tools = []
+
+        bottom_nav_items = []
+        tools_for_quick = []
         breadcrumb_items = []
 
         if current_user.is_authenticated:
             role = getattr(current_user, 'role', 'trader')
             if role == 'admin':
-                nav = build_nav(ADMIN_NAV)
-                tools = build_nav(ADMIN_TOOLS)
+                bottom_nav_items = build_nav(ADMIN_NAV)
+                tools_for_quick = build_nav(ADMIN_TOOLS)
             else:
-                nav = build_nav(TRADER_NAV)
-                tools = build_nav(TRADER_TOOLS)
+                bottom_nav_items = build_nav(TRADER_NAV)
+                tools_for_quick = build_nav(TRADER_TOOLS)
 
             # Generate breadcrumb items
             try:
                 from helpers.breadcrumb_helper import get_breadcrumb_items
                 breadcrumb_items = get_breadcrumb_items()
             except Exception as e:
-                logger.error(f"Error generating breadcrumb items: {e}")
+                logger.error(f"Error generating breadcrumb items: {e}", extra={
+                    'session_id': session.get('sid', 'no-session-id'),
+                    'ip_address': request.remote_addr if has_request_context() else 'none'
+                })
                 breadcrumb_items = []
 
         return {
@@ -593,8 +600,8 @@ def create_app():
                 {'code': 'en', 'name': 'English'},
                 {'code': 'ha', 'name': 'Hausa'}
             ],
-            'navigation': nav,
-            'tools': tools,
+            'bottom_nav_items': bottom_nav_items,
+            'tools_for_quick': tools_for_quick,
             'breadcrumb_items': breadcrumb_items,
         }
 
