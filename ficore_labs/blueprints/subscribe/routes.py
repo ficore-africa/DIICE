@@ -182,14 +182,29 @@ def callback():
             session.pop('pending_transaction', None)
             return redirect(url_for('subscribe_bp.subscription_required'))
 
+        # --- FIX START: Update MongoDB and explicitly update current_user ---
         db = get_mongo_db()
+        subscription_end_date = datetime.now(timezone.utc) + timedelta(days=30 if pending_transaction['plan_code'] == 'monthly' else 365)
+        
         update_data = {
             'is_subscribed': True,
             'subscription_plan': pending_transaction['plan_code'],
             'subscription_start': datetime.now(timezone.utc),
-            'subscription_end': datetime.now(timezone.utc) + timedelta(days=30 if pending_transaction['plan_code'] == 'monthly' else 365)
+            'subscription_end': subscription_end_date
         }
         update_user(db, current_user.id, update_data)
+
+        # CRITICAL FIX: Manually update the current_user object attributes 
+        # so Flask-Login has the correct status for the next request.
+        # This breaks the redirect loop by satisfying the subscription check 
+        # on the protected pages.
+        if hasattr(current_user, 'is_subscribed'):
+            current_user.is_subscribed = True
+        if hasattr(current_user, 'subscription_plan'):
+            current_user.subscription_plan = pending_transaction['plan_code']
+        if hasattr(current_user, 'subscription_end'):
+            current_user.subscription_end = subscription_end_date
+        # --- FIX END ---
 
         db.audit_logs.insert_one({
             'admin_id': 'system',
@@ -238,6 +253,13 @@ def subscription_required():
             f"Rendering subscription required page for user {current_user.id}, is_subscribed: {current_user.is_subscribed}, is_trial_active: {current_user.is_trial_active()}",
             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
         )
+        # 💡 IMPORTANT: Before rendering, check if the user status is NOW valid
+        if current_user.is_subscribed or current_user.is_trial_active():
+             logger.info(f"User {current_user.id} is now subscribed/trial active, redirecting to home.")
+             # If the user somehow landed here but is now subscribed (e.g., after the fix), redirect them out.
+             return redirect(url_for('general_bp.home'))
+
+
         return render_template(
             'subscribe/subscription_required.html',
             title=trans('subscribe_required_title', lang=lang, default='Subscription Required'),
