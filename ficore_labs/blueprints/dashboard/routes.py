@@ -14,6 +14,14 @@ logger = logging.getLogger(__name__)
 
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
 
+def safe_to_float(value, default=0.0):
+    """Convert a value to float, return default if conversion fails."""
+    try:
+        return float(value) if value is not None else default
+    except (ValueError, TypeError):
+        logger.warning(f"Failed to convert value to float: {value}")
+        return default
+
 def normalize_datetime(doc):
     """Convert created_at to timezone-aware datetime if it's a string or naive datetime."""
     if 'created_at' in doc:
@@ -57,14 +65,14 @@ def weekly_profit_data():
                     {'$match': {'user_id': user_id, 'type': 'receipt', 'created_at': {'$gte': start, '$lt': end}}},
                     {'$group': {'_id': None, 'total': {'$sum': '$amount'}}}
                 ])
-                receipts_total = next(receipts, {}).get('total', 0) or 0
+                receipts_total = safe_to_float(next(receipts, {}).get('total', 0))
 
                 # Sum payments (expenses) for the day
                 payments = db.cashflows.aggregate([
                     {'$match': {'user_id': user_id, 'type': 'payment', 'created_at': {'$gte': start, '$lt': end}}},
                     {'$group': {'_id': None, 'total': {'$sum': '$amount'}}}
                 ])
-                payments_total = next(payments, {}).get('total', 0) or 0
+                payments_total = safe_to_float(next(payments, {}).get('total', 0))
 
                 profit = receipts_total - payments_total
                 profit_per_day.append({
@@ -110,7 +118,7 @@ def refresh_dashboard_data():
             ])
             receipts_data = next(receipts_result, {})
             stats['total_receipts'] = receipts_data.get('count', 0)
-            stats['total_receipts_amount'] = receipts_data.get('total_amount', 0)
+            stats['total_receipts_amount'] = safe_to_float(receipts_data.get('total_amount', 0))
 
             # Calculate payments
             payments_result = db.cashflows.aggregate([
@@ -119,7 +127,7 @@ def refresh_dashboard_data():
             ])
             payments_data = next(payments_result, {})
             stats['total_payments'] = payments_data.get('count', 0)
-            stats['total_payments_amount'] = payments_data.get('total_amount', 0)
+            stats['total_payments_amount'] = safe_to_float(payments_data.get('total_amount', 0))
 
             # Calculate debtors
             debtors_result = db.records.aggregate([
@@ -128,7 +136,7 @@ def refresh_dashboard_data():
             ])
             debtors_data = next(debtors_result, {})
             stats['total_debtors'] = debtors_data.get('count', 0)
-            stats['total_debtors_amount'] = debtors_data.get('total_amount', 0)
+            stats['total_debtors_amount'] = safe_to_float(debtors_data.get('total_amount', 0))
 
             # Calculate creditors
             creditors_result = db.records.aggregate([
@@ -137,7 +145,7 @@ def refresh_dashboard_data():
             ])
             creditors_data = next(creditors_result, {})
             stats['total_creditors'] = creditors_data.get('count', 0)
-            stats['total_creditors_amount'] = creditors_data.get('total_amount', 0)
+            stats['total_creditors_amount'] = safe_to_float(creditors_data.get('total_amount', 0))
 
             # Calculate inventory
             inventory_result = db.records.aggregate([
@@ -146,7 +154,7 @@ def refresh_dashboard_data():
             ])
             inventory_data = next(inventory_result, {})
             stats['total_inventory'] = inventory_data.get('count', 0)
-            stats['total_inventory_cost'] = inventory_data.get('total_cost', 0)
+            stats['total_inventory_cost'] = safe_to_float(inventory_data.get('total_cost', 0))
 
             # Calculate profits
             stats['gross_profit'] = stats['total_receipts_amount'] - stats['total_payments_amount']
@@ -213,7 +221,7 @@ def index():
             ])
             receipts_data = next(receipts_result, {})
             stats['total_receipts'] = receipts_data.get('count', 0)
-            stats['total_receipts_amount'] = receipts_data.get('total_amount', 0)
+            stats['total_receipts_amount'] = safe_to_float(receipts_data.get('total_amount', 0))
 
             # Payments
             payments_result = db.cashflows.aggregate([
@@ -222,7 +230,7 @@ def index():
             ])
             payments_data = next(payments_result, {})
             stats['total_payments'] = payments_data.get('count', 0)
-            stats['total_payments_amount'] = payments_data.get('total_amount', 0)
+            stats['total_payments_amount'] = safe_to_float(payments_data.get('total_amount', 0))
 
             # Debtors
             debtors_result = db.records.aggregate([
@@ -231,7 +239,7 @@ def index():
             ])
             debtors_data = next(debtors_result, {})
             stats['total_debtors'] = debtors_data.get('count', 0)
-            stats['total_debtors_amount'] = debtors_data.get('total_amount', 0)
+            stats['total_debtors_amount'] = safe_to_float(debtors_data.get('total_amount', 0))
 
             # Creditors
             creditors_result = db.records.aggregate([
@@ -240,7 +248,7 @@ def index():
             ])
             creditors_data = next(creditors_result, {})
             stats['total_creditors'] = creditors_data.get('count', 0)
-            stats['total_creditors_amount'] = creditors_data.get('total_amount', 0)
+            stats['total_creditors_amount'] = safe_to_float(creditors_data.get('total_amount', 0))
 
             # Inventory
             inventory_result = db.records.aggregate([
@@ -249,7 +257,7 @@ def index():
             ])
             inventory_data = next(inventory_result, {})
             stats['total_inventory'] = inventory_data.get('count', 0)
-            stats['total_inventory_cost'] = inventory_data.get('total_cost', 0)
+            stats['total_inventory_cost'] = safe_to_float(inventory_data.get('total_cost', 0))
 
             # Profits
             stats['gross_profit'] = stats['total_receipts_amount'] - stats['total_payments_amount']
@@ -324,7 +332,6 @@ def index():
                 extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
             )
             unpaid_debtors = unpaid_creditors = []
-
 
         # Determine tax prep mode
         tax_prep_mode = request.args.get('tax_prep') == '1'
