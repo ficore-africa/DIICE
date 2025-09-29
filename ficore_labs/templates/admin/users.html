@@ -22,7 +22,7 @@
     {% if not (current_user.is_trial_active or current_user.is_subscribed) %}
         <div class="alert alert-warning">
             {{ trans('subscription_required', default='Your trial or subscription has expired. Please subscribe to continue managing users.') }}
-            <a href="{{ url_for('personal_bp.subscribe') }}" class="btn btn-primary">{{ trans('subscribe_now', default='Subscribe Now') }}</a>
+            <a href="{{ url_for('subscribe_bp.subscribe') }}" class="btn btn-primary">{{ trans('subscribe_now', default='Subscribe Now') }}</a>
         </div>
     {% endif %}
     {% if users %}
