@@ -75,14 +75,17 @@ def custom_login_required(f):
                 'ip_address': request.remote_addr
             })
             return redirect(url_for('users.login', next=request.url))
-        if not current_user.is_trial_active() and request.endpoint != 'business.home':
-            logger.info(f"User {current_user.id} trial expired, redirecting to home", extra={
+        # Skip trial check for business.home to prevent redirect loop
+        if request.endpoint == 'business.home' or request.endpoint == 'subscribe_bp.subscription_required':
+            return f(*args, **kwargs)
+        if not current_user.is_trial_active():
+            logger.info(f"User {current_user.id} trial expired, redirecting to subscription", extra={
                 'session_id': session.get('sid', 'no-session-id'),
                 'role': current_user.role,
                 'ip_address': request.remote_addr
             })
             flash('Please subscribe to access premium features.', 'info')
-            return redirect(url_for('business.home'))
+            return redirect(url_for('subscribe_bp.subscription_required'))
         return f(*args, **kwargs)
     return decorated_function
 
