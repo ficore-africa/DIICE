@@ -781,7 +781,19 @@ def should_show_subscription_banner(user):
     except Exception as e:
         logger.error(f"Error checking subscription banner for user {user.get('id', 'unknown')}: {str(e)}", extra={'session_id': session.get('sid', 'no-session-id')})
         return False
-
+        
+def safe_to_float(value, default=0.0):
+    """Convert a value to float, return default if conversion fails."""
+    if value is None:
+        logger.warning(f"Received None value for conversion to float")
+        return default
+    try:
+        result = float(value)
+        return result
+    except (ValueError, TypeError) as e:
+        logger.warning(f"Failed to convert value to float: {value} (type: {type(value)}), error: {str(e)}")
+        return default
+        
 def format_currency(amount, currency='₦', lang=None, include_symbol=True):
     try:
         with current_app.app_context():
@@ -2923,6 +2935,7 @@ def create_dashboard_safe_response(stats, recent_data, additional_data=None):
             'timestamp': datetime.now(timezone.utc).isoformat()
 
         }
+
 
 
 
