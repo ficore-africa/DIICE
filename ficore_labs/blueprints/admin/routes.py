@@ -200,13 +200,20 @@ def dashboard():
             user['_id'] = str(user['_id'])
             trial_end = user.get('trial_end')
             subscription_end = user.get('subscription_end')
-            trial_end_aware = to_utc_aware(trial_end)
-            subscription_end_aware = to_utc_aware(subscription_end)
-            now_aware = datetime.now(timezone.utc)
-            user['is_trial_active'] = (
-                now_aware <= trial_end_aware if user.get('is_trial') and trial_end_aware
-                else user.get('is_subscribed') and subscription_end_aware and now_aware <= subscription_end_aware
-            )
+            try:
+                trial_end_aware = to_utc_aware(trial_end)
+                subscription_end_aware = to_utc_aware(subscription_end)
+                now_aware = datetime.now(timezone.utc)
+                user['is_trial_active'] = False
+                user['broken_dates'] = False
+                if user.get('is_trial') and trial_end_aware:
+                    user['is_trial_active'] = now_aware <= trial_end_aware
+                elif user.get('is_subscribed') and subscription_end_aware:
+                    user['is_trial_active'] = now_aware <= subscription_end_aware
+            except Exception as e:
+                logger.warning(f"Datetime error for user {user.get('_id')}: {e}")
+                user['is_trial_active'] = False
+                user['broken_dates'] = True
         logger.info(f"Admin {current_user.id} accessed dashboard",
                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
         return render_template(
@@ -238,13 +245,20 @@ def manage_users():
             user['username'] = user['_id']
             trial_end = user.get('trial_end')
             subscription_end = user.get('subscription_end')
-            trial_end_aware = to_utc_aware(trial_end)
-            subscription_end_aware = to_utc_aware(subscription_end)
-            now_aware = datetime.now(timezone.utc)
-            user['is_trial_active'] = (
-                now_aware <= trial_end_aware if user.get('is_trial') and trial_end_aware
-                else user.get('is_subscribed') and subscription_end_aware and now_aware <= subscription_end_aware
-            )
+            try:
+                trial_end_aware = to_utc_aware(trial_end)
+                subscription_end_aware = to_utc_aware(subscription_end)
+                now_aware = datetime.now(timezone.utc)
+                user['is_trial_active'] = False
+                user['broken_dates'] = False
+                if user.get('is_trial') and trial_end_aware:
+                    user['is_trial_active'] = now_aware <= trial_end_aware
+                elif user.get('is_subscribed') and subscription_end_aware:
+                    user['is_trial_active'] = now_aware <= subscription_end_aware
+            except Exception as e:
+                logger.warning(f"Datetime error for user {user.get('_id')}: {e}")
+                user['is_trial_active'] = False
+                user['broken_dates'] = True
         return render_template('admin/users.html', users=users, title=trans('admin_manage_users_title', default='Manage Users'), now=datetime.now(timezone.utc))
     except Exception as e:
         logger.error(f"Error fetching users for admin {current_user.id}: {str(e)}",
@@ -409,13 +423,20 @@ def manage_user_roles():
             user['_id'] = str(user['_id'])
             trial_end = user.get('trial_end')
             subscription_end = user.get('subscription_end')
-            trial_end_aware = to_utc_aware(trial_end)
-            subscription_end_aware = to_utc_aware(subscription_end)
-            now_aware = datetime.now(timezone.utc)
-            user['is_trial_active'] = (
-                now_aware <= trial_end_aware if user.get('is_trial') and trial_end_aware
-                else user.get('is_subscribed') and subscription_end_aware and now_aware <= subscription_end_aware
-            )
+            try:
+                trial_end_aware = to_utc_aware(trial_end)
+                subscription_end_aware = to_utc_aware(subscription_end)
+                now_aware = datetime.now(timezone.utc)
+                user['is_trial_active'] = False
+                user['broken_dates'] = False
+                if user.get('is_trial') and trial_end_aware:
+                    user['is_trial_active'] = now_aware <= trial_end_aware
+                elif user.get('is_subscribed') and subscription_end_aware:
+                    user['is_trial_active'] = now_aware <= subscription_end_aware
+            except Exception as e:
+                logger.warning(f"Datetime error for user {user.get('_id')}: {e}")
+                user['is_trial_active'] = False
+                user['broken_dates'] = True
         return render_template('admin/user_roles.html', form=form, users=users, title=trans('admin_manage_user_roles_title', default='Manage User Roles'), now=datetime.now(timezone.utc))
     except Exception as e:
         logger.error(f"Error in manage_user_roles for admin {current_user.id}: {str(e)}",
@@ -497,19 +518,20 @@ def manage_user_subscriptions():
             user['_id'] = str(user['_id'])
             trial_end = user.get('trial_end')
             subscription_end = user.get('subscription_end')
-            trial_end_aware = to_utc_aware(trial_end)
-            subscription_end_aware = to_utc_aware(subscription_end)
-            now_aware = datetime.now(timezone.utc)
             try:
+                trial_end_aware = to_utc_aware(trial_end)
+                subscription_end_aware = to_utc_aware(subscription_end)
+                now_aware = datetime.now(timezone.utc)
                 user['is_trial_active'] = False
+                user['broken_dates'] = False
                 if user.get('is_trial') and trial_end_aware:
                     user['is_trial_active'] = now_aware <= trial_end_aware
                 elif user.get('is_subscribed') and subscription_end_aware:
                     user['is_trial_active'] = now_aware <= subscription_end_aware
             except Exception as e:
-                logger.error(f"Error processing datetime for user {user['_id']}: {str(e)}",
-                             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-                user['is_trial_active'] = False  # Fallback to False if datetime processing fails
+                logger.warning(f"Datetime error for user {user.get('_id')}: {e}")
+                user['is_trial_active'] = False
+                user['broken_dates'] = True
         return render_template('admin/user_subscriptions.html', form=form, users=users, title=trans('admin_manage_user_subscriptions_title', default='Manage User Subscriptions'), now=datetime.now(timezone.utc))
     except Exception as e:
         logger.error(f"Error in manage_user_subscriptions for admin {current_user.id}: {str(e)}",
@@ -603,13 +625,20 @@ def manage_user_trials():
             user['_id'] = str(user['_id'])
             trial_end = user.get('trial_end')
             subscription_end = user.get('subscription_end')
-            trial_end_aware = to_utc_aware(trial_end)
-            subscription_end_aware = to_utc_aware(subscription_end)
-            now_aware = datetime.now(timezone.utc)
-            user['is_trial_active'] = (
-                now_aware <= trial_end_aware if user.get('is_trial') and trial_end_aware
-                else user.get('is_subscribed') and subscription_end_aware and now_aware <= subscription_end_aware
-            )
+            try:
+                trial_end_aware = to_utc_aware(trial_end)
+                subscription_end_aware = to_utc_aware(subscription_end)
+                now_aware = datetime.now(timezone.utc)
+                user['is_trial_active'] = False
+                user['broken_dates'] = False
+                if user.get('is_trial') and trial_end_aware:
+                    user['is_trial_active'] = now_aware <= trial_end_aware
+                elif user.get('is_subscribed') and subscription_end_aware:
+                    user['is_trial_active'] = now_aware <= subscription_end_aware
+            except Exception as e:
+                logger.warning(f"Datetime error for user {user.get('_id')}: {e}")
+                user['is_trial_active'] = False
+                user['broken_dates'] = True
         return render_template('admin/user_trials.html', form=form, users=users, title=trans('admin_manage_user_trials_title', default='Manage User Trials'), now=datetime.now(timezone.utc))
     except Exception as e:
         logger.error(f"Error in manage_user_trials for admin {current_user.id}: {str(e)}",
@@ -938,13 +967,20 @@ def customer_reports():
             user['_id'] = str(user['_id'])
             trial_end = user.get('trial_end')
             subscription_end = user.get('subscription_end')
-            trial_end_aware = to_utc_aware(trial_end)
-            subscription_end_aware = to_utc_aware(subscription_end)
-            now_aware = datetime.now(timezone.utc)
-            user['is_trial_active'] = (
-                now_aware <= trial_end_aware if user.get('is_trial') and trial_end_aware
-                else user.get('is_subscribed') and subscription_end_aware and now_aware <= subscription_end_aware
-            )
+            try:
+                trial_end_aware = to_utc_aware(trial_end)
+                subscription_end_aware = to_utc_aware(subscription_end)
+                now_aware = datetime.now(timezone.utc)
+                user['is_trial_active'] = False
+                user['broken_dates'] = False
+                if user.get('is_trial') and trial_end_aware:
+                    user['is_trial_active'] = now_aware <= trial_end_aware
+                elif user.get('is_subscribed') and subscription_end_aware:
+                    user['is_trial_active'] = now_aware <= subscription_end_aware
+            except Exception as e:
+                logger.warning(f"Datetime error for user {user.get('_id')}: {e}")
+                user['is_trial_active'] = False
+                user['broken_dates'] = True
         if format == 'pdf':
             return generate_customer_report_pdf(users)
         elif format == 'csv':
