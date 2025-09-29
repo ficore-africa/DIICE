@@ -10,7 +10,7 @@
             <!-- Primary Auth Actions -->
             <div class="auth-buttons">
                 <a href="{{ url_for('users.signup') }}" class="btn btn-primary btn-lg" data-bs-toggle="tooltip" data-bs-title="{{ t('general_signup_tooltip', default='Create your Ficore Africa account') | e }}">
-                    <i class="bi bi-person-plus me-2"></i>{{ t('general_signup', default='Sign Up') | e }}
+                    <i class="bi bi-person-plus me-2"></i>{{ t('general_signup', default='Sign up') | e }}
                 </a>
                 <a href="{{ url_for('users.login') }}" class="btn btn-outline-primary btn-lg" data-bs-toggle="tooltip" data-bs-title="{{ t('general_login_tooltip', default='Log in to your account') | e }}">
                     <i class="bi bi-box-arrow-in-right me-2"></i>{{ t('general_login', default='Log In') | e }}
@@ -192,6 +192,18 @@
         </div>
     </div>
 
+    <!-- Call to Action -->
+    <div class="section-card mt-5 text-center">
+        <h3 class="section-title">{{ t('general_ready_to_start', default='Ready to Take Control of Your Finances?') | e }}</h3>
+        <p class="text-muted">{{ t('general_signup_prompt', default='Sign up today to access tools for business management or startup growth.') | e }}</p>
+        <div class="hero-actions">
+            <div class="auth-buttons">
+                <a href="{{ url_for('users.signup') }}" class="btn btn-primary" data-bs-toggle="tooltip" data-bs-title="{{ t('general_get_started_tooltip', default='Start your financial journey') | e }}">{{ t('general_get_started', default='Sign up') | e }}</a>
+                <a href="{{ url_for('users.login') }}" class="btn btn-outline-primary" data-bs-toggle="tooltip" data-bs-title="{{ t('general_login_tooltip', default='Log in to your account') | e }}">{{ t('general_login', default='Log In') | e }}</a>
+            </div>
+        </div>
+    </div>
+
     <!-- FAQ Section -->
     <div class="section-card faq-section mt-5">
         <h2 class="section-title text-center"><i class="bi bi-question-circle-fill me-2 text-primary"></i>{{ t('general_faq', default='Frequently Asked Questions') | e }}</h2>
@@ -259,26 +271,6 @@
             </div>
         </div>
     </div>
-
-    <!-- Call to Action -->
-    <div class="section-card mt-5 text-center">
-        <h3 class="section-title">{{ t('general_ready_to_start', default='Ready to Take Control of Your Finances?') | e }}</h3>
-        <p class="text-muted">{{ t('general_signup_prompt', default='Sign up today to access tools for business management or startup growth.') | e }}</p>
-        <div class="hero-actions">
-            <div class="auth-buttons">
-                <a href="{{ url_for('users.signup') }}" class="btn btn-primary" data-bs-toggle="tooltip" data-bs-title="{{ t('general_get_started_tooltip', default='Start your financial journey') | e }}">{{ t('general_get_started', default='Get Started') | e }}</a>
-                <a href="{{ url_for('users.login') }}" class="btn btn-outline-primary" data-bs-toggle="tooltip" data-bs-title="{{ t('general_login_tooltip', default='Log in to your account') | e }}">{{ t('general_login', default='Log In') | e }}</a>
-            </div>
-            <div class="secondary-actions">
-                <a href="https://personal.ficoreafrica.com" target="_blank" class="btn btn-outline-secondary" data-bs-toggle="tooltip" data-bs-title="{{ t('general_personal_finance_tooltip', default='Manage your personal finances') | e }}">
-                    <i class="bi bi-wallet2 me-2"></i>{{ t('general_personal_finance', default='Personal Finance App') | e }}
-                </a>
-                <a href="{{ url_for('general_bp.waitlist') }}" class="btn btn-outline-warning" data-bs-toggle="tooltip" data-bs-title="{{ t('general_waitlist_tooltip', default='Get early access to new features') | e }}">
-                    <i class="bi bi-star me-2"></i>{{ t('general_get_early_access', default='Get Early Access') | e }}
-                </a>
-            </div>
-        </div>
-    </div>
 </div>
 
 <style>
@@ -320,7 +312,7 @@
     object-fit: cover;
 }
 .gradient-bg {
-    background: linear-gradient(135deg, #007bff, #6610f2);
+    background: linear-gradient(135deg, #22488d, #f0812d);
 }
 .carousel-item {
     padding: 1rem;
@@ -345,21 +337,9 @@
     justify-content: center;
 }
 
-.secondary-actions {
-    display: flex;
-    gap: 1rem;
-    flex-wrap: wrap;
-    justify-content: center;
-}
-
 .auth-buttons .btn {
     min-width: 140px;
     font-weight: 600;
-}
-
-.secondary-actions .btn {
-    min-width: 160px;
-    font-weight: 500;
 }
 
 /* Responsive adjustments */
@@ -373,12 +353,12 @@
 }
 
 @media (max-width: 576px) {
-    .auth-buttons, .secondary-actions {
+    .auth-buttons {
         flex-direction: column;
         width: 100%;
     }
     
-    .auth-buttons .btn, .secondary-actions .btn {
+    .auth-buttons .btn {
         width: 100%;
         min-width: auto;
     }
@@ -422,6 +402,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         } catch (error) {
             console.error('Failed to initialize carousel:', error);
+            carousel.innerHTML = '<p class="text-muted text-center">Testimonials temporarily unavailable.</p>';
         }
     }
 
@@ -433,6 +414,7 @@ document.addEventListener('DOMContentLoaded', function() {
             counter.textContent = target;
         } else {
             counter.textContent = '0';
+            console.warn('Animated counter data-count attribute missing');
         }
     }
 

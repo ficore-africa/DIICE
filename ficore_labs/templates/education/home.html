@@ -36,13 +36,13 @@
                                 <div class="card-body text-center">
                                     <div class="mb-3">
                                         {% if user_type_id == 'employee' %}
-                                            <i class="fas fa-user-tie fa-3x text-primary"></i>
+                                            <i class="fas fa-user-tie fa-3x" style="color:#22488d;"></i>
                                         {% elif user_type_id == 'entrepreneur_unregistered' %}
-                                            <i class="fas fa-lightbulb fa-3x text-warning"></i>
+                                            <i class="fas fa-lightbulb fa-3x" style="color:#f0812d;"></i>
                                         {% elif user_type_id == 'sole_proprietor' %}
-                                            <i class="fas fa-store fa-3x text-success"></i>
+                                            <i class="fas fa-store fa-3x" style="color:#10b981;"></i>
                                         {% elif user_type_id == 'company' %}
-                                            <i class="fas fa-building fa-3x text-info"></i>
+                                            <i class="fas fa-building fa-3x" style="color:#22488d;"></i>
                                         {% endif %}
                                     </div>
                                     <h5 class="card-title">{{ user_type.name }}</h5>
@@ -50,7 +50,7 @@
                                     <div class="mt-auto">
                                         <span class="badge badge-secondary">{{ user_type.modules|length }} {{ trans('modules', default='modules') }}</span>
                                     </div>
-                                    <a href="{{ url_for('education.user_type_modules', user_type=user_type_id) }}" class="btn btn-outline-primary mt-3">{{ trans('select', default='Select') }}</a>
+                                    <a href="{{ url_for('education.user_type_modules', user_type=user_type_id) }}" class="btn mt-3" style="background:#22488d;color:#fff;border:none;">{{ trans('select', default='Select') }}</a>
                                 </div>
                             </div>
                         </div>
@@ -76,22 +76,22 @@
 
                     <div class="row mt-4">
                         <div class="col-md-6">
-                            <div class="card border-primary">
+                            <div class="card" style="border:2px solid #22488d;">
                                 <div class="card-body text-center">
-                                    <i class="fas fa-book fa-2x text-primary mb-3"></i>
+                                    <i class="fas fa-book fa-2x mb-3" style="color:#22488d;"></i>
                                     <h5>{{ trans('browse_all_modules', default='Browse All Modules') }}</h5>
                                     <p class="text-muted">{{ trans('browse_modules_desc', default='Explore all available education modules') }}</p>
-                                    <a href="{{ url_for('education.user_type_modules', user_type='employee') }}" class="btn btn-outline-primary">{{ trans('view_all', default='View All') }}</a>
+                                    <a href="{{ url_for('education.user_type_modules', user_type='employee') }}" class="btn" style="background:#22488d;color:#fff;border:none;">{{ trans('view_all', default='View All') }}</a>
                                 </div>
                             </div>
                         </div>
                         <div class="col-md-6">
-                            <div class="card border-success">
+                            <div class="card" style="border:2px solid #10b981;">
                                 <div class="card-body text-center">
-                                    <i class="fas fa-search fa-2x text-success mb-3"></i>
+                                    <i class="fas fa-search fa-2x mb-3" style="color:#10b981;"></i>
                                     <h5>{{ trans('search_topics', default='Search Topics') }}</h5>
                                     <p class="text-muted">{{ trans('search_desc', default='Find specific tax topics and information') }}</p>
-                                    <a href="{{ url_for('education.search') }}" class="btn btn-outline-success">{{ trans('search_now', default='Search Now') }}</a>
+                                    <a href="{{ url_for('education.search') }}" class="btn" style="background:#10b981;color:#fff;border:none;">{{ trans('search_now', default='Search Now') }}</a>
                                 </div>
                             </div>
                         </div>

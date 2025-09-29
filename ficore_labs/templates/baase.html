@@ -82,7 +82,7 @@
                 </button>
                 <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
                     <ul class="navbar-nav">
-                        {% for item in bottom_nav_items %}
+                        {% for item in explore_features_for_template(current_user) %}
                             {% if not item.endpoint == 'dashboard.index' or current_user.is_trial_active() %}
                             <li class="nav-item">
                                 <a class="nav-link {% if request.endpoint == item.endpoint %}active{% endif %}" href="{{ item.url | e }}" data-bs-toggle="tooltip" data-bs-title="{{ t(item.tooltip_key, default=item.tooltip) | e }}">
@@ -114,7 +114,7 @@
                 </button>
                 <div class="collapse navbar-collapse" id="navbarNav">
                     <ul class="navbar-nav">
-                        {% for item in bottom_nav_items %}
+                        {% for item in explore_features_for_template(current_user) %}
                             <li class="nav-item">
                                 <a class="nav-link {% if request.endpoint == item.endpoint %}active{% endif %}" href="{{ item.url | e }}" data-bs-toggle="tooltip" data-bs-title="{{ t(item.tooltip_key, default=item.tooltip) | e }}">
                                     <i class="bi {{ item.icon | default('bi-question-circle') | e }} me-2"></i>{{ t(item.label_key, default=item.label) | e }}
@@ -122,9 +122,6 @@
                             </li>
                         {% endfor %}
                         {% if not current_user.is_subscribed and not current_user.is_trial_active() %}
-                            <li class="nav-item">
-                                <a class="nav-link" href="{{ url_for('subscribe_bp.subscribe') | e }}">{{ t('subscribe_title', default='Subscribe') | e }}</a>
-                            </li>
                             <li class="nav-item">
                                 <a class="nav-link" href="{{ url_for('view_data') | e }}">{{ t('view_data_title', default='View Data') | e }}</a>
                             </li>
@@ -154,7 +151,6 @@
             <div class="alert alert-warning alert-dismissible fade show" role="alert">
                 <i class="bi bi-exclamation-triangle-fill me-2"></i>
                 {{ t('subscribe_prompt', default='Your trial has expired. Subscribe now to continue using all features or view your data.') | e }}
-                <a href="{{ url_for('subscribe_bp.subscribe') | e }}" class="btn btn-sm btn-primary ms-2">{{ t('subscribe_button', default='Subscribe Now') | e }}</a>
                 <a href="{{ url_for('view_data') | e }}" class="btn btn-sm btn-secondary ms-2">{{ t('view_data_button', default='View Data') | e }}</a>
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="{{ t('general_close', default='Close') | e }}"></button>
             </div>
@@ -180,7 +176,7 @@
     {% if current_user.is_authenticated %}
         <nav class="bottom-nav d-md-none" role="navigation" aria-label="{{ t('general_mobile_navigation', default='Mobile navigation') | e }}">
             <div class="nav-container">
-                {% for item in bottom_nav_items %}
+                {% for item in explore_features_for_template(current_user) %}
                     {% if not item.endpoint == 'dashboard.index' or current_user.is_trial_active() %}
                     <a href="{{ item.url | e }}" class="nav-item {% if request.endpoint == item.endpoint %}active{% endif %}" aria-label="{{ t(item.label_key, default=item.label) | e }}">
                         <i class="bi {{ item.icon | default('bi-question-circle') | e }}"></i>
@@ -189,10 +185,6 @@
                     {% endif %}
                 {% endfor %}
                 {% if not current_user.is_subscribed and not current_user.is_trial_active() %}
-                    <a href="{{ url_for('subscribe_bp.subscribe') | e }}" class="nav-item {% if request.endpoint == 'subscribe_bp.subscribe' %}active{% endif %}" aria-label="{{ t('subscribe_title', default='Subscribe') | e }}">
-                        <i class="bi bi-star-fill"></i>
-                        <div class="nav-label">{{ t('subscribe_title', default='Subscribe') | e }}</div>
-                    </a>
                     <a href="{{ url_for('view_data') | e }}" class="nav-item {% if request.endpoint == 'view_data' %}active{% endif %}" aria-label="{{ t('view_data_title', default='View Data') | e }}">
                         <i class="bi bi-eye"></i>
                         <div class="nav-label">{{ t('view_data_title', default='View Data') | e }}</div>
@@ -339,10 +331,6 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
     
-    <!-- Offline Functionality Scripts Commented Out on Purpose to keep app simple for now 
-    <script src="{{ url_for('static', filename='js/offline-manager.js') | e }}"></script> 
-    <script src="{{ url_for('static', filename='js/offline-ui.js') | e }}"></script>
-    <script src="{{ url_for('static', filename='js/sync-service.js') | e }}"></script> -->
     <script>
         // Custom confetti effect
         function launchConfetti() {
@@ -545,6 +533,7 @@
                             collapse.hide();
                             navbarToggler.setAttribute('aria-expanded', 'false');
                         }
+                        console.log('Navigating to:', link.getAttribute('href')); // Debug log
                     });
                 });
 

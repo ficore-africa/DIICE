@@ -16,7 +16,6 @@
                     </div>
                 {% endif %}
             {% endwith %}
-            <!-- Only one account type: Entrepreneur/Trader -->
             <p class="mb-3 text-muted">{{ t('general_form_reset_note', default='Form fields retain your input for convenience. Clear them if needed.') | escape }}</p>
             <form class="validate-form needs-validation" method="POST" action="{{ url_for('users.signup') }}" novalidate aria-labelledby="signup-form-title">
                 {{ form.hidden_tag() }}
@@ -25,9 +24,7 @@
                     {{ form.username(class="form-control" + (" is-invalid" if form.username.errors else ""), value=form.username.data or '', required=True, id="username", autofocus=True, **{"aria-describedby": "usernameFeedback" if form.username.errors else "", "aria-required": "true"}) | safe }}
                     {% if form.username.errors %}
                         <div id="usernameFeedback" class="invalid-feedback" role="alert">
-                            {% for error in form.username.errors %}
-                                {{ error | escape }}<br>
-                            {% endfor %}
+                            {{ form.username.errors[0] | escape }}
                         </div>
                     {% endif %}
                 </div>
@@ -36,9 +33,7 @@
                     {{ form.email(class="form-control" + (" is-invalid" if form.email.errors else ""), value=form.email.data or '', required=True, id="email", **{"aria-describedby": "emailFeedback" if form.email.errors else "", "aria-required": "true"}) | safe }}
                     {% if form.email.errors %}
                         <div id="emailFeedback" class="invalid-feedback" role="alert">
-                            {% for error in form.email.errors %}
-                                {{ error | escape }}<br>
-                            {% endfor %}
+                            {{ form.email.errors[0] | escape }}
                         </div>
                     {% endif %}
                 </div>
@@ -50,26 +45,21 @@
                     </span>
                     {% if form.password.errors %}
                         <div id="passwordFeedback" class="invalid-feedback" role="alert">
-                            {% for error in form.password.errors %}
-                                {{ error | escape }}<br>
-                            {% endfor %}
+                            {{ form.password.errors[0] | escape }}
                         </div>
                     {% endif %}
                 </div>
-                <!-- Role selection removed: all users are entrepreneurs/traders -->
                 <div class="form-group mb-3">
                     <label class="form-label" for="language">{{ t('general_language', default='Language') | escape }}</label>
                     {{ form.language(class="form-select" + (" is-invalid" if form.language.errors else ""), required=True, id="language", **{"aria-describedby": "languageFeedback" if form.language.errors else "", "aria-required": "true"}) | safe }}
                     {% if form.language.errors %}
                         <div id="languageFeedback" class="invalid-feedback" role="alert">
-                            {% for error in form.language.errors %}
-                                {{ error | escape }}<br>
-                            {% endfor %}
+                            {{ form.language.errors[0] | escape }}
                         </div>
                     {% endif %}
                 </div>
                 <div class="form-group mb-3 text-center">
-                    <p>{{ t('general_trial_info', default='Your account includes a 30-day free trial.') | escape }}</p>
+                    <p>{{ t('general_trial_info', default='Your account includes a <strong>30-day free trial</strong>.') | escape }}</p>
                     <p>{{ t('general_agree_to_terms', default='By signing up, you agree to our') | escape }} <a href="{{ url_for('general_bp.terms') | escape }}" aria-label="{{ t('general_terms', default='Terms of Service') | escape }}">{{ t('general_terms', default='Terms of Service') | escape }}</a>.</p>
                 </div>
                 <div class="text-center">
@@ -82,6 +72,52 @@
         </div>
     </div>
 </div>
+<style>
+.form-group {
+    position: relative;
+}
+.form-control, .form-select {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #ced4da;
+    border-radius: 0.25rem;
+}
+.form-label {
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+}
+.password-toggle {
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+}
+.password-toggle i {
+    font-size: 1.2rem;
+    color: #6b7280;
+}
+.btn-primary {
+    width: 100%;
+    padding: 0.75rem;
+    background-color: #2563eb;
+    border: none;
+    border-radius: 0.25rem;
+    color: white;
+    font-weight: 600;
+}
+.alert-dismissible {
+    position: relative;
+    padding-right: 4rem;
+}
+.btn-close {
+    position: absolute;
+    top: 0.75rem;
+    right: 1rem;
+}
+</style>
 {% endblock %}
 {% block extra_scripts %}
 <script>

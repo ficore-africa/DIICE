@@ -9,6 +9,9 @@
     {% set tool_icon = 'fa-history' %}
     {% set subtitle = t('tax_history_description', default='Review and manage your past tax calculations') %}
     {% include 'tool_header.html' %}
+    <div class="alert alert-info mt-3">
+        <strong>Tip:</strong> Based on your recorded expenses on Ficore, you may have deductible spending from categories like office, transport, tools, etc. <a href="{{ url_for('education.education_home') }}" class="link-info" target="_blank">Learn more in our Tax Education Center</a>
+    </div>
 
     <!-- Navigation Breadcrumb -->
     <nav aria-label="breadcrumb" class="mb-4">
@@ -84,7 +87,10 @@
                                         {{ csrf_token() }}
                                         <input type="hidden" name="tax_id" value="{{ calc_id }}">
                                         <input type="hidden" name="action" value="delete">
-                                        <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('{{ t('tax_confirm_delete', default='Are you sure you want to delete this tax calculation?') | e }}');">
+                                        <script type="text/javascript">
+                                            var taxConfirmDeleteMsg = "{{ t('tax_confirm_delete', default='Are you sure you want to delete this tax calculation?') | escapejs }}";
+                                        </script>
+                                        <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm(taxConfirmDeleteMsg);">
                                             <i class="fas fa-trash me-1"></i>{{ t('general_delete', default='Delete') }}
                                         </button>
                                     </form>
@@ -132,7 +138,7 @@ document.addEventListener('DOMContentLoaded', function() {
         form.addEventListener('submit', function(e) {
             e.preventDefault();
             
-            if (!confirm('{{ t('tax_confirm_delete', default='Are you sure you want to delete this tax calculation?') | e }}')) {
+            if (!confirm(taxConfirmDeleteMsg)) {
                 return;
             }
 

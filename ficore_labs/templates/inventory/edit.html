@@ -1,8 +1,7 @@
 {% extends 'base.html' %}
-{% block title %}{{ trans('inventory_add_title', default='Add Inventory Item') }} - FiCore{% endblock %}
+{% block title %}{{ trans('inventory_edit_title', default='Edit Inventory Item') }}{% endblock %}
 {% block content %}
 <div class="container mt-5">
-    <!-- Back Button -->
     <div class="d-flex align-items-center mb-4">
         <button onclick="history.back()" class="btn btn-outline-secondary me-3" aria-label="{{ trans('general_back', default='Back') | e }}">
             <i class="bi bi-arrow-left"></i> {{ trans('general_back', default='Back') | e }}
@@ -12,55 +11,58 @@
         </a>
     </div>
 
-    <div class="page-title">
-        <h1>{{ trans('inventory_add_title', default='Add Inventory Item') }}</h1>
-        <small class="subtext">{{ trans('inventory_subtitle', default='Add a new item to your inventory') }}</small>
-    </div>
-
-    {% if not can_interact %}
-        <div class="alert alert-warning" role="alert">
-            {{ trans('inventory_subscription_required', default='Your trial has expired or you do not have an active subscription. Please subscribe to add an inventory item.') }}
-            <a href="{{ url_for('general_bp.subscription_required') }}" class="alert-link">{{ trans('general_subscribe', default='Subscribe now') }}</a>
-        </div>
-    {% endif %}
-
-    <form action="{{ url_for('inventory.add') }}" method="POST" class="row g-3" {% if not can_interact %}onsubmit="return false;"{% endif %}>
+    <h1>{{ trans('inventory_edit_title', default='Edit Inventory Item') }}</h1>
+    <form action="{{ url_for('inventory.edit', item_id=item._id) }}" method="POST" class="row g-3">
         {{ form.hidden_tag() }}
         <div class="col-12">
             <label for="name" class="form-label">{{ trans('inventory_name', default='Item Name') }}</label>
-            {{ form.name(class="form-control", required=True, disabled=not can_interact) }}
+            {{ form.name(class="form-control", required=True) }}
             {% if form.name.errors %}
                 <p class="text-danger mt-1">{{ form.name.errors[0] }}</p>
             {% endif %}
         </div>
         <div class="col-12">
             <label for="cost" class="form-label">{{ trans('inventory_cost', default='Cost') }}</label>
-            {{ form.cost(class="form-control", type="number", step="0.01", required=True, disabled=not can_interact) }}
+            {{ form.cost(class="form-control", type="number", step="0.01", required=True) }}
             {% if form.cost.errors %}
                 <p class="text-danger mt-1">{{ form.cost.errors[0] }}</p>
             {% endif %}
         </div>
         <div class="col-12">
             <label for="selling_price" class="form-label">{{ trans('inventory_selling_price', default='Selling Price') }}</label>
-            {{ form.selling_price(class="form-control", type="number", step="0.01", required=True, disabled=not can_interact) }}
+            {{ form.selling_price(class="form-control", type="number", step="0.01", required=True) }}
             <small id="suggested-price" class="form-text text-muted"></small>
             {% if form.selling_price.errors %}
                 <p class="text-danger mt-1">{{ form.selling_price.errors[0] }}</p>
             {% endif %}
         </div>
         <div class="col-12">
-            <label for="stock_qty" class="form-label">{{ trans('inventory_stock_qty', default='Stock Quantity') }}</label>
-            {{ form.stock_qty(class="form-control", type="number", step="0.01", min="0", disabled=not can_interact) }}
-            {% if form.stock_qty.errors %}
-                <p class="text-danger mt-1">{{ form.stock_qty.errors[0] }}</p>
+            <label for="quantity_in_stock" class="form-label">{{ trans('inventory_quantity_in_stock', default='Quantity in Stock') }}</label>
+            {{ form.quantity_in_stock(class="form-control", type="number", step="1") }}
+            {% if form.quantity_in_stock.errors %}
+                <p class="text-danger mt-1">{{ form.quantity_in_stock.errors[0] }}</p>
+            {% endif %}
+        </div>
+        <div class="col-12">
+            <label for="reorder_level" class="form-label">{{ trans('inventory_reorder_level', default='Reorder Level') }}</label>
+            {{ form.reorder_level(class="form-control", type="number", step="1") }}
+            {% if form.reorder_level.errors %}
+                <p class="text-danger mt-1">{{ form.reorder_level.errors[0] }}</p>
+            {% endif %}
+        </div>
+        <div class="col-12">
+            <label for="restock_date" class="form-label">{{ trans('inventory_restock_date', default='Restock Date') }}</label>
+            {{ form.restock_date(class="form-control", type="date") }}
+            {% if form.restock_date.errors %}
+                <p class="text-danger mt-1">{{ form.restock_date.errors[0] }}</p>
             {% endif %}
         </div>
         <div class="col-12">
             <label for="category" class="form-label">{{ trans('inventory_category', default='Category') }}</label>
-            <select name="category" class="form-control" id="category" {% if not can_interact %}disabled{% endif %}>
+            <select name="category" class="form-control" id="category">
                 <option value="">{{ trans('general_select', default='Select Category') }}</option>
                 {% for cat in INVENTORY_CATEGORIES %}
-                    <option value="{{ cat }}">{{ cat }}</option>
+                    <option value="{{ cat }}" {% if form.category.data == cat %}selected{% endif %}>{{ cat }}</option>
                 {% endfor %}
             </select>
             {% if form.category.errors %}
@@ -69,10 +71,10 @@
         </div>
         <div class="col-12">
             <label for="unit" class="form-label">{{ trans('inventory_unit', default='Unit') }}</label>
-            <select name="unit" class="form-control" id="unit" {% if not can_interact %}disabled{% endif %}>
+            <select name="unit" class="form-control" id="unit">
                 <option value="">{{ trans('general_select', default='Select Unit') }}</option>
                 {% for unit in INVENTORY_UNITS %}
-                    <option value="{{ unit }}">{{ unit }}</option>
+                    <option value="{{ unit }}" {% if form.unit.data == unit %}selected{% endif %}>{{ unit }}</option>
                 {% endfor %}
             </select>
             {% if form.unit.errors %}
@@ -81,10 +83,10 @@
         </div>
         <div class="col-12">
             <label for="status" class="form-label">{{ trans('inventory_status', default='Status') }}</label>
-            <select name="status" class="form-control" id="status" {% if not can_interact %}disabled{% endif %}>
-                <option value="Active">{{ trans('inventory_status_active', default='Active') }}</option>
-                <option value="Out of Stock">{{ trans('inventory_status_out_of_stock', default='Out of Stock') }}</option>
-                <option value="Discontinued">{{ trans('inventory_status_discontinued', default='Discontinued') }}</option>
+            <select name="status" class="form-control" id="status">
+                <option value="Active" {% if form.status.data == 'Active' %}selected{% endif %}>{{ trans('inventory_status_active', default='Active') }}</option>
+                <option value="Out of Stock" {% if form.status.data == 'Out of Stock' %}selected{% endif %}>{{ trans('inventory_status_out_of_stock', default='Out of Stock') }}</option>
+                <option value="Discontinued" {% if form.status.data == 'Discontinued' %}selected{% endif %}>{{ trans('inventory_status_discontinued', default='Discontinued') }}</option>
             </select>
             {% if form.status.errors %}
                 <p class="text-danger mt-1">{{ form.status.errors[0] }}</p>
@@ -92,27 +94,13 @@
         </div>
         <div class="col-12">
             <label for="vendor_id" class="form-label">{{ trans('inventory_vendor_id', default='Vendor ID') }}</label>
-            {{ form.vendor_id(class="form-control", disabled=not can_interact) }}
+            {{ form.vendor_id(class="form-control") }}
             {% if form.vendor_id.errors %}
                 <p class="text-danger mt-1">{{ form.vendor_id.errors[0] }}</p>
             {% endif %}
         </div>
         <div class="col-12">
-            <label for="reorder_level" class="form-label">{{ trans('inventory_reorder_level', default='Reorder Level') }}</label>
-            {{ form.reorder_level(class="form-control", type="number", step="1", disabled=not can_interact) }}
-            {% if form.reorder_level.errors %}
-                <p class="text-danger mt-1">{{ form.reorder_level.errors[0] }}</p>
-            {% endif %}
-        </div>
-        <div class="col-12">
-            <label for="restock_date" class="form-label">{{ trans('inventory_restock_date', default='Restock Date') }}</label>
-            {{ form.restock_date(class="form-control", type="date", disabled=not can_interact) }}
-            {% if form.restock_date.errors %}
-                <p class="text-danger mt-1">{{ form.restock_date.errors[0] }}</p>
-            {% endif %}
-        </div>
-        <div class="col-12">
-            <button type="submit" class="btn btn-primary w-100" {% if not can_interact %}disabled{% endif %}>{{ trans('general_submit', default='Add Item') }}</button>
+            <button type="submit" class="btn btn-primary w-100">{{ trans('general_submit', default='Update Item') }}</button>
         </div>
     </form>
 

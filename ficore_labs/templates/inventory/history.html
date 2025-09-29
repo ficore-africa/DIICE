@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% block title %}{{ trans('inventory_history_title', default='Inventory Movement History') }} - {{ item_name }}{% endblock %}
+{% block content %}
+<div class="container mt-5">
+    <div class="d-flex align-items-center mb-4">
+        <button onclick="history.back()" class="btn btn-outline-secondary me-3" aria-label="{{ trans('general_back', default='Back') | e }}">
+            <i class="bi bi-arrow-left"></i> {{ trans('general_back', default='Back') | e }}
+        </button>
+        <a href="{{ url_for('inventory.index') | e }}" class="btn btn-link text-decoration-none">
+            <i class="bi bi-list"></i> {{ trans('inventory_back_to_list', default='Back to Inventory List') | e }}
+        </a>
+    </div>
+
+    <h1>{{ trans('inventory_history_title', default='Inventory Movement History') }} - {{ item_name | e }}</h1>
+    {% if movements %}
+    <div class="table-responsive">
+        <table class="table table-bordered table-hover">
+            <thead>
+                <tr>
+                    <th>{{ trans('general_date', default='Date') }}</th>
+                    <th>{{ trans('inventory_change_type', default='Change Type') }}</th>
+                    <th>{{ trans('inventory_quantity', default='Quantity') }}</th>
+                    <th>{{ trans('general_notes', default='Notes') }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for movement in movements %}
+                <tr>
+                    <td>{{ movement.date | format_date }}</td>
+                    <td>{{ movement.change_type | e }}</td>
+                    <td>{{ movement.quantity }}</td>
+                    <td>{{ movement.notes | e }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="text-muted">{{ trans('inventory_no_movements', default='No inventory movements found.') }}</p>
+    {% endif %}
+</div>
+{% endblock %}

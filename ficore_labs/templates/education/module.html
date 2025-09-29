@@ -14,11 +14,11 @@
                             {{ module.title }}
                         </h3>
                         <div>
-                            <button onclick="history.back()" class="btn btn-outline-secondary mr-2">
-                                <i class="fas fa-arrow-left mr-1"></i>{{ trans('back', default='Back') }}
+                            <button onclick="history.back()" class="btn" style="background:#22488d;color:#fff;border:none;margin-right:0.5rem;">
+                                <i class="fas fa-arrow-left mr-1" style="color:#fff;"></i>{{ trans('back', default='Back') }}
                             </button>
-                            <button onclick="markAsComplete()" class="btn btn-success">
-                                <i class="fas fa-check mr-1"></i>{{ trans('mark_complete', default='Mark Complete') }}
+                            <button onclick="markAsComplete()" class="btn" style="background:#f0812d;color:#fff;border:none;">
+                                <i class="fas fa-check mr-1" style="color:#fff;"></i>{{ trans('mark_complete', default='Mark Complete') }}
                             </button>
                         </div>
                     </div>
@@ -36,8 +36,8 @@
                     <div class="row mb-4" id="{{ section_id }}">
                         <div class="col-12">
                             <div class="card">
-                                <div class="card-header bg-light">
-                                    <h4 class="mb-0">{{ section.title }}</h4>
+                                <div class="card-header" style="background:#f2fefa;border-left:4px solid #22488d;">
+                                    <h4 class="mb-0" style="color:#22488d;">{{ section.title }}</h4>
                                 </div>
                                 <div class="card-body">
                                     <p class="lead">{{ section.content }}</p>
@@ -47,7 +47,7 @@
                                     <ul class="list-group list-group-flush">
                                         {% for point in section.key_points %}
                                         <li class="list-group-item d-flex align-items-center">
-                                            <i class="fas fa-check-circle text-success mr-3"></i>
+                                            <i class="fas fa-check-circle mr-3" style="color:#22488d;"></i>
                                             {{ point }}
                                         </li>
                                         {% endfor %}
@@ -56,8 +56,8 @@
 
                                     {% if section.action_url and section.action_text %}
                                     <div class="mt-4">
-                                        <a href="{{ section.action_url }}" target="_blank" class="btn btn-primary">
-                                            <i class="fas fa-external-link-alt mr-2"></i>{{ section.action_text }}
+                                        <a href="{{ section.action_url }}" target="_blank" class="btn" style="background:#22488d;color:#fff;border:none;">
+                                            <i class="fas fa-external-link-alt mr-2" style="color:#fff;"></i>{{ section.action_text }}
                                         </a>
                                     </div>
                                     {% endif %}
@@ -69,20 +69,19 @@
 
                     <div class="row mt-5">
                         <div class="col-12">
-                            <div class="card bg-light">
+                            <div class="card" style="background:#f2fefa;">
                                 <div class="card-body">
-                                    <h5><i class="fas fa-lightbulb mr-2"></i>{{ trans('practical_tip', default='Practical Tip') }}</h5>
+                                    <h5><i class="fas fa-lightbulb mr-2" style="color:#f0812d;"></i>{{ trans('practical_tip', default='Practical Tip') }}</h5>
                                     <p class="mb-3">{{ trans('module_tip_' + module_id, default='Use Ficore\'s expense tracking features to automatically categorize your business expenses and simplify tax compliance.') }}</p>
-                                    
                                     <div class="row">
                                         <div class="col-md-6">
-                                            <a href="{{ url_for('tax.index') }}" class="btn btn-outline-success btn-block">
-                                                <i class="fas fa-calculator mr-2"></i>{{ trans('try_tax_calculator', default='Try Tax Calculator') }}
+                                            <a href="{{ url_for('tax.index') }}" class="btn" style="background:#22488d;color:#fff;border:none;width:100%;">
+                                                <i class="fas fa-calculator mr-2" style="color:#fff;"></i>{{ trans('try_tax_calculator', default='Try Tax Calculator') }}
                                             </a>
                                         </div>
                                         <div class="col-md-6">
-                                            <a href="{{ url_for('education.glossary') }}" class="btn btn-outline-info btn-block">
-                                                <i class="fas fa-book mr-2"></i>{{ trans('view_glossary', default='View Glossary') }}
+                                            <a href="{{ url_for('education.glossary') }}" class="btn" style="background:#f0812d;color:#fff;border:none;width:100%;">
+                                                <i class="fas fa-book mr-2" style="color:#fff;"></i>{{ trans('view_glossary', default='View Glossary') }}
                                             </a>
                                         </div>
                                     </div>
@@ -93,8 +92,8 @@
 
                     <div class="row mt-4">
                         <div class="col-12 text-center">
-                            <button onclick="markAsComplete()" class="btn btn-success btn-lg">
-                                <i class="fas fa-graduation-cap mr-2"></i>{{ trans('complete_module', default='Complete This Module') }}
+                            <button onclick="markAsComplete()" class="btn btn-lg" style="background:#22488d;color:#fff;border:none;">
+                                <i class="fas fa-graduation-cap mr-2" style="color:#fff;"></i>{{ trans('complete_module', default='Complete This Module') }}
                             </button>
                         </div>
                     </div>
