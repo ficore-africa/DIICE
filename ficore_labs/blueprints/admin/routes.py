@@ -3,8 +3,7 @@ import os
 from io import BytesIO
 import io
 import csv
-from datetime import datetime, timezone
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
 from flask import Blueprint, render_template, redirect, url_for, flash, request, Response, send_file, session
 from flask_login import login_required, current_user
@@ -190,7 +189,8 @@ def dashboard():
             'admin/dashboard.html',
             stats=stats,
             recent_users=recent_users,
-            title=trans('admin_dashboard', default='Admin Dashboard')
+            title=trans('admin_dashboard', default='Admin Dashboard'),
+            now=datetime.now(timezone.utc)
         )
     except Exception as e:
         logger.error(f"Error loading admin dashboard for user {current_user.id}: {str(e)}",
@@ -220,7 +220,7 @@ def manage_users():
                 datetime.now(timezone.utc) <= trial_end_aware if user.get('is_trial') and trial_end_aware
                 else user.get('is_subscribed') and subscription_end_aware and datetime.now(timezone.utc) <= subscription_end_aware
             )
-        return render_template('admin/users.html', users=users, title=trans('admin_manage_users_title', default='Manage Users'))
+        return render_template('admin/users.html', users=users, title=trans('admin_manage_users_title', default='Manage Users'), now=datetime.now(timezone.utc))
     except Exception as e:
         logger.error(f"Error fetching users for admin {current_user.id}: {str(e)}",
                      extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
@@ -466,7 +466,7 @@ def manage_user_subscriptions():
                 datetime.now(timezone.utc) <= trial_end_aware if user.get('is_trial') and trial_end_aware
                 else user.get('is_subscribed') and subscription_end_aware and datetime.now(timezone.utc) <= subscription_end_aware
             )
-        return render_template('admin/user_subscriptions.html', form=form, users=users, title=trans('admin_manage_user_subscriptions_title', default='Manage User Subscriptions'))
+        return render_template('admin/user_subscriptions.html', form=form, users=users, title=trans('admin_manage_user_subscriptions_title', default='Manage User Subscriptions'), now=datetime.now(timezone.utc))
     except Exception as e:
         logger.error(f"Error in manage_user_subscriptions for admin {current_user.id}: {str(e)}",
                      extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
@@ -554,7 +554,7 @@ def manage_user_trials():
                     logger.error(f"Error in bulk trial update: {str(e)}",
                                  extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
                     flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
-                    return render_template('admin/user_trials.html', form=form, users=users, title=trans('admin_manage_user_trials_title', default='Manage User Trials'))
+                    return render_template('admin/user_trials.html', form=form, users=users, title=trans('admin_manage_user_trials_title', default='Manage User Trials'), now=datetime.now(timezone.utc))
         for user in users:
             user['_id'] = str(user['_id'])
             trial_end = user.get('trial_end')
@@ -565,7 +565,7 @@ def manage_user_trials():
                 datetime.now(timezone.utc) <= trial_end_aware if user.get('is_trial') and trial_end_aware
                 else user.get('is_subscribed') and subscription_end_aware and datetime.now(timezone.utc) <= subscription_end_aware
             )
-        return render_template('admin/user_trials.html', form=form, users=users, title=trans('admin_manage_user_trials_title', default='Manage User Trials'))
+        return render_template('admin/user_trials.html', form=form, users=users, title=trans('admin_manage_user_trials_title', default='Manage User Trials'), now=datetime.now(timezone.utc))
     except Exception as e:
         logger.error(f"Error in manage_user_trials for admin {current_user.id}: {str(e)}",
                      extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
@@ -956,7 +956,7 @@ def customer_reports():
             return generate_customer_report_pdf(users)
         elif format == 'csv':
             return generate_customer_report_csv(users)
-        return render_template('admin/customer_reports.html', users=users, title=trans('admin_customer_reports_title', default='Customer Reports'))
+        return render_template('admin/customer_reports.html', users=users, title=trans('admin_customer_reports_title', default='Customer Reports'), now=datetime.now(timezone.utc))
     except Exception as e:
         logger.error(f"Error in customer_reports for admin {current_user.id}: {str(e)}",
                      extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
@@ -1563,5 +1563,6 @@ def system_health_monitor():
         logger.error(f"Error loading system health: {str(e)}")
         flash(trans('admin_health_error', default='Error loading system health data'), 'danger')
         return redirect(url_for('admin.dashboard'))
+
 
 
