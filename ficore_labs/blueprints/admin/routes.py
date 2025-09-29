@@ -223,11 +223,21 @@ def manage_users():
 def suspend_user(user_id):
     """Suspend a user account."""
     try:
-        ObjectId(user_id)
+        # Only treat as ObjectId if it looks like one
+        from bson.objectid import ObjectId as BsonObjectId
+        is_objectid = False
+        try:
+            BsonObjectId(str(user_id))
+            is_objectid = True
+        except Exception:
+            is_objectid = False
         db = utils.get_mongo_db()
         if db is None:
             raise Exception("Failed to connect to MongoDB")
-        user_query = {'_id': ObjectId(user_id)}
+        if is_objectid:
+            user_query = {'_id': BsonObjectId(user_id)}
+        else:
+            user_query = {'user_id': user_id}
         user = db.users.find_one(user_query)
         if user is None:
             flash(trans('admin_user_not_found', default='User not found'), 'danger')
@@ -243,11 +253,6 @@ def suspend_user(user_id):
             logger.info(f"Admin {current_user.id} suspended user {user_id}",
                         extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
             log_audit_action('suspend_user', {'user_id': user_id})
-        return redirect(url_for('admin.manage_users'))
-    except errors.InvalidId:
-        logger.error(f"Invalid user_id format: {user_id}",
-                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-        flash(trans('admin_invalid_user_id', default='Invalid user ID'), 'danger')
         return redirect(url_for('admin.manage_users'))
     except Exception as e:
         logger.error(f"Error suspending user {user_id}: {str(e)}",
@@ -405,11 +410,13 @@ def manage_user_subscriptions():
         if request.method == 'POST' and form.validate_on_submit():
             user_id = request.form.get('user_id')
             try:
-                ObjectId(user_id)
-                user = db.users.find_one({'_id': ObjectId(user_id)})
-                if user is None:
-                    flash(trans('user_not_found', default='User not found'), 'danger')
-                    return redirect(url_for('admin.manage_user_subscriptions'))
+                from bson.objectid import ObjectId as BsonObjectId
+                is_objectid = False
+                try:
+                    BsonObjectId(str(user_id))
+                    is_objectid = True
+                except Exception:
+                    is_objectid = False
                 plan_durations = {'monthly': 30, 'yearly': 365}
                 update_data = {
                     'is_subscribed': form.is_subscribed.data == 'True',
@@ -421,8 +428,16 @@ def manage_user_subscriptions():
                 if form.is_subscribed.data == 'True' and not form.subscription_end.data and form.subscription_plan.data:
                     duration = plan_durations.get(form.subscription_plan.data, 30)
                     update_data['subscription_end'] = datetime.now(timezone.utc) + timedelta(days=duration)
+                if is_objectid:
+                    user_query = {'_id': BsonObjectId(user_id)}
+                else:
+                    user_query = {'user_id': user_id}
+                user = db.users.find_one(user_query)
+                if user is None:
+                    flash(trans('user_not_found', default='User not found'), 'danger')
+                    return redirect(url_for('admin.manage_user_subscriptions'))
                 db.users.update_one(
-                    {'_id': ObjectId(user_id)},
+                    user_query,
                     {'$set': update_data}
                 )
                 logger.info(f"User subscription updated: id={user_id}, subscribed={update_data['is_subscribed']}, plan={update_data['subscription_plan']}, admin={current_user.id}",
@@ -434,11 +449,6 @@ def manage_user_subscriptions():
                     'subscription_end': update_data['subscription_end'].strftime('%Y-%m-%d') if update_data['subscription_end'] else None
                 })
                 flash(trans('subscription_updated', default='User subscription updated successfully'), 'success')
-                return redirect(url_for('admin.manage_user_subscriptions'))
-            except errors.InvalidId:
-                logger.error(f"Invalid user_id format: {user_id}",
-                             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-                flash(trans('admin_invalid_user_id', default='Invalid user ID'), 'danger')
                 return redirect(url_for('admin.manage_user_subscriptions'))
             except Exception as e:
                 logger.error(f"Error updating user subscription {user_id}: {str(e)}",
