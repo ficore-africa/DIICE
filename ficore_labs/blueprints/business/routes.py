@@ -18,11 +18,15 @@ def home():
         user_id = current_user.id
         lang = session.get('lang', 'en')
 
-        # Check trial/subscription status
-        if not current_user.is_trial_active() and not current_user.is_subscribed:
-            return redirect(url_for('subscribe_bp.subscription_required'))
+        # Subscription/trial check REMOVED
+        # if not current_user.is_trial_active() and not current_user.is_subscribed:
+        #     return redirect(url_for('subscribe_bp.subscription_required'))
 
-        is_read_only = not current_user.is_subscribed and not current_user.is_trial_active()
+        # is_read_only is now set to False as the subscription check is removed.
+        # If read-only mode should still be enforced for non-subscribed users, 
+        # the check below can be re-enabled without the redirect.
+        # is_read_only = not current_user.is_subscribed and not current_user.is_trial_active()
+        is_read_only = False 
 
         # Fetch debt summary
         creditors_pipeline = [
