@@ -1,3 +1,41 @@
+@admin_bp.route('/feedback', methods=['GET', 'POST'])
+@login_required
+@utils.requires_role('admin')
+@utils.limiter.limit("50 per hour")
+def manage_feedback():
+    """View and filter user feedback."""
+    try:
+        db = utils.get_mongo_db()
+        if db is None:
+            raise Exception("Failed to connect to MongoDB")
+        form = FeedbackFilterForm()
+        filter_kwargs = {}
+        if request.method == 'POST' and form.validate_on_submit():
+            if form.tool_name.data:
+                filter_kwargs['tool_name'] = form.tool_name.data
+            if form.user_id.data:
+                filter_kwargs['user_id'] = utils.sanitize_input(form.user_id.data, max_length=50)
+        feedback_list = [to_dict_feedback(fb) for fb in get_feedback(db, filter_kwargs)]
+        for feedback in feedback_list:
+            feedback['id'] = str(feedback['id'])
+            feedback['timestamp'] = (
+                feedback['timestamp'].astimezone(ZoneInfo("UTC")).strftime('%Y-%m-%d %H:%M:%S')
+                if feedback['timestamp'] and feedback['timestamp'].tzinfo
+                else feedback['timestamp'].replace(tzinfo=ZoneInfo("UTC")).strftime('%Y-%m-%d %H:%M:%S')
+                if feedback['timestamp']
+                else ''
+            )
+        return render_template(
+            'admin/feedback.html',
+            form=form,
+            feedback_list=feedback_list,
+            title=trans('admin_feedback_title', default='Manage Feedback')
+        )
+    except Exception as e:
+        logger.error(f"Error fetching feedback for admin {current_user.id}: {str(e)}",
+                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
+        flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
+        return render_template('error/500.html'), 500
 import logging
 import os
 from io import BytesIO
@@ -31,25 +69,31 @@ admin_bp = Blueprint('admin', __name__, template_folder='templates/admin', url_p
 # Helper to ensure all datetimes are UTC-aware
 def to_utc_aware(dt):
     """Convert a datetime or string to UTC-aware datetime."""
-    if not dt:
-        return None
-    if isinstance(dt, str):
-        try:
-            dt = datetime.fromisoformat(dt)
-        except ValueError:
+    try:
+        if not dt:
+            # Always return a valid UTC datetime
+            return datetime.min.replace(tzinfo=timezone.utc)
+        if isinstance(dt, str):
             try:
-                dt = datetime.strptime(dt, '%Y-%m-%d')
+                dt = datetime.fromisoformat(dt)
             except ValueError:
-                logger.error(f"Invalid datetime string format: {dt}",
-                             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-                return None
-    if isinstance(dt, datetime):
-        if dt.tzinfo is None:
-            return dt.replace(tzinfo=timezone.utc)
-        return dt.astimezone(timezone.utc)
-    logger.error(f"Invalid datetime type: {type(dt)}",
-                 extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-    return None
+                try:
+                    dt = datetime.strptime(dt, '%Y-%m-%d')
+                except ValueError:
+                    logger.error(f"Invalid datetime string format: {dt}",
+                                 extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
+                    return datetime.min.replace(tzinfo=timezone.utc)
+        if isinstance(dt, datetime):
+            if dt.tzinfo is None:
+                return dt.replace(tzinfo=timezone.utc)
+            return dt.astimezone(timezone.utc)
+        logger.error(f"Invalid datetime type: {type(dt)}",
+                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
+        return datetime.min.replace(tzinfo=timezone.utc)
+    except Exception as e:
+        logger.error(f"Exception in to_utc_aware: {e}",
+                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
+        return datetime.min.replace(tzinfo=timezone.utc)
 
 # Form Definitions
 class RoleForm(FlaskForm):
@@ -1251,45 +1295,6 @@ def education_management():
         logger.error(f"Error in education management for admin {current_user.id}: {str(e)}")
         flash(trans('admin_database_error', default='Database error occurred'), 'danger')
         return redirect(url_for('admin.dashboard'))
-
-@admin_bp.route('/feedback', methods=['GET', 'POST'])
-@login_required
-@utils.requires_role('admin')
-@utils.limiter.limit("50 per hour")
-def manage_feedback():
-    """View and filter user feedback."""
-    try:
-        db = utils.get_mongo_db()
-        if db is None:
-            raise Exception("Failed to connect to MongoDB")
-        form = FeedbackFilterForm()
-        filter_kwargs = {}
-        if request.method == 'POST' and form.validate_on_submit():
-            if form.tool_name.data:
-                filter_kwargs['tool_name'] = form.tool_name.data
-            if form.user_id.data:
-                filter_kwargs['user_id'] = utils.sanitize_input(form.user_id.data, max_length=50)
-        feedback_list = [to_dict_feedback(fb) for fb in get_feedback(db, filter_kwargs)]
-        for feedback in feedback_list:
-            feedback['id'] = str(feedback['id'])
-            feedback['timestamp'] = (
-                feedback['timestamp'].astimezone(ZoneInfo("UTC")).strftime('%Y-%m-%d %H:%M:%S')
-                if feedback['timestamp'] and feedback['timestamp'].tzinfo
-                else feedback['timestamp'].replace(tzinfo=ZoneInfo("UTC")).strftime('%Y-%m-%d %H:%M:%S')
-                if feedback['timestamp']
-                else ''
-            )
-        return render_template(
-            'admin/feedback.html',
-            form=form,
-            feedback_list=feedback_list,
-            title=trans('admin_feedback_title', default='Manage Feedback')
-        )
-    except Exception as e:
-        logger.error(f"Error fetching feedback for admin {current_user.id}: {str(e)}",
-                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-        flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
-        return render_template('error/500.html'), 500
 
 @admin_bp.route('/system/health', methods=['GET'])
 @login_required
