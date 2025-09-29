@@ -42,7 +42,8 @@ def landing():
                 extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
             )
             flash(trans('general_error', default='An error occurred. Please try again.'), 'danger')
-            return redirect(url_for('subscribe_bp.subscription_required'))
+            # The redirect to subscription_required on error has been REMOVED
+            return redirect(url_for('general_bp.home')) # Fallback to home instead of an infinite loop risk
     try:
         current_app.logger.info(
             f"Accessing general.landing - User: {current_user.id if current_user.is_authenticated else 'anonymous'}, Authenticated: {current_user.is_authenticated}, Session: {dict(session)}",
@@ -88,15 +89,17 @@ def landing():
 @general_bp.route('/home')
 @login_required
 def home():
-    """Trader homepage with trial/subscription check."""
+    """Trader homepage."""
     try:
         user = get_user(get_mongo_db(), current_user.id)
-        if not user.is_trial_active() and not user.is_subscribed:
-            current_app.logger.info(
-                f"Redirecting user {current_user.id} to subscribe due to expired trial",
-                extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
-            )
-            return redirect(url_for('subscribe_bp.subscription_required'))
+        
+        # Original subscription/trial check block has been REMOVED:
+        # if not user.is_trial_active() and not user.is_subscribed:
+        #     current_app.logger.info(
+        #         f"Redirecting user {current_user.id} to subscribe due to expired trial",
+        #         extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
+        #     )
+        #     return redirect(url_for('subscribe_bp.subscription_required'))
         
         if user.trial_end and user.trial_end.tzinfo is None:
             user.trial_end = user.trial_end.replace(tzinfo=ZoneInfo("UTC"))
@@ -130,7 +133,8 @@ def home():
             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
         )
         flash(trans('general_error', default='An error occurred'), 'danger')
-        return redirect(url_for('subscribe_bp.subscription_required'))
+        # Defaulting to a safe, authenticated-only redirect in case of error
+        return redirect(url_for('general_bp.landing')) 
 
 @general_bp.route('/about')
 def about():
@@ -275,13 +279,14 @@ def feedback():
             
             if current_user.is_authenticated:
                 user = get_user(get_mongo_db(), current_user.id)
-                if not user.is_trial_active() and not user.is_subscribed:
-                    current_app.logger.info(
-                        f"Redirecting user {current_user.id} to subscribe due to expired trial from feedback",
-                        extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
-                    )
-                    flash(trans('general_subscription_required', default='Your trial has expired. Please subscribe to submit feedback.'), 'warning')
-                    return redirect(url_for('subscribe_bp.subscription_required'))
+                # Subscription/trial check in feedback submission has been REMOVED
+                # if not user.is_trial_active() and not user.is_subscribed:
+                #     current_app.logger.info(
+                #         f"Redirecting user {current_user.id} to subscribe due to expired trial from feedback",
+                #         extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
+                #     )
+                #     flash(trans('general_subscription_required', default='Your trial has expired. Please subscribe to submit feedback.'), 'warning')
+                #     return redirect(url_for('subscribe_bp.subscription_required'))
             
             with current_app.app_context():
                 db = get_mongo_db()
@@ -312,7 +317,7 @@ def feedback():
             )
             flash(trans('general_thank_you', default='Thank you for your feedback!'), 'success')
             return redirect(url_for('general_bp.home'))
-        
+            
         except CSRFError as e:
             current_app.logger.error(
                 f'CSRF error in feedback submission: {str(e)}',
@@ -325,7 +330,7 @@ def feedback():
                 f'Error processing feedback: {str(e)}',
                 extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id if current_user.is_authenticated else 'anonymous', 'ip_address': request.remote_addr}
             )
-            flash(trans('general_error', default='Error occurred during feedback submission'), 'danger')
+            flash(trans('general_invalid_input', default='Error occurred during feedback submission'), 'danger')
             return render_template('general/feedback.html', tool_options=tool_options, title=trans('general_feedback', lang=lang)), 400
         except TemplateNotFound as e:
             current_app.logger.error(
@@ -407,7 +412,7 @@ def waitlist():
                 )
                 flash(trans('general_thank_you_waitlist', default='Thank you for joining our waitlist! We’ll be in touch soon.'), 'success')
                 return redirect(url_for('general_bp.landing'))
-            
+                
             except Exception as e:
                 current_app.logger.error(
                     f'Error processing waitlist: {str(e)}',
