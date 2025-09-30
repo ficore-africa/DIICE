@@ -300,7 +300,6 @@
 .language-btn {
   background: transparent;
   border: 1px solid #1E3A8A;
-  color: #1E3A8A;
   border-radius: 6px;
   font-weight: 500;
   transition: all 0.2s ease;
@@ -335,7 +334,7 @@
 }
 
 .btn-outline-primary {
-    border: 0.5px solid var(--button-secondary-border);
+    border: 0.3px solid var(--button-secondary-border);
     color: #000000; /* HA text color */
     background-color: transparent;
     box-shadow: 0 0 0 1px var(--button-secondary-border);
@@ -347,7 +346,7 @@
     background-color: rgba(34, 72, 141, 0.1);
     color: var(--button-secondary-bg);
     border-color: var(--button-secondary-border);
-    box-shadow: 0 0 0 2px var(--button-secondary-border), 0 4px 12px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 0 0 1px var(--button-secondary-border), 0 4px 12px rgba(0, 0, 0, 0.15);
     transform: translateY(-2px);
 }
 
@@ -370,3 +369,4 @@
         border-width: 0.3px;
     }
 }
+
