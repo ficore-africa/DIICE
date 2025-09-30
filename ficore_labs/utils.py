@@ -244,14 +244,6 @@ ADMIN_TOOLS = [
         "icon": "bi-hourglass-split"
     },
     {
-        "endpoint": "admin.bulk_operations",
-        "label": "Bulk Operations",
-        "label_key": "admin_bulk_operations",
-        "description_key": "admin_bulk_operations_desc",
-        "tooltip_key": "admin_bulk_operations_tooltip",
-        "icon": "bi-list-check"
-    },
-    {
         "endpoint": "admin.manage_feedback",
         "label": "Feedback",
         "label_key": "admin_feedback",
@@ -266,14 +258,6 @@ ADMIN_TOOLS = [
         "description_key": "admin_analytics_dashboard_desc",
         "tooltip_key": "admin_analytics_dashboard_tooltip",
         "icon": "bi-bar-chart"
-    },
-    {
-        "endpoint": "admin.enhanced_analytics_dashboard",
-        "label": "Enhanced Analytics",
-        "label_key": "admin_enhanced_analytics",
-        "description_key": "admin_enhanced_analytics_desc",
-        "tooltip_key": "admin_enhanced_analytics_tooltip",
-        "icon": "bi-bar-chart-steps"
     },
 ]
 
@@ -2799,6 +2783,7 @@ def create_dashboard_safe_response(stats, recent_data, additional_data=None):
             'timestamp': datetime.now(timezone.utc).isoformat()
 
         }
+
 
 
 
