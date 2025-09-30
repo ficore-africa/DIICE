@@ -228,20 +228,27 @@ def recent_activity():
         # Fetch recent cashflows, limit to 10 for performance
         cashflows = list(db.cashflows.find({'user_id': user_id}).sort('created_at', -1).limit(10))
         
-        # Normalize datetime fields
-        cashflows = [normalize_datetime(doc) for doc in cashflows]
+        # Normalize datetime fields and map to activity format
+        activities = []
+        for cashflow in cashflows:
+            normalized = normalize_datetime(cashflow)
+            activity = {
+                'description': cashflow.get('description', 'Recent activity'),
+                'timestamp': normalized.get('created_at', datetime.now(timezone.utc).isoformat()),
+                'amount': cashflow.get('amount'),
+                'type': cashflow.get('type'),
+                'icon': get_activity_icon(cashflow.get('type'))  # Assuming a helper function
+            }
+            activities.append(activity)
         
         # Clean and serialize data for JSON response
-        cleaned_cashflows = []
-        for cashflow in cashflows:
-            try:
-                cleaned_cashflow = serialize_for_json(cashflow)
-                cleaned_cashflows.append(cleaned_cashflow)
-            except Exception as e:
-                logger.warning(f"Failed to clean cashflow record {cashflow.get('_id', 'unknown')}: {str(e)}")
-                continue
-        
-        return safe_json_response(cleaned_cashflows)
+        cleaned_activities = [serialize_for_json(activity) for activity in activities]
+
+        logger.info(
+            f"Fetched recent activity for user {user_id}: activities={len(cleaned_activities)}",
+            extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': user_id}
+        )
+        return safe_json_response(cleaned_activities)
     except Exception as e:
         logger.error(
             f"Error fetching recent activity for user {user_id}: {str(e)}",
@@ -255,5 +262,16 @@ def normalize_datetime(doc):
     """Convert created_at and updated_at to timezone-aware datetime if they are strings or naive datetimes."""
     for field in ['created_at', 'updated_at']:
         if field in doc:
-            doc[field] = safe_parse_datetime(doc[field])
+            if isinstance(doc[field], str):
+                doc[field] = safe_parse_datetime(doc[field])
+            elif doc[field].tzinfo is None:
+                doc[field] = doc[field].replace(tzinfo=ZoneInfo("UTC"))
     return doc
+
+def get_activity_icon(type):
+    """Helper function to map cashflow type to icon (placeholder)."""
+    icons = {
+        'receipt': 'bi-arrow-down-circle',
+        'payment': 'bi-arrow-up-circle'
+    }
+    return icons.get(type, 'bi-circle')
