@@ -220,7 +220,8 @@ const translations = {
     owed_to_you: '{{ t("general_owed_to_you", default="Owed to you") | e }}',
     you_owe: '{{ t("general_you_owe", default="You owe") | e }}',
     balanced: '{{ t("general_balanced", default="Balanced") | e }}',
-    no_recent_activity: '{{ t("general_no_recent_activity", default="Recent activity") | e }}',
+    no_recent_activity: '{{ t("general_no_recent_activity", default="No recent activity") | e }}',
+    recent_activity: '{{ t("general_recent_activity", default="Recent activity") | e }}',  // New translation key
     start_by_adding_debt: '{{ t("general_start_adding", default="Start by adding a debt or transaction") | e }}',
     view_all: '{{ t("general_view_all", default="View All") | e }}',
     view_less: '{{ t("general_view_less", default="View Less") | e }}'
@@ -291,8 +292,8 @@ function renderRecentActivities(activities) {
                         <i class="bi ${activity.icon || getActivityIcon(activity.type)} ${getActivityColor(activity.type)}"></i>
                     </div>
                     <div class="activity-content">
-                        <div class="activity-description fw-semibold">${activity.description || (activity.amount ? translations.no_recent_activity : '')}</div>
-                        <div class="activity-time text-muted">${activity.timestamp && !isNaN(new Date(activity.timestamp).getTime()) ? formatTimeAgo(activity.timestamp) : (activity.amount ? translations.no_recent_activity : '')}</div>
+                        <div class="activity-description fw-semibold">${activity.description || (activity.amount || activity.timestamp ? translations.recent_activity : translations.no_recent_activity)}</div>
+                        <div class="activity-time text-muted">${activity.timestamp && !isNaN(new Date(activity.timestamp).getTime()) ? formatTimeAgo(activity.timestamp) : (activity.amount || activity.timestamp ? translations.recent_activity : translations.no_recent_activity)}</div>
                     </div>
                     ${activity.amount ? `<div class="activity-amount text-nowrap ms-2 fw-bold">${format_currency(activity.amount)}</div>` : ''}
                 </div>
