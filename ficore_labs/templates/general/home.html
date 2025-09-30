@@ -270,6 +270,7 @@ function loadRecentActivity() {
             return response.json();
         })
         .then(activities => {
+            console.log('Received activities:', activities); // Debug log
             allActivities = activities;
             renderRecentActivities(isShowingAllActivities ? activities : activities.slice(0, 2));
             updateViewAllLink();
@@ -290,8 +291,8 @@ function renderRecentActivities(activities) {
                         <i class="bi ${activity.icon || getActivityIcon(activity.type)} ${getActivityColor(activity.type)}"></i>
                     </div>
                     <div class="activity-content">
-                        <div class="activity-description fw-semibold">${activity.description}</div>
-                        <div class="activity-time text-muted">${formatTimeAgo(activity.timestamp)}</div>
+                        <div class="activity-description fw-semibold">${activity.description || translations.no_recent_activity}</div>
+                        <div class="activity-time text-muted">${activity.timestamp && !isNaN(new Date(activity.timestamp).getTime()) ? formatTimeAgo(activity.timestamp) : translations.no_recent_activity}</div>
                     </div>
                     ${activity.amount ? `<div class="activity-amount text-nowrap ms-2 fw-bold">${format_currency(activity.amount)}</div>` : ''}
                 </div>
@@ -398,6 +399,9 @@ function getActivityColor(type) {
 }
 
 function formatTimeAgo(timestamp) {
+    if (!timestamp || isNaN(new Date(timestamp).getTime())) {
+        return translations.no_recent_activity;
+    }
     const now = new Date();
     const time = new Date(timestamp);
     const diffInSeconds = Math.floor((now - time) / 1000);
