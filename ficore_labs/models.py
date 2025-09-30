@@ -264,10 +264,6 @@ def verify_no_naive_datetimes(db):
                 logger.warning(f"Found {naive_count} naive datetimes in {collection_name}")
 
 def migrate_users_schema(db):
-    """
-    Migrate the users collection to remove language from top-level and add it to business_details,
-    and add goals array to business_details for users with setup_complete=True.
-    """
     try:
         # Check if migration has already been applied
         if db.system_config.find_one({'_id': 'users_schema_migration_2025_09_30'}):
@@ -278,6 +274,9 @@ def migrate_users_schema(db):
         users_no_setup = db.users.find({'setup_complete': False, 'language': {'$exists': True}})
         no_setup_count = 0
         for user in users_no_setup:
+            if user is None:  # Add safeguard
+                logger.warning("Encountered None user in users_no_setup, skipping")
+                continue
             db.users.update_one(
                 {'_id': user['_id']},
                 {'$unset': {'language': ''}}
@@ -290,6 +289,9 @@ def migrate_users_schema(db):
         users_with_setup = db.users.find({'setup_complete': True, 'business_details': {'$exists': True}})
         setup_count = 0
         for user in users_with_setup:
+            if user is None:  # Add safeguard
+                logger.warning("Encountered None user in users_with_setup, skipping")
+                continue
             updates = {}
             # Move language to business_details.language if it exists
             if 'language' in user:
@@ -320,6 +322,7 @@ def migrate_users_schema(db):
 
     except Exception as e:
         logger.error(f"Failed to migrate users schema: {str(e)}", exc_info=True)
+        raise
         raise
 
 def initialize_app_data(app):
