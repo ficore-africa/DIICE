@@ -38,7 +38,7 @@ except ImportError:
 limiter = Limiter(
     key_func=get_remote_address,
     default_limits=['5000 per day', '500 per hour'],
-    storage_uri=os.getenv('REDIS_URI', 'memory://')  # Use Redis for production
+    storage_uri=os.getenv('REDIS_URI', 'memory://')  
 )
 
 # Set up logging
@@ -298,7 +298,7 @@ def get_explore_features():
             user_role = current_user.role
 
         if user_role == 'unauthenticated':
-            business_tool_keys = ["debtors_dashboard", "receipts_dashboard", "profit_summary"]  # Removed "business_reports"
+            business_tool_keys = ["debtors_dashboard", "receipts_dashboard", "payments_dashboard"]  
             for tool in TRADER_TOOLS:
                 if tool["label_key"] in business_tool_keys:
                     features.append({
@@ -2751,6 +2751,7 @@ def create_dashboard_safe_response(stats, recent_data, additional_data=None):
             'timestamp': datetime.now(timezone.utc).isoformat()
 
         }
+
 
 
 
