@@ -1,41 +1,4 @@
-@admin_bp.route('/feedback', methods=['GET', 'POST'])
-@login_required
-@utils.requires_role('admin')
-@utils.limiter.limit("50 per hour")
-def manage_feedback():
-    """View and filter user feedback."""
-    try:
-        db = utils.get_mongo_db()
-        if db is None:
-            raise Exception("Failed to connect to MongoDB")
-        form = FeedbackFilterForm()
-        filter_kwargs = {}
-        if request.method == 'POST' and form.validate_on_submit():
-            if form.tool_name.data:
-                filter_kwargs['tool_name'] = form.tool_name.data
-            if form.user_id.data:
-                filter_kwargs['user_id'] = utils.sanitize_input(form.user_id.data, max_length=50)
-        feedback_list = [to_dict_feedback(fb) for fb in get_feedback(db, filter_kwargs)]
-        for feedback in feedback_list:
-            feedback['id'] = str(feedback['id'])
-            feedback['timestamp'] = (
-                feedback['timestamp'].astimezone(ZoneInfo("UTC")).strftime('%Y-%m-%d %H:%M:%S')
-                if feedback['timestamp'] and feedback['timestamp'].tzinfo
-                else feedback['timestamp'].replace(tzinfo=ZoneInfo("UTC")).strftime('%Y-%m-%d %H:%M:%S')
-                if feedback['timestamp']
-                else ''
-            )
-        return render_template(
-            'admin/feedback.html',
-            form=form,
-            feedback_list=feedback_list,
-            title=trans('admin_feedback_title', default='Manage Feedback')
-        )
-    except Exception as e:
-        logger.error(f"Error fetching feedback for admin {current_user.id}: {str(e)}",
-                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-        flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
-        return render_template('error/500.html'), 500
+
 import logging
 import os
 from io import BytesIO
@@ -1306,3 +1269,42 @@ def system_health_monitor():
         logger.error(f"Error loading system health: {str(e)}")
         flash(trans('admin_health_error', default='Error loading system health data'), 'danger')
         return redirect(url_for('admin.dashboard'))
+
+@admin_bp.route('/feedback', methods=['GET', 'POST'])
+@login_required
+@utils.requires_role('admin')
+@utils.limiter.limit("50 per hour")
+def manage_feedback():
+    """View and filter user feedback."""
+    try:
+        db = utils.get_mongo_db()
+        if db is None:
+            raise Exception("Failed to connect to MongoDB")
+        form = FeedbackFilterForm()
+        filter_kwargs = {}
+        if request.method == 'POST' and form.validate_on_submit():
+            if form.tool_name.data:
+                filter_kwargs['tool_name'] = form.tool_name.data
+            if form.user_id.data:
+                filter_kwargs['user_id'] = utils.sanitize_input(form.user_id.data, max_length=50)
+        feedback_list = [to_dict_feedback(fb) for fb in get_feedback(db, filter_kwargs)]
+        for feedback in feedback_list:
+            feedback['id'] = str(feedback['id'])
+            feedback['timestamp'] = (
+                feedback['timestamp'].astimezone(ZoneInfo("UTC")).strftime('%Y-%m-%d %H:%M:%S')
+                if feedback['timestamp'] and feedback['timestamp'].tzinfo
+                else feedback['timestamp'].replace(tzinfo=ZoneInfo("UTC")).strftime('%Y-%m-%d %H:%M:%S')
+                if feedback['timestamp']
+                else ''
+            )
+        return render_template(
+            'admin/feedback.html',
+            form=form,
+            feedback_list=feedback_list,
+            title=trans('admin_feedback_title', default='Manage Feedback')
+        )
+    except Exception as e:
+        logger.error(f"Error fetching feedback for admin {current_user.id}: {str(e)}",
+                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
+        flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
+        return render_template('error/500.html'), 500
