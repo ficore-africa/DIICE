@@ -167,6 +167,89 @@ TRADER_NAV = [
         "description_key": "profile_settings_desc",
         "tooltip_key": "profile_tooltip",
         "icon": "bi-person"
+    },
+]
+
+TRADER_EXPLORE = [
+    {
+        "endpoint": "dashboard.index",
+        "label": "Dashboard",
+        "label_key": "dashboard_summary",
+        "description_key": "dashboard_summary_desc",
+        "tooltip_key": "dashboard_tooltip",
+        "icon": "bi-bar-chart-line"
+    },  
+    {
+        "endpoint": "receipts.index",
+        "label": "Receipts",
+        "label_key": "receipts_dashboard",
+        "description_key": "receipts_dashboard_desc",
+        "tooltip_key": "receipts_tooltip",
+        "icon": "bi-cash-coin"
+    },
+    {
+        "endpoint": "debtors.index",
+        "label": "Debtors",
+        "label_key": "debtors_dashboard",
+        "description_key": "debtors_dashboard_desc",
+        "tooltip_key": "debtors_tooltip",
+        "icon": "bi-person-plus"
+    },
+    {
+        "endpoint": "creditors.index",
+        "label": "Creditors",
+        "label_key": "creditors_dashboard",
+        "description_key": "creditors_dashboard_desc",
+        "tooltip_key": "creditors_tooltip",
+        "icon": "bi-arrow-up-circle"
+    },
+    {
+        "endpoint": "inventory.index",
+        "label": "Inventory",
+        "label_key": "inventory_dashboard",
+        "description_key": "inventory_dashboard_desc",
+        "tooltip_key": "inventory_tooltip",
+        "icon": "bi-box-seam"
+    },
+    {
+        "endpoint": "payments.index",
+        "label": "Payments",
+        "label_key": "payments_dashboard",
+        "description_key": "payments_dashboard_desc",
+        "tooltip_key": "payments_tooltip",
+        "icon": "bi-calculator"
+    },
+    {
+        "endpoint": "tax.index",
+        "label": "Tax Calculator",
+        "label_key": "tax_calculator",
+        "description_key": "tax_calculator_desc",
+        "tooltip_key": "tax_calculator_tooltip",
+        "icon": "bi-percent"
+    },
+    {
+        "endpoint": "education.education_home",
+        "label": "Learn",
+        "label_key": "tax_education",
+        "description_key": "tax_education_desc",
+        "tooltip_key": "tax_education_tooltip",
+        "icon": "bi-mortarboard"
+    },
+    {
+        "endpoint": "settings.profile",
+        "label": "Settings",
+        "label_key": "profile_settings",
+        "description_key": "profile_settings_desc",
+        "tooltip_key": "profile_tooltip",
+        "icon": "bi-person"
+    },
+    {
+        "endpoint": "reports.index",
+        "label": "Profit Summary",
+        "label_key": "profit_summary",
+        "description_key": "profit_summary_desc",
+        "tooltip_key": "profit_summary_tooltip",
+        "icon": "bi-graph-up-arrow"
     }
 ]
 
@@ -255,6 +338,129 @@ ADMIN_NAV = [
         "icon": "bi-person"
     }
 ]
+ADMIN_EXPLORE = [
+    {
+        "endpoint": "admin.dashboard",
+        "label": "Dashboard",
+        "label_key": "admin_dashboard",
+        "description_key": "admin_dashboard_desc",
+        "tooltip_key": "admin_dashboard_tooltip",
+        "icon": "bi-speedometer"
+    },
+    {
+        "endpoint": "admin.manage_users",
+        "label": "Manage Users",
+        "label_key": "admin_manage_users",
+        "description_key": "admin_manage_users_desc",
+        "tooltip_key": "admin_manage_users_tooltip",
+        "icon": "bi-people"
+    },
+    {
+        "endpoint": "admin.manage_user_roles",
+        "label": "User Roles",
+        "label_key": "admin_manage_user_roles",
+        "description_key": "admin_manage_user_roles_desc",
+        "tooltip_key": "admin_manage_user_roles_tooltip",
+        "icon": "bi-person-badge"
+    },
+    {
+        "endpoint": "admin.manage_user_subscriptions",
+        "label": "User Subscriptions",
+        "label_key": "admin_manage_user_subscriptions",
+        "description_key": "admin_manage_user_subscriptions_desc",
+        "tooltip_key": "admin_manage_user_subscriptions_tooltip",
+        "icon": "bi-credit-card"
+    },
+    {
+        "endpoint": "admin.manage_user_trials",
+        "label": "User Trials",
+        "label_key": "admin_manage_user_trials",
+        "description_key": "admin_manage_user_trials_desc",
+        "tooltip_key": "admin_manage_user_trials_tooltip",
+        "icon": "bi-hourglass-split"
+    },
+    {
+        "endpoint": "admin.payment_receipts",
+        "label": "Subscription Receipts",
+        "label_key": "admin_manage_receipts",
+        "description_key": "admin_manage_receipts_desc",
+        "tooltip_key": "admin_manage_receipts_tooltip",
+        "icon": "bi-receipt"
+    },
+    {
+        "endpoint": "admin.tax_config",
+        "label": "Tax Configuration",
+        "label_key": "admin_tax_config",
+        "description_key": "admin_tax_config_desc",
+        "tooltip_key": "admin_tax_config_tooltip",
+        "icon": "bi-percent"
+    },
+    {
+        "endpoint": "admin.manage_tax_rates",
+        "label": "Tax Rates",
+        "label_key": "admin_manage_tax_rates",
+        "description_key": "admin_manage_tax_rates_desc",
+        "tooltip_key": "admin_manage_tax_rates_tooltip",
+        "icon": "bi-graph-up"
+    },
+    {
+        "endpoint": "admin.manage_tax_bands",
+        "label": "Tax Bands",
+        "label_key": "admin_manage_tax_bands",
+        "description_key": "admin_manage_tax_bands_desc",
+        "tooltip_key": "admin_manage_tax_bands_tooltip",
+        "icon": "bi-sliders"
+    },
+    {
+        "endpoint": "admin.manage_tax_exemptions",
+        "label": "Tax Exemptions",
+        "label_key": "admin_manage_tax_exemptions",
+        "description_key": "admin_manage_tax_exemptions_desc",
+        "tooltip_key": "admin_manage_tax_exemptions_tooltip",
+        "icon": "bi-x-circle"
+    },
+    {
+        "endpoint": "admin.system_settings",
+        "label": "System Settings",
+        "label_key": "admin_system_settings",
+        "description_key": "admin_system_settings_desc",
+        "tooltip_key": "admin_system_settings_tooltip",
+        "icon": "bi-gear"
+    },
+    {
+        "endpoint": "admin.audit",
+        "label": "Audit Logs",
+        "label_key": "admin_audit",
+        "description_key": "admin_audit_desc",
+        "tooltip_key": "admin_audit_tooltip",
+        "icon": "bi-journal-check"
+    },
+    {
+        "endpoint": "admin.manage_feedback",
+        "label": "Feedback",
+        "label_key": "admin_feedback",
+        "description_key": "admin_feedback_desc",
+        "tooltip_key": "admin_feedback_tooltip",
+        "icon": "bi-chat-dots"
+    },
+    {
+        "endpoint": "admin.analytics_dashboard",
+        "label": "Analytics Dashboard",
+        "label_key": "admin_analytics_dashboard",
+        "description_key": "admin_analytics_dashboard_desc",
+        "tooltip_key": "admin_analytics_dashboard_tooltip",
+        "icon": "bi-bar-chart"
+    },
+    {
+        "endpoint": "admin.education_management",
+        "label": "Education Management",
+        "label_key": "admin_education_management",
+        "description_key": "admin_education_management_desc",
+        "tooltip_key": "admin_education_management_tooltip",
+        "icon": "bi-mortarboard"
+    },
+
+]
 
 ALL_TOOLS = []
 
@@ -264,8 +470,10 @@ def initialize_tools_with_urls(app):
         with app.app_context():
             TRADER_TOOLS = generate_tools_with_urls(TRADER_TOOLS)
             TRADER_NAV = generate_tools_with_urls(TRADER_NAV)
+            TRADER_EXPLORE = generate_tools_with_urls(TRADER_EXPLORE)
             ADMIN_TOOLS = generate_tools_with_urls(ADMIN_TOOLS)
             ADMIN_NAV = generate_tools_with_urls(ADMIN_NAV)
+            ADMIN_EXPLORE = generate_tools_with_urls(ADMIN_EXPLORE)
             ALL_TOOLS = TRADER_TOOLS + ADMIN_TOOLS
             logger.info('Initialized tools and navigation with resolved URLs', extra={'session_id': 'no-session-id'})
     except Exception as e:
@@ -2751,6 +2959,7 @@ def create_dashboard_safe_response(stats, recent_data, additional_data=None):
             'timestamp': datetime.now(timezone.utc).isoformat()
 
         }
+
 
 
 
