@@ -71,6 +71,16 @@
                         {% endif %}
                     </div>
 
+                    <div class="profile-form-group">
+                        <label for="language" class="profile-form-label">{{ t('settings_language', default='Language') }}</label>
+                        {{ form.language(class='profile-form-control') }}
+                        {% if form.language.errors %}
+                            {% for error in form.language.errors %}
+                                <p class="profile-text-danger">{{ error }}</p>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
+
                     {% if user.role == 'trader' %}
                     <hr class="profile-divider">
                     <h5 class="profile-heading">{{ t('settings_business_information', default='Business Information') }}</h5>
@@ -115,6 +125,16 @@
                         {% endif %}
                     </div>
                     {% endif %}
+
+                    <div class="profile-form-group">
+                        <label for="goals" class="profile-form-label">{{ t('settings_goals', default='Business Goals') }}</label>
+                        {{ form.goals(class='profile-form-check') }}
+                        {% if form.goals.errors %}
+                            {% for error in form.goals.errors %}
+                                <p class="profile-text-danger">{{ error }}</p>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
 
                     <div class="profile-form-group">
                         <label for="debt_reminder_frequency" class="profile-form-label">{{ t('settings_debt_reminder_frequency', default='Debt Reminder Frequency') }}</label>
