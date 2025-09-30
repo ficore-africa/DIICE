@@ -787,6 +787,7 @@ def create_app():
                 return []
 
         bottom_nav_items = []
+        explore_all_features = []
         tools_for_quick = []
         breadcrumb_items = []
 
@@ -795,9 +796,11 @@ def create_app():
             if role == 'admin':
                 bottom_nav_items = build_nav(ADMIN_NAV)
                 tools_for_quick = build_nav(ADMIN_TOOLS)
+                explore_all_features = build_nav(ADMIN_EXPLORE)
             else:
                 bottom_nav_items = build_nav(TRADER_NAV)
                 tools_for_quick = build_nav(TRADER_TOOLS)
+                explore_all_features = build_nav(TRADER_EXPLORE)
 
             # Generate breadcrumb items
             try:
@@ -821,6 +824,7 @@ def create_app():
             'bottom_nav_items': bottom_nav_items,
             'tools_for_quick': tools_for_quick,
             'breadcrumb_items': breadcrumb_items,
+            'explore_all_features': explore_all_features,
         }
 
     @app.route('/')
