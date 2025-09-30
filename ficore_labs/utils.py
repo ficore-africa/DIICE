@@ -1,12 +1,3 @@
-
-def initialize_default_tax_config_with_app(app):
-    """
-    Utility function to initialize default tax config with app context.
-    Import and call admin_tax_config.initialize_default_tax_config() safely.
-    """
-    from admin_tax_config import initialize_default_tax_config
-    with app.app_context():
-        return initialize_default_tax_config()
 import re
 import logging
 import uuid
@@ -54,6 +45,15 @@ limiter = Limiter(
 root_logger = logging.getLogger('bizcore_app')
 root_logger.setLevel(logging.INFO)
 
+def initialize_default_tax_config_with_app(app):
+    """
+    Utility function to initialize default tax config with app context.
+    Import and call admin_tax_config.initialize_default_tax_config() safely.
+    """
+    from admin_tax_config import initialize_default_tax_config
+    with app.app_context():
+        return initialize_default_tax_config()
+        
 class SessionFormatter(logging.Formatter):
     def format(self, record):
         record.session_id = getattr(record, 'session_id', 'no-session-id')
@@ -118,36 +118,12 @@ TRADER_TOOLS = [
         "icon": "bi-person-plus"
     },
     {
-        "endpoint": "creditors.index",
-        "label": "Creditors",
-        "label_key": "creditors_dashboard",
-        "description_key": "creditors_dashboard_desc",
-        "tooltip_key": "creditors_tooltip",
-        "icon": "bi-arrow-up-circle"
-    },
-    {
-        "endpoint": "inventory.index",
-        "label": "Inventory",
-        "label_key": "inventory_dashboard",
-        "description_key": "inventory_dashboard_desc",
-        "tooltip_key": "inventory_tooltip",
-        "icon": "bi-box-seam"
-    },
-    {
         "endpoint": "payments.index",
         "label": "Payments",
         "label_key": "payments_dashboard",
         "description_key": "payments_dashboard_desc",
         "tooltip_key": "payments_tooltip",
         "icon": "bi-calculator"
-    },
-    {
-        "endpoint": "tax.index",
-        "label": "Tax Calculator",
-        "label_key": "tax_calculator",
-        "description_key": "tax_calculator_desc",
-        "tooltip_key": "tax_calculator_tooltip",
-        "icon": "bi-percent"
     },
     {
         "endpoint": "reports.index",
@@ -2783,6 +2759,7 @@ def create_dashboard_safe_response(stats, recent_data, additional_data=None):
             'timestamp': datetime.now(timezone.utc).isoformat()
 
         }
+
 
 
 
