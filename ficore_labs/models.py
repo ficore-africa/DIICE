@@ -414,7 +414,7 @@ def initialize_app_data(app):
                                 'subscription_plan': {'bsonType': ['string', 'null'], 'enum': [None, 'monthly', 'yearly', 'admin']},
                                 'subscription_start': {'bsonType': ['date', 'null']},
                                 'subscription_end': {'bsonType': ['date', 'null']},
-                                'language': {'bsonType': ['string', 'null'], 'enum': [None, 'en', 'ha']},
+                                'language': {'bsonType': ['string', 'null'], 'enum': [None, 'en', 'ha', 'es', 'fr', 'yo']},
                                 'created_at': {'bsonType': 'date'},
                                 'display_name': {'bsonType': ['string', 'null']},
                                 'is_admin': {'bsonType': 'bool'},
@@ -431,7 +431,7 @@ def initialize_app_data(app):
                                         'industry': {'bsonType': 'string'},
                                         'products_services': {'bsonType': 'string'},
                                         'phone_number': {'bsonType': 'string'},
-                                        'language': {'bsonType': ['string', 'null'], 'enum': [None, 'en', 'ha']},
+                                        'language': {'bsonType': ['string', 'null'], 'enum': [None, 'en', 'ha', 'es', 'fr', 'yo']},
                                         'goals': {
                                             'bsonType': 'array',
                                             'items': {
@@ -1201,6 +1201,67 @@ def get_user(db, user_id):
         return None
     except Exception as e:
         logger.error(f"{trans('general_user_fetch_error', default='Error getting user by ID')} {user_id}: {str(e)}", exc_info=True)
+        raise
+
+def update_user_language(db, user_id, language):
+    """
+    Update the user's language in business_details.
+    """
+    valid_languages = ['en', 'ha', 'es', 'fr', 'yo']
+    if language not in valid_languages:
+        raise ValueError(f"Invalid language: {language}. Must be one of {valid_languages}")
+    
+    try:
+        result = db.users.update_one(
+            {'_id': user_id},
+            {'$set': {'business_details.language': language}}
+        )
+        if result.modified_count > 0:
+            logger.info(f"Updated language to {language} for user {user_id}")
+            get_user.cache_clear()
+            get_user_by_email.cache_clear()
+            return True
+        logger.info(f"No changes made to language for user {user_id}")
+        return False
+    except Exception as e:
+        logger.error(f"Error updating language for user {user_id}: {str(e)}", exc_info=True)
+        raise
+
+def get_user_goals(db, user_id):
+    """
+    Retrieve the user's goals from business_details.
+    """
+    try:
+        user = db.users.find_one({'_id': user_id}, {'business_details.goals': 1})
+        if user and 'business_details' in user and 'goals' in user['business_details']:
+            return user['business_details']['goals']
+        return []
+    except Exception as e:
+        logger.error(f"Error retrieving goals for user {user_id}: {str(e)}", exc_info=True)
+        raise
+
+def update_user_goals(db, user_id, goals):
+    """
+    Update the user's goals in business_details.
+    """
+    valid_goals = ['track_expenses', 'manage_customers', 'improve_savings', 'increase_sales', 'streamline_operations']
+    if not all(goal in valid_goals for goal in goals):
+        raise ValueError(f"Invalid goals: {goals}. Must be a subset of {valid_goals}")
+    
+    try:
+        result = db.users.update_one(
+            {'_id': user_id},
+            {'$set': {'business_details.goals': goals}}
+        )
+        if result.modified_count > 0:
+            logger.info(f"Updated goals to {goals} for user {user_id}")
+            get_user.cache_clear()
+            get_user_by_email.cache_clear()
+            return True
+        logger.info(f"No changes made to goals for user {user_id}")
+        return False
+    except Exception as e:
+        logger.error(f"Error updating goals for user {user_id}: {str(e)}", exc_info=True)
         raise
 
 def update_user(db, user_id, update_data):
