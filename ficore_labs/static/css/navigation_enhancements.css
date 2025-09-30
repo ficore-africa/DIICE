@@ -359,3 +359,14 @@
 .language-buttons .language-btn.btn-outline-primary.active {
     color: #000000; /* HA active: black */
 }
+/* Default (desktop/tablet) */
+.btn-outline-primary {
+    border: 0.5px solid var(--button-secondary-border);
+}
+
+/* Mobile: reduce border thickness */
+@media (max-width: 576px) {
+    .btn-outline-primary {
+        border-width: 0.3px;
+    }
+}
