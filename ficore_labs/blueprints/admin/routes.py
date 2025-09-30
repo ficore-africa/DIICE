@@ -44,8 +44,9 @@ class SubscriptionForm(FlaskForm):
     subscription_plan = SelectField(trans('subscription_plan', default='Subscription Plan'), choices=[('', 'None'), ('monthly', 'Monthly (₦1k)'), ('yearly', 'Yearly (₦10k)')], render_kw={'class': 'form-select'})
     subscription_end = DateField(trans('subscription_end', default='Subscription End Date'), format='%Y-%m-%d', validators=[Optional()], render_kw={'class': 'form-control'})
     submit = SubmitField(trans('subscription_update', default='Update Subscription'), render_kw={'class': 'btn btn-primary'})
-        ## Only keep core admin user management routes: dashboard, manage_users, manage_user_roles, manage_user_subscriptions, manage_user_trials, suspend_user, delete_user, toggle_user_language
-        ## Remove all other admin routes for brevity and maintainability
+
+# TrialForm for manage_user_trials
+class TrialForm(FlaskForm):
     is_trial = SelectField(trans('trial_status', default='Trial Status'), choices=[('True', 'Active Trial'), ('False', 'No Trial')], validators=[DataRequired()], render_kw={'class': 'form-select'})
     trial_end = DateField(trans('trial_end', default='Trial End Date'), format='%Y-%m-%d', validators=[Optional()], render_kw={'class': 'form-control'})
     submit = SubmitField(trans('trial_update', default='Update Trial'), render_kw={'class': 'btn btn-primary'})
