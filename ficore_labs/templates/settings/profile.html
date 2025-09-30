@@ -15,23 +15,31 @@
         </div>
     </div>
 
-
+    <div class="profile-card profile-kyc-status-card">
+        <div class="profile-card-body">
+            <h5 class="profile-heading">{{ t('kyc_status', default='KYC Status') }}</h5>
+            <p class="profile-text">{{ user.kyc_status|capitalize }}</p>
+            {% if user.kyc_status != 'approved' %}
+                <a href="{{ url_for('kyc.submit') }}" class="profile-btn profile-btn-primary">{{ t('submit_kyc', default='Submit KYC') }}</a>
+            {% endif %}
+        </div>
+    </div>
 
     <div class="profile-grid">
-    <button class="profile-btn profile-btn-primary profile-explore-tools-btn" onclick="location.href='{{ url_for('general_bp.home') }}'">
+        <button class="profile-btn profile-btn-primary profile-explore-tools-btn" onclick="location.href='{{ url_for('general_bp.home') }}'">
             <i class="bi bi-briefcase profile-icon"></i> {{ t('settings_explore_business_tools', default='Explore Your Business Tools') }}
         </button>
         <small class="profile-text-muted profile-text-center">{{ t('settings_explore_business_description', default='Manage debtors, creditors, inventory, payments, and business analytics!') }}</small>
     </div>
 
     <div class="profile-grid">
-    <button class="profile-btn profile-btn-outline-primary" onclick="location.href='{{ url_for('general_bp.feedback') }}'">
+        <button class="profile-btn profile-btn-outline-primary" onclick="location.href='{{ url_for('general_bp.feedback') }}'">
             <i class="bi bi-chat-dots profile-icon"></i> {{ t('settings_provide_feedback', default='Provide Feedback') }}
         </button>
     </div>
 
     <div class="profile-grid">
-    <button class="profile-btn profile-btn-outline-primary profile-subscription-status-btn" onclick="location.href='{{ url_for('subscribe_bp.subscription_status') }}'">
+        <button class="profile-btn profile-btn-outline-primary profile-subscription-status-btn" onclick="location.href='{{ url_for('subscribe_bp.subscription_status') }}'">
             <i class="bi bi-card-checklist profile-icon"></i> {{ t('settings_subscription_status', default='Check Your Subscription Status') }}
         </button>
     </div>
@@ -168,20 +176,6 @@
                         <label class="profile-form-check-label" for="activitySidebarToggle"></label>
                     </div>
                 </div>
-                <div class="profile-toggle-item">
-                    <i class="bi bi-translate profile-icon-left"></i> {{ t('settings_language', default='Language') }}
-                    <select class="profile-form-select" id="languageSelect" onchange="updateLanguageSetting(this.value)">
-                        <option value="en" {% if session.get('lang', 'en') == 'en' %}selected{% endif %}>{{ t('settings_language_english', default='English') }}</option>
-                        <option value="ha" {% if session.get('lang', 'en') == 'ha' %}selected{% endif %}>{{ t('settings_language_hausa', default='Hausa') }}</option>
-                    </select>
-                </div>
-                <div class="profile-toggle-item">
-                    <i class="bi bi-bell profile-icon-left"></i> {{ t('settings_notifications', default='Notifications') }}
-                    <div class="profile-form-check form-switch">
-                        <input class="profile-form-check-input" type="checkbox" id="notificationsToggle" {% if user.settings.get('notifications_enabled', True) %}checked{% endif %}>
-                        <label class="profile-form-check-label" for="notificationsToggle"></label>
-                    </div>
-                </div>
             </div>
         </div>
     </section>
@@ -236,7 +230,7 @@
     </section>
 
     <div class="profile-grid">
-    <button class="profile-btn profile-btn-danger" onclick="location.href='{{ url_for('users.logout') }}'">
+        <button class="profile-btn profile-btn-danger" onclick="location.href='{{ url_for('users.logout') }}'">
             <i class="bi bi-box-arrow-right profile-icon"></i> {{ t('general_logout', default='Log out') }}
         </button>
     </div>
@@ -251,7 +245,7 @@
 
                 if (settingName.includes('fingerprint') && value) {
                     if (!navigator.credentials || !window.PublicKeyCredential) {
-                        alert("{{ t('settings_fingerprint_not_supported', default='Fingerprint authentication is not supported on this device.')|escapejs }}");
+                        alert('{{ t('settings_fingerprint_not_supported', default='Fingerprint authentication is not supported on this device.') }}');
                         this.checked = false;
                         return;
                     }
@@ -280,59 +274,17 @@
                 .then(response => response.json())
                 .then(data => {
                     if (!data.success) {
-                         alert("{{ t('settings_failed_to_update_setting', default='Failed to update setting')|escapejs }}: " + (data.message || "{{ t('general_unknown_error', default='Unknown error')|escapejs }}"));
+                        alert('{{ t('settings_failed_to_update_setting', default='Failed to update setting') }}: ' + (data.message || '{{ t('general_unknown_error', default='Unknown error') }}'));
                         this.checked = !value;
                     }
                 })
                 .catch(error => {
                     console.error('Error updating setting:', error);
-                    alert("{{ t('general_error_occurred', default='An error occurred. Please try again.')|escapejs }}");
+                    alert('{{ t('general_error_occurred', default='An error occurred. Please try again.') }}');
                     this.checked = !value;
                 });
             });
         });
-
-        // Language select handler
-        const languageSelect = document.getElementById('languageSelect');
-        if (languageSelect) {
-            languageSelect.addEventListener('change', function() {
-                updateLanguageSetting(this.value);
-            });
-        }
-        // Notification toggle handler
-        const notificationsToggle = document.getElementById('notificationsToggle');
-        if (notificationsToggle) {
-            notificationsToggle.addEventListener('change', function() {
-                fetch('/settings/api/update-user-setting', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': '{{ csrf_token() }}'
-                    },
-                    body: JSON.stringify({
-                        setting: 'notifications_enabled',
-                        value: this.checked
-                    })
-                });
-            });
-        }
-    });
-
-    function updateLanguageSetting(lang) {
-        fetch('/settings/api/update-user-setting', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': '{{ csrf_token() }}'
-            },
-            body: JSON.stringify({
-                setting: 'language',
-                value: lang
-            })
-        }).then(() => {
-            location.reload();
-        });
-    }
     });
 </script>
 {% endblock %}
