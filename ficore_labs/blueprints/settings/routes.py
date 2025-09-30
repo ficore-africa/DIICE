@@ -396,7 +396,7 @@ def update_user_setting():
         valid_settings = [
             'showKoboToggle', 'incognitoModeToggle', 'appSoundsToggle',
             'fingerprintPasswordToggle', 'fingerprintPinToggle', 'hideSensitiveDataToggle',
-            'activitySidebarToggle', 'language', 'notifications_enabled'
+            'activitySidebarToggle'
         ]
         if setting_name not in valid_settings:
             logger.error(
@@ -407,45 +407,26 @@ def update_user_setting():
 
         settings = user.settings.copy()
         security_settings = user.security_settings.copy()
-        update_data = {'updated_at': datetime.now(timezone.utc)}
-
         if setting_name == 'showKoboToggle':
             settings['show_kobo'] = bool(value)
-            update_data['settings'] = settings
         elif setting_name == 'incognitoModeToggle':
             settings['incognito_mode'] = bool(value)
-            update_data['settings'] = settings
         elif setting_name == 'appSoundsToggle':
             settings['app_sounds'] = bool(value)
-            update_data['settings'] = settings
         elif setting_name == 'activitySidebarToggle':
             settings['activity_sidebar_enabled'] = bool(value)
-            update_data['settings'] = settings
-        elif setting_name == 'notifications_enabled':
-            settings['notifications_enabled'] = bool(value)
-            update_data['settings'] = settings
-        elif setting_name == 'language':
-            # Only allow 'en' or 'ha'
-            if value not in ['en', 'ha']:
-                return jsonify({"success": False, "message": trans('general_invalid_setting', default='Invalid language value.')}), 400
-            update_data['language'] = value
-            session['lang'] = value
         elif setting_name == 'fingerprintPasswordToggle':
             security_settings['fingerprint_password'] = bool(value)
-            update_data['security_settings'] = security_settings
         elif setting_name == 'fingerprintPinToggle':
             security_settings['fingerprint_pin'] = bool(value)
-            update_data['security_settings'] = security_settings
         elif setting_name == 'hideSensitiveDataToggle':
             security_settings['hide_sensitive_data'] = bool(value)
-            update_data['security_settings'] = security_settings
 
-        # Always update settings/security_settings if changed
-        if 'settings' not in update_data:
-            update_data['settings'] = settings
-        if 'security_settings' not in update_data:
-            update_data['security_settings'] = security_settings
-
+        update_data = {
+            'settings': settings,
+            'security_settings': security_settings,
+            'updated_at': datetime.now(timezone.utc)
+        }
         if update_user(db, user_id, update_data):
             logger.info(
                 f"Setting {setting_name} updated for user {user_id}",
