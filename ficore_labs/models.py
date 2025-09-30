@@ -898,13 +898,6 @@ def initialize_app_data(app):
                 except Exception as e:
                     logger.error(f"Failed to fix user documents: {str(e)}", exc_info=True)
                     raise
-
-                # Run users schema migration for language and goals
-                try:
-                    migrate_users_schema(db_instance)
-                except Exception as e:
-                    logger.error(f"Failed to migrate users schema: {str(e)}", exc_info=True)
-                    raise
             
             try:
                 convert_naive_to_aware_datetimes(db_instance)
