@@ -2,6 +2,16 @@
 {% block title %}{{ title }} - FiCore{% endblock %}
 {% block content %}
 <div class="container mt-5">
+    <!-- Language Toggler -->
+    <form method="post" action="{{ url_for('admin.toggle_user_language', user_id=current_user.id, language='en') }}" class="mb-3 d-inline">
+        <input type="hidden" name="language" value="en">
+        <button type="submit" class="btn btn-outline-primary btn-sm {% if current_user.language == 'en' %}active{% endif %}">English</button>
+    </form>
+    <form method="post" action="{{ url_for('admin.toggle_user_language', user_id=current_user.id, language='ha') }}" class="mb-3 d-inline">
+        <input type="hidden" name="language" value="ha">
+        <button type="submit" class="btn btn-outline-primary btn-sm {% if current_user.language == 'ha' %}active{% endif %}">Hausa</button>
+    </form>
+    <span class="ms-2 text-muted">{{ t('admin_language_toggle', default='Switch Language') }}</span>
     <h1>{{ title }}</h1>
     <div class="row">
         <div class="col-md-4">
