@@ -1,7 +1,7 @@
 // Global function to toggle the dashboard sidebar/panel and update the server
 function toggleSidebarSetting(value) {
     // Update local state and localStorage
-    const sidebar = document.getElementById('recentActivitySidebar'); // Use correct ID from sidebar code
+    const sidebar = document.getElementById('recentActivitySidebar');
     const persistentToggle = document.getElementById('sidebarPersistentToggle');
     let sidebarDisabled = !value;
     localStorage.setItem('sidebarDisabled', sidebarDisabled);
@@ -24,7 +24,7 @@ function toggleSidebarSetting(value) {
     }
 
     // Send the setting to the server
-    fetch('{{ url_for("settings.update_user_setting") | e }}', {
+    fetch('/settings/api/update-user-setting', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -45,7 +45,7 @@ function toggleSidebarSetting(value) {
             if (toggle) {
                 toggle.checked = !value;
             }
-            alert('{{ t("settings_failed_to_update_setting", default="Failed to update setting") }}: ' + (data.message || '{{ t("general_unknown_error", default="Unknown error") }}'));
+            alert(data.message || 'Failed to update setting');
             // Revert UI changes
             updateSidebarVisibility();
         }
@@ -57,13 +57,13 @@ function toggleSidebarSetting(value) {
         if (toggle) {
             toggle.checked = !value;
         }
-        alert('{{ t("general_error_occurred", default="An error occurred. Please try again.") }}');
+        alert('An error occurred. Please try again.');
         // Revert UI changes
         updateSidebarVisibility();
     });
 }
 
-// Function to update sidebar visibility (from original sidebar code)
+// Function to update sidebar visibility
 function updateSidebarVisibility() {
     const sidebar = document.getElementById('recentActivitySidebar');
     const persistentToggle = document.getElementById('sidebarPersistentToggle');
@@ -82,7 +82,7 @@ function updateSidebarVisibility() {
     }
 }
 
-// Function to toggle sidebar visibility (from original sidebar code)
+// Function to toggle sidebar visibility
 function toggleActivitySidebar() {
     const sidebarDisabled = localStorage.getItem('sidebarDisabled') === 'true';
     if (sidebarDisabled) return;
@@ -100,7 +100,10 @@ function toggleActivitySidebar() {
             sidebar.classList.add('expanded');
             icon.className = 'bi bi-chevron-left';
             persistentToggle.classList.add('hidden');
-            loadRecentActivitySidebar(); // Assume this function exists from original code
+            // Placeholder for loadRecentActivitySidebar (implement or stub as needed)
+            if (typeof loadRecentActivitySidebar === 'function') {
+                loadRecentActivitySidebar();
+            }
         } else {
             sidebar.classList.remove('expanded');
             icon.className = 'bi bi-chevron-right';
