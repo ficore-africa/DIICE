@@ -44,6 +44,9 @@ limiter = Limiter(
 )
 
 # Decorators
+def escapejs_filter(value):
+    return json.dumps(str(value))[1:-1]
+    
 def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -556,6 +559,7 @@ def create_app():
     app.jinja_env.globals['format_currency'] = format_currency
     app.jinja_env.filters['format_percentage'] = format_percentage
     app.jinja_env.globals['format_percentage'] = format_percentage
+    app.jinja_env.filters['escapejs'] = escapejs_filter
 
     @app.template_filter('format_date')
     def format_date_wrapper(value):
