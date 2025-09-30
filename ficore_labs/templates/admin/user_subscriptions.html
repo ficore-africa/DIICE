@@ -51,10 +51,22 @@
         <tr>
             <td>{{ user._id }}</td>
             <td>{{ user.email }}</td>
-            <td>{{ 'Subscribed' if user.is_subscribed else 'Not Subscribed' }}</td>
+            <td>
+                {% if user.is_subscribed and user.subscription_end and user.subscription_end >= now %}
+                    {{ trans('subscribed', default='Subscribed') }}
+                {% else %}
+                    {{ trans('not_subscribed', default='Not Subscribed') }}
+                {% endif %}
+            </td>
             <td>{{ user.subscription_plan|capitalize or 'None' }}</td>
             <td>{{ user.subscription_end.strftime('%Y-%m-%d') if user.subscription_end else 'N/A' }}</td>
-            <td>{{ 'Active' if user.is_trial and user.trial_end and user.trial_end >= now else 'Inactive' }}</td>
+            <td>
+                {% if user.is_trial and user.trial_end and user.trial_end >= now %}
+                    {{ trans('active', default='Active') }}
+                {% else %}
+                    {{ trans('inactive', default='Inactive') }}
+                {% endif %}
+            </td>
         </tr>
         {% endfor %}
     </tbody>
