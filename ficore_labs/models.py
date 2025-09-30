@@ -367,12 +367,12 @@ def initialize_app_data(app):
                                 'business_details': {
                                     'bsonType': ['object', 'null'],
                                     'properties': {
-                                        'name': {'bsonType': 'string'},
-                                        'address': {'bsonType': 'string'},
-                                        'industry': {'bsonType': 'string'},
-                                        'products_services': {'bsonType': 'string'},
-                                        'phone_number': {'bsonType': 'string'},
-                                        'language': {'bsonType': ['string', 'null'], 'enum': [None, 'en', 'ha', 'es', 'fr', 'yo']},
+                                        'name': {'bsonType': ['string', 'null']},
+                                        'address': {'bsonType': ['string', 'null']},
+                                        'industry': {'bsonType': ['string', 'null']},
+                                        'products_services': {'bsonType': ['string', 'null']},
+                                        'phone_number': {'bsonType': ['string', 'null']},
+                                        'language': {'bsonType': ['string', 'null'], 'enum': [None, 'en', 'ha']},
                                         'goals': {
                                             'bsonType': 'array',
                                             'items': {
