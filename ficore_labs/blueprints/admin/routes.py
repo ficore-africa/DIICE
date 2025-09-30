@@ -30,6 +30,14 @@ logger = logging.getLogger(__name__)
 admin_bp = Blueprint('admin', __name__, template_folder='templates/admin', url_prefix='/admin')
 
 # Helper to ensure all datetimes are UTC-aware
+def safe_utc(dt):
+    """
+    Convert a datetime to UTC-aware datetime, returning None if input is None.
+    """
+    if dt is None:
+        return None
+    return to_utc_aware(dt)
+    
 def to_utc_aware(dt):
     """Convert a datetime or string to UTC-aware datetime."""
     try:
@@ -1308,3 +1316,4 @@ def manage_feedback():
                      extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
         flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
         return render_template('error/500.html'), 500
+
