@@ -2,7 +2,7 @@ INVENTORY_TRANSLATIONS = {
     'en': {
         'inventory_title': 'Inventory',
         'inventory_dashboard': 'Inventory',
-        'inventory_dashboard_desc': 'Manage your stock and track inventory costs to optimize your business operations.',
+        'inventory_dashboard_desc': 'Manage your stock and track inventory.',
         'inventory_tooltip': 'Track stock levels, costs, and selling prices efficiently.',
         'inventory_list': 'Inventory List',
         'inventory_add': 'Add Inventory Item',
