@@ -1,7 +1,7 @@
 CREDITORS_TRANSLATIONS = {
     'en': {
         'creditors_dashboard': 'Creditors',
-        'creditors_dashboard_desc': 'Monitor outstanding payments to suppliers and vendors to maintain healthy cash flow.',
+        'creditors_dashboard_desc': 'Monitor outstanding payments and cash flow.',
         'creditors_tooltip': 'Track payment obligations and manage supplier relationships effectively.',
         'creditors_list': 'Creditors List',
         'they_owe_title': 'They Owe',
