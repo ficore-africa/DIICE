@@ -28,6 +28,8 @@ logger = logging.getLogger(__name__)
 
 admin_bp = Blueprint('admin', __name__, template_folder='templates/admin', url_prefix='/admin')
 
+# Helper to ensure all datetimes are UTC-aware
+
 # Form Definitions
 class RoleForm(FlaskForm):
     role = SelectField(trans('user_role', default='Role'), choices=[('trader', 'Trader'), ('admin', 'Admin')], validators=[DataRequired()], render_kw={'class': 'form-select'})
@@ -484,7 +486,13 @@ def manage_user_subscriptions():
                 logger.info(f"No changes made to subscription for user_id: {user_id}",
                             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
                 flash(trans('admin_no_changes', default='No changes made to subscription'), 'info')
-            return redirect(url_for('admin.manage_user_subscriptions'))
+            # After update, reload users from DB to reflect changes
+            users = list(db.users.find())
+            for user in users:
+                user['_id'] = str(user['_id'])
+                user['trial_end'] = utils.safe_parse_datetime(user.get('trial_end')) if user.get('trial_end') else None
+                user['subscription_end'] = utils.safe_parse_datetime(user.get('subscription_end')) if user.get('subscription_end') else None
+            return render_template('admin/user_subscriptions.html', form=form, users=users, title=trans('admin_manage_user_subscriptions_title', default='Manage User Subscriptions'), now=datetime.now(timezone.utc))
         for user in users:
             user['_id'] = str(user['_id'])
             user['trial_end'] = utils.safe_parse_datetime(user.get('trial_end')) if user.get('trial_end') else None
