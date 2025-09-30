@@ -850,86 +850,6 @@ def manage_tax_exemptions():
         flash(trans('admin_tax_exemptions_error', default='An error occurred while managing tax exemptions'), 'danger')
         return render_template('error/500.html'), 500
 
-@admin_bp.route('/bulk/operations', methods=['GET', 'POST'])
-@login_required
-@utils.requires_role('admin')
-@utils.limiter.limit("10 per hour")
-def bulk_operations():
-    """Bulk operations for user management."""
-    try:
-        db = utils.get_mongo_db()
-        if db is None:
-            raise Exception("Failed to connect to MongoDB")
-        if request.method == 'POST':
-            operation = request.form.get('operation')
-            user_ids = request.form.getlist('user_ids')
-            if not user_ids:
-                flash(trans('admin_no_users_selected', default='No users selected'), 'danger')
-                return redirect(url_for('admin.bulk_operations'))
-            results = {'success': 0, 'failed': 0}
-            for user_id in user_ids:
-                try:
-                    user_query = {'_id': user_id}
-                    user = db.users.find_one(user_query)
-                    if user is None:
-                        results['failed'] += 1
-                        continue
-                    if operation == 'extend_trial':
-                        days = int(request.form.get('trial_days', 30))
-                        new_trial_end = datetime.now(timezone.utc) + timedelta(days=days)
-                        db.users.update_one(
-                            user_query,
-                            {'$set': {
-                                'is_trial': True,
-                                'trial_end': new_trial_end,
-                                'updated_at': datetime.now(timezone.utc)
-                            }}
-                        )
-                        results['success'] += 1
-                    elif operation == 'suspend_users':
-                        db.users.update_one(
-                            user_query,
-                            {'$set': {
-                                'suspended': True,
-                                'updated_at': datetime.now(timezone.utc)
-                            }}
-                        )
-                        results['success'] += 1
-                    elif operation == 'activate_users':
-                        db.users.update_one(
-                            user_query,
-                            {'$set': {
-                                'suspended': False,
-                                'updated_at': datetime.now(timezone.utc)
-                            }}
-                        )
-                        results['success'] += 1
-                except Exception as e:
-                    logger.error(f"Error in bulk operation {operation} for user {user_id}: {str(e)}",
-                                 extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-                    results['failed'] += 1
-            log_audit_action('bulk_operation', {
-                'operation': operation,
-                'user_count': len(user_ids),
-                'success_count': results['success'],
-                'failed_count': results['failed']
-            })
-            flash(trans('admin_bulk_operation_complete',
-                       default=f'Bulk operation completed: {results["success"]} successful, {results["failed"]} failed'),
-                  'success' if results['failed'] == 0 else 'warning')
-            return redirect(url_for('admin.bulk_operations'))
-        users = list(db.users.find({'role': {'$ne': 'admin'}}).sort('created_at', -1))
-        for user in users:
-            user['_id'] = str(user['_id'])
-        return render_template('admin/bulk_operations.html',
-                             users=users,
-                             title=trans('admin_bulk_operations_title', default='Bulk Operations'))
-    except Exception as e:
-        logger.error(f"Error in bulk_operations for admin {current_user.id}: {str(e)}",
-                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-        flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
-        return render_template('error/500.html'), 500
-        
 @admin_bp.route('/system/settings', methods=['GET', 'POST'])
 @login_required
 @utils.requires_role('admin')
@@ -1105,39 +1025,6 @@ def toggle_user_language(user_id, language):
                      extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
         flash(trans('admin_database_error', default='An error occurred while updating language'), 'danger')
         return redirect(url_for('admin.manage_users'))
-        
-# Enhanced Admin Routes
-@admin_bp.route('/analytics/enhanced', methods=['GET'])
-@login_required
-@utils.requires_role('admin')
-@utils.limiter.limit("30 per hour")
-def enhanced_analytics_dashboard():
-    """Enhanced analytics dashboard with comprehensive metrics"""
-    try:
-        db = utils.get_mongo_db()
-        if db is None:
-            raise Exception("Failed to connect to MongoDB")
-        
-        analytics = get_user_analytics()
-        system_health = get_system_health()
-        
-        recent_actions = list(db.audit_logs.find().sort('timestamp', -1).limit(10))
-        for action in recent_actions:
-            action['_id'] = str(action['_id'])
-        
-        logger.info(f"Admin {current_user.id} accessed enhanced analytics dashboard")
-        
-        return render_template(
-            'admin/enhanced_analytics.html',
-            analytics=analytics,
-            system_health=system_health,
-            recent_actions=recent_actions,
-            title=trans('admin_enhanced_analytics', default='Enhanced Analytics Dashboard')
-        )
-    except Exception as e:
-        logger.error(f"Error loading enhanced analytics for admin {current_user.id}: {str(e)}")
-        flash(trans('admin_analytics_error', default='Error loading analytics dashboard'), 'danger')
-        return redirect(url_for('admin.dashboard'))
 
 @admin_bp.route('/education/management', methods=['GET', 'POST'])
 @login_required
@@ -1223,4 +1110,5 @@ def manage_feedback():
                      extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
         flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
         return render_template('error/500.html'), 500
+
 
