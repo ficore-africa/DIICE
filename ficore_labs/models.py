@@ -269,12 +269,11 @@ def migrate_users_schema(db):
         if db.system_config.find_one({'_id': 'users_schema_migration_2025_09_30'}):
             logger.info("Users schema migration already applied, skipping.")
             return
-
         # Process users with setup_complete=False: Remove language
         users_no_setup = db.users.find({'setup_complete': False, 'language': {'$exists': True}})
         no_setup_count = 0
         for user in users_no_setup:
-            if user is None:  # Add safeguard
+            if user is None:
                 logger.warning("Encountered None user in users_no_setup, skipping")
                 continue
             db.users.update_one(
@@ -287,18 +286,20 @@ def migrate_users_schema(db):
 
         # Process users with setup_complete=True: Move language to business_details and add goals
         users_with_setup = db.users.find({'setup_complete': True, 'business_details': {'$exists': True}})
+        logger.info(f"Found {db.users.count_documents({'setup_complete': True, 'business_details': {'$exists': True}})} users for migration")
         setup_count = 0
         for user in users_with_setup:
-            if user is None:  # Add safeguard
+            if user is None:
                 logger.warning("Encountered None user in users_with_setup, skipping")
                 continue
+            logger.debug(f"Processing user with _id: {user.get('_id', 'unknown')}")
             updates = {}
             # Move language to business_details.language if it exists
             if 'language' in user:
                 updates['business_details.language'] = user['language']
                 updates['language'] = None  # Will be unset
             # Add goals array if not already present
-            if 'business_details' not in user or 'goals' not in user.get('business_details', {}):
+            if not user.get('business_details') or 'goals' not in user.get('business_details', {}):
                 updates['business_details.goals'] = []
             if updates:
                 db.users.update_one(
@@ -322,7 +323,6 @@ def migrate_users_schema(db):
 
     except Exception as e:
         logger.error(f"Failed to migrate users schema: {str(e)}", exc_info=True)
-        raise
         raise
 
 def initialize_app_data(app):
