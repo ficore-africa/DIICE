@@ -1,5 +1,7 @@
-{% extends 'base.html' %}
-{% block title %}{{ t('general_create_account', default='Sign Up') | escape }}{% endblock %}
+{% extends "base.html" %}
+{% block title %}
+{{ t('general_create_account', default='Sign Up') | escape }}
+{% endblock %}
 {% block content %}
 <div class="container my-5">
     <h1 class="text-center mb-4" id="signup-form-title">{{ t('general_create_account', default='Sign Up') | escape }}</h1>
@@ -17,6 +19,10 @@
                 {% endif %}
             {% endwith %}
             <p class="mb-3 text-muted">{{ t('general_form_reset_note', default='Form fields retain your input for convenience. Clear them if needed.') | escape }}</p>
+            <p class="mb-3 text-muted">
+                {{ t('general_trial_info', default='Your 30-day free trial starts now. ') | escape }}
+                <span id="trial-countdown" aria-live="polite">30 days remaining</span>.
+            </p>
             <form class="validate-form needs-validation" method="POST" action="{{ url_for('users.signup') }}" novalidate aria-labelledby="signup-form-title">
                 {{ form.hidden_tag() }}
                 <div class="form-group mb-3">
@@ -49,18 +55,10 @@
                         </div>
                     {% endif %}
                 </div>
-                <div class="form-group mb-3">
-                    <label class="form-label" for="language">{{ t('general_language', default='Language') | escape }}</label>
-                    {{ form.language(class="form-select" + (" is-invalid" if form.language.errors else ""), required=True, id="language", **{"aria-describedby": "languageFeedback" if form.language.errors else "", "aria-required": "true"}) | safe }}
-                    {% if form.language.errors %}
-                        <div id="languageFeedback" class="invalid-feedback" role="alert">
-                            {{ form.language.errors[0] | escape }}
-                        </div>
-                    {% endif %}
-                </div>
                 <div class="form-group mb-3 text-center">
-                    <p>{{ t('general_trial_info', default='Your account includes a <strong>30-day free trial</strong>.') | escape }}</p>
-                    <p>{{ t('general_agree_to_terms', default='By signing up, you agree to our') | escape }} <a href="{{ url_for('general_bp.terms') | escape }}" aria-label="{{ t('general_terms', default='Terms of Service') | escape }}">{{ t('general_terms', default='Terms of Service') | escape }}</a>.</p>
+                    <p>{{ t('general_agree_to_terms', default='By signing up, you agree to our') | escape }} 
+                        <a href="{{ url_for('general_bp.terms') | escape }}" aria-label="{{ t('general_terms', default='Terms of Service') | escape }}" target="_blank">{{ t('general_terms', default='Terms of Service') | escape }}</a>.
+                    </p>
                 </div>
                 <div class="text-center">
                     <button type="submit" class="btn btn-primary" aria-label="{{ t('general_create_account', default='Sign Up') | escape }}">{{ t('general_create_account', default='Sign Up') | escape }}</button>
@@ -76,7 +74,7 @@
 .form-group {
     position: relative;
 }
-.form-control, .form-select {
+.form-control {
     width: 100%;
     padding: 0.75rem;
     border: 1px solid #ced4da;
@@ -186,6 +184,23 @@ document.getElementById('password').addEventListener('input', function () {
             }
         });
     });
+
+    // Trial countdown (starts today: September 30, 2025)
+    function updateTrialCountdown() {
+        const trialStart = new Date('2025-09-30');
+        const trialEnd = new Date(trialStart.getTime() + 30 * 24 * 60 * 60 * 1000);
+        const now = new Date();
+        const daysLeft = Math.ceil((trialEnd - now) / (1000 * 60 * 60 * 24));
+        const countdownEl = document.getElementById('trial-countdown');
+        if (daysLeft > 0) {
+            countdownEl.textContent = `${daysLeft} days remaining`;
+        } else {
+            countdownEl.textContent = 'Trial expired';
+            countdownEl.classList.add('text-danger');
+        }
+    }
+    updateTrialCountdown();
+    setInterval(updateTrialCountdown, 24 * 60 * 60 * 1000); // Update daily
 })();
 </script>
 {% endblock %}
