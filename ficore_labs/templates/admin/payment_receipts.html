@@ -1,49 +1,112 @@
 {% extends 'admin/base.html' %}
+{% block title %}{{ title }} - FiCore{% endblock %}
 {% block content %}
-<h2>{{ title }}</h2>
-<table class="table table-bordered table-hover">
-    <thead>
-        <tr>
-            <th>ID</th>
-            <th>User ID</th>
-            <th>Filename</th>
-            <th>Plan</th>
-            <th>Amount</th>
-            <th>Status</th>
-            <th>Payment Date</th>
-            <th>Uploaded At</th>
-            <th>Actions</th>
-        </tr>
-    </thead>
-    <tbody>
-    {% for r in receipts %}
-        <tr>
-            <td>{{ r._id }}</td>
-            <td>{{ r.user_id }}</td>
-            <td>{{ r.filename }}</td>
-            <td>{{ r.plan_type|capitalize }}</td>
-            <td>{{ r.amount_paid }}</td>
-            <td>{{ r.status|capitalize }}</td>
-            <td>{{ r.payment_date.strftime('%Y-%m-%d') if r.payment_date else '' }}</td>
-            <td>{{ r.uploaded_at.strftime('%Y-%m-%d %H:%M') if r.uploaded_at else '' }}</td>
-            <td>
-                {% if r.status == 'pending' %}
-                <form method="post" action="{{ url_for('admin.approve_payment_receipt', receipt_id=r._id) }}" style="display:inline;">
-                    <button class="btn btn-success btn-sm" type="submit">Approve</button>
-                </form>
-                <form method="post" action="{{ url_for('admin.reject_payment_receipt', receipt_id=r._id) }}" style="display:inline;">
-                    <input type="text" name="rejection_reason" placeholder="Reason" class="form-control form-control-sm" style="width:100px;display:inline;" required>
-                    <button class="btn btn-danger btn-sm" type="submit">Reject</button>
-                </form>
-                {% elif r.status == 'approved' %}
-                    <span class="badge bg-success">Approved</span>
-                {% elif r.status == 'rejected' %}
-                    <span class="badge bg-danger">Rejected</span>
-                    <br><small>{{ r.rejection_reason }}</small>
-                {% endif %}
-            </td>
-        </tr>
-    {% endfor %}
-    </tbody>
-</table>
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4 class="card-title mb-0">
+                        <i class="bi bi-receipt"></i> {{ t('admin_payment_receipts', default='Subscription Receipts') }}
+                    </h4>
+                    <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary">
+                        <i class="bi bi-arrow-left"></i> {{ t('general_back', default='Back to Dashboard') }}
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if receipts %}
+                    <table class="table table-bordered table-hover">
+                        <thead>
+                            <tr>
+                                <th>{{ t('admin_receipt_id', default='ID') }}</th>
+                                <th>{{ t('admin_user_name', default='User Name') }}</th>
+                                <th>{{ t('admin_user_email', default='User Email') }}</th>
+                                <th>{{ t('admin_filename', default='Filename') }}</th>
+                                <th>{{ t('admin_plan_type', default='Plan') }}</th>
+                                <th>{{ t('admin_amount_paid', default='Amount') }}</th>
+                                <th>{{ t('admin_status', default='Status') }}</th>
+                                <th>{{ t('admin_payment_date', default='Payment Date') }}</th>
+                                <th>{{ t('admin_upload_date', default='Uploaded At') }}</th>
+                                <th>{{ t('admin_actions', default='Actions') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for receipt in receipts %}
+                            <tr>
+                                <td>{{ receipt._id }}</td>
+                                <td>{{ receipt.user_display_name }}</td>
+                                <td>{{ receipt.user_email }}</td>
+                                <td>
+                                    <a href="{{ receipt.file_path }}" target="_blank">{{ receipt.filename }}</a>
+                                </td>
+                                <td>{{ receipt.plan_type|capitalize }}</td>
+                                <td>{{ receipt.amount_paid|format_number }}</td>
+                                <td>
+                                    {% if receipt.status == 'pending' %}
+                                        <span class="badge bg-warning">{{ t('admin_status_pending', default='Pending') }}</span>
+                                    {% elif receipt.status == 'approved' %}
+                                        <span class="badge bg-success">{{ t('admin_status_approved', default='Approved') }}</span>
+                                    {% elif receipt.status == 'rejected' %}
+                                        <span class="badge bg-danger">{{ t('admin_status_rejected', default='Rejected') }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ receipt.payment_date|format_date if receipt.payment_date else 'N/A' }}</td>
+                                <td>{{ receipt.uploaded_at|format_date if receipt.uploaded_at else 'N/A' }}</td>
+                                <td>
+                                    <a href="{{ url_for('admin.view_payment_receipt', receipt_id=receipt._id) }}" class="btn btn-primary btn-sm">
+                                        <i class="bi bi-eye"></i> {{ t('general_view', default='View') }}
+                                    </a>
+                                    {% if receipt.status == 'pending' %}
+                                    <form method="post" action="{{ url_for('admin.approve_payment_receipt', receipt_id=receipt._id) }}" style="display:inline;">
+                                        {{ csrf_token() }}
+                                        <button class="btn btn-success btn-sm" type="submit" onclick="return confirm('{{ t('admin_confirm_approve', default='Are you sure you want to approve this receipt?') }}')">
+                                            <i class="bi bi-check-circle"></i> {{ t('admin_approve', default='Approve') }}
+                                        </button>
+                                    </form>
+                                    <button type="button" class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#rejectModal{{ receipt._id }}">
+                                        <i class="bi bi-x-circle"></i> {{ t('admin_reject', default='Reject') }}
+                                    </button>
+                                    <!-- Reject Modal -->
+                                    <div class="modal fade" id="rejectModal{{ receipt._id }}" tabindex="-1" aria-labelledby="rejectModalLabel{{ receipt._id }}" aria-hidden="true">
+                                        <div class="modal-dialog">
+                                            <div class="modal-content">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title" id="rejectModalLabel{{ receipt._id }}">{{ t('admin_reject_receipt', default='Reject Receipt') }}</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ t('general_close', default='Close') }}"></button>
+                                                </div>
+                                                <form method="post" action="{{ url_for('admin.reject_payment_receipt', receipt_id=receipt._id) }}">
+                                                    {{ csrf_token() }}
+                                                    <div class="modal-body">
+                                                        <div class="mb-3">
+                                                            <label for="rejection_reason{{ receipt._id }}" class="form-label">
+                                                                {{ t('admin_rejection_reason', default='Rejection Reason') }} <span class="text-danger">*</span>
+                                                            </label>
+                                                            <textarea class="form-control" id="rejection_reason{{ receipt._id }}" name="rejection_reason" rows="3" required
+                                                                      placeholder="{{ t('admin_rejection_reason_placeholder', default='Please provide a reason for rejecting this receipt...') }}"></textarea>
+                                                        </div>
+                                                    </div>
+                                                    <div class="modal-footer">
+                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ t('general_cancel', default='Cancel') }}</button>
+                                                        <button type="submit" class="btn btn-danger">{{ t('admin_reject', default='Reject') }}</button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% elif receipt.status == 'rejected' %}
+                                    <small>{{ receipt.rejection_reason or 'N/A' }}</small>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <p class="text-muted">{{ t('admin_no_receipts', default='No receipts found.') }}</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
