@@ -263,68 +263,6 @@ def verify_no_naive_datetimes(db):
             if naive_count > 0:
                 logger.warning(f"Found {naive_count} naive datetimes in {collection_name}")
 
-def migrate_users_schema(db):
-    try:
-        # Check if migration has already been applied
-        if db.system_config.find_one({'_id': 'users_schema_migration_2025_09_30'}):
-            logger.info("Users schema migration already applied, skipping.")
-            return
-
-        # Process users with setup_complete=False: Remove language
-        users_no_setup = db.users.find({'setup_complete': False, 'language': {'$exists': True}})
-        no_setup_count = 0
-        for user in users_no_setup:
-            if user is None:
-                logger.warning("Encountered None user in users_no_setup, skipping")
-                continue
-            db.users.update_one(
-                {'_id': user['_id']},
-                {'$unset': {'language': ''}}
-            )
-            no_setup_count += 1
-        if no_setup_count > 0:
-            logger.info(f"Removed language field from {no_setup_count} users with setup_complete=False")
-
-        # Process users with setup_complete=True: Move language to business_details and add goals
-        users_with_setup = db.users.find({'setup_complete': True, 'business_details': {'$exists': True}})
-        logger.info(f"Found {db.users.count_documents({'setup_complete': True, 'business_details': {'$exists': True}})} users for migration")
-        setup_count = 0
-        for user in users_with_setup:
-            if user is None:
-                logger.warning("Encountered None user in users_with_setup, skipping")
-                continue
-            logger.debug(f"Processing user with _id: {user.get('_id', 'unknown')}")
-            updates = {}
-            # Move language to business_details.language if it exists
-            if 'language' in user:
-                updates['business_details.language'] = user['language']
-            # Add goals array if not already present
-            if not user.get('business_details') or 'goals' not in user.get('business_details', {}):
-                updates['business_details.goals'] = []
-            if updates:
-                db.users.update_one(
-                    {'_id': user['_id']},
-                    {
-                        '$set': updates,
-                        '$unset': {'language': ''} if 'language' in user else {}  # Only unset if language exists
-                    }
-                )
-                setup_count += 1
-        if setup_count > 0:
-            logger.info(f"Updated {setup_count} users with setup_complete=True: moved language to business_details and added goals")
-
-        # Mark migration as complete
-        db.system_config.update_one(
-            {'_id': 'users_schema_migration_2025_09_30'},
-            {'$set': {'value': True, 'migrated_at': datetime.now(timezone.utc)}},
-            upsert=True
-        )
-        logger.info("Users schema migration completed and marked in system_config")
-
-    except Exception as e:
-        logger.error(f"Failed to migrate users schema: {str(e)}", exc_info=True)
-        raise
-
 def initialize_app_data(app):
     """
     Initialize MongoDB collections, indexes, and perform one-off migrations.
