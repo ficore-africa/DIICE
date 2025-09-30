@@ -349,10 +349,7 @@ def suspend_user(user_id):
         db = utils.get_mongo_db()
         if db is None:
             raise Exception("Failed to connect to MongoDB")
-        try:
-            user_query = {'_id': ObjectId(user_id)}
-        except errors.InvalidId:
-            user_query = {'user_id': user_id}
+        user_query = {'_id': user_id}
         user = db.users.find_one(user_query)
         if user is None:
             flash(trans('admin_user_not_found', default='User not found'), 'danger')
@@ -385,10 +382,7 @@ def delete_user(user_id):
         db = utils.get_mongo_db()
         if db is None:
             raise Exception("Failed to connect to MongoDB")
-        try:
-            user_query = {'_id': ObjectId(user_id)}
-        except errors.InvalidId:
-            user_query = {'user_id': user_id}
+        user_query = {'_id': user_id}
         user = db.users.find_one(user_query)
         if user is None:
             flash(trans('admin_user_not_found', default='User not found'), 'danger')
@@ -413,7 +407,7 @@ def delete_user(user_id):
                      extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
         flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
         return render_template('error/500.html'), 500
-
+        
 @admin_bp.route('/data/delete/<collection>/<item_id>', methods=['POST'])
 @login_required
 @utils.requires_role('admin')
@@ -467,13 +461,10 @@ def manage_user_roles():
                              extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
                 flash(trans('admin_no_user_id', default='No user ID provided'), 'danger')
                 return redirect(url_for('admin.manage_user_roles'))
-            try:
-                user_query = {'_id': ObjectId(user_id)}
-            except errors.InvalidId:
-                user_query = {'user_id': user_id}
+            user_query = {'_id': user_id}
             user = db.users.find_one(user_query)
             if user is None:
-                logger.error(f"User not found for user_id: {user_id}",
+                logger.error(f"User not found for _id: {user_id}",
                              extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
                 flash(trans('user_not_found', default='User not found'), 'danger')
                 return redirect(url_for('admin.manage_user_roles'))
@@ -494,7 +485,7 @@ def manage_user_roles():
                 log_audit_action('update_user_role', {'user_id': user_id, 'new_role': new_role})
                 flash(trans('user_role_updated', default='User role updated successfully'), 'success')
             else:
-                logger.info(f"No changes made to role for user_id: {user_id}",
+                logger.info(f"No changes made to role for _id: {user_id}",
                             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
                 flash(trans('admin_no_changes', default='No changes made to role'), 'info')
             return redirect(url_for('admin.manage_user_roles'))
@@ -542,13 +533,10 @@ def manage_user_subscriptions():
                              extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
                 flash(trans('admin_no_user_id', default='No user ID provided'), 'danger')
                 return redirect(url_for('admin.manage_user_subscriptions'))
-            try:
-                user_query = {'_id': ObjectId(user_id)}
-            except errors.InvalidId:
-                user_query = {'user_id': user_id}
+            user_query = {'_id': user_id}
             user = db.users.find_one(user_query)
             if user is None:
-                logger.error(f"User not found for user_id: {user_id}",
+                logger.error(f"User not found for _id: {user_id}",
                              extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
                 flash(trans('user_not_found', default='User not found'), 'danger')
                 return redirect(url_for('admin.manage_user_subscriptions'))
@@ -560,7 +548,6 @@ def manage_user_subscriptions():
                 'subscription_end': None,
                 'updated_at': datetime.now(timezone.utc)
             }
-            # Handle subscription_end from form, always ensure UTC-aware
             try:
                 if form.subscription_end.data:
                     subscription_end_dt = datetime.combine(form.subscription_end.data, datetime.min.time())
@@ -589,10 +576,9 @@ def manage_user_subscriptions():
                 })
                 flash(trans('subscription_updated', default='User subscription updated successfully'), 'success')
             else:
-                logger.info(f"No changes made to subscription for user_id: {user_id}",
+                logger.info(f"No changes made to subscription for _id: {user_id}",
                             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
                 flash(trans('admin_no_changes', default='No changes made to subscription'), 'info')
-            # After update, reload users from DB to reflect changes
             users = list(db.users.find())
             for user in users:
                 user['_id'] = str(user['_id'])
@@ -603,14 +589,13 @@ def manage_user_subscriptions():
             user['_id'] = str(user['_id'])
             user['trial_end'] = utils.safe_parse_datetime(user.get('trial_end')) if user.get('trial_end') else None
             user['subscription_end'] = utils.safe_parse_datetime(user.get('subscription_end')) if user.get('subscription_end') else None
-            # No more complex status logic here; template will handle status display
         return render_template('admin/user_subscriptions.html', form=form, users=users, title=trans('admin_manage_user_subscriptions_title', default='Manage User Subscriptions'), now=datetime.now(timezone.utc))
     except Exception as e:
         logger.error(f"Error in manage_user_subscriptions for admin {current_user.id}: {str(e)}",
                      extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
         flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
         return render_template('error/500.html'), 500
-        
+
 @admin_bp.route('/users/trials', methods=['GET', 'POST'])
 @login_required
 @utils.requires_role('admin')
@@ -626,10 +611,7 @@ def manage_user_trials():
         if request.method == 'POST' and form.validate_on_submit():
             user_id = request.form.get('user_id')
             if user_id:
-                try:
-                    user_query = {'_id': ObjectId(user_id)}
-                except errors.InvalidId:
-                    user_query = {'user_id': user_id}
+                user_query = {'_id': user_id}
                 user = db.users.find_one(user_query)
                 if user is None:
                     flash(trans('user_not_found', default='User not found'), 'danger')
@@ -725,11 +707,6 @@ def manage_user_trials():
     except Exception as e:
         logger.error(f"Error in manage_user_trials for admin {current_user.id}: {str(e)}",
                      extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-        flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
-        return render_template('error/500.html'), 500
-
-## All non-core admin routes (receipts, audit, debtors, creditors, records, cashflows, kyc, reports, waitlist, etc.) have been removed for brevity and maintainability. Only core user management routes and feedback remain.
-## All waitlist-related routes have been removed as requested.
         flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
         return render_template('error/500.html'), 500
 
@@ -892,10 +869,11 @@ def bulk_operations():
             results = {'success': 0, 'failed': 0}
             for user_id in user_ids:
                 try:
-                    try:
-                        user_query = {'_id': ObjectId(user_id)}
-                    except errors.InvalidId:
-                        user_query = {'user_id': user_id}
+                    user_query = {'_id': user_id}
+                    user = db.users.find_one(user_query)
+                    if user is None:
+                        results['failed'] += 1
+                        continue
                     if operation == 'extend_trial':
                         days = int(request.form.get('trial_days', 30))
                         new_trial_end = datetime.now(timezone.utc) + timedelta(days=days)
@@ -951,7 +929,7 @@ def bulk_operations():
                      extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
         flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
         return render_template('error/500.html'), 500
-
+        
 @admin_bp.route('/system/settings', methods=['GET', 'POST'])
 @login_required
 @utils.requires_role('admin')
@@ -1098,20 +1076,21 @@ def toggle_user_language(user_id, language):
         if language not in ['en', 'ha']:
             flash(trans('admin_invalid_language', default='Invalid language selected'), 'danger')
             return redirect(url_for('admin.manage_users'))
-        
         db = utils.get_mongo_db()
         if db is None:
             raise Exception("Failed to connect to MongoDB")
-        
-        # Update user language preference
+        user_query = {'_id': user_id}
+        user = db.users.find_one(user_query)
+        if user is None:
+            flash(trans('admin_user_not_found', default='User not found'), 'danger')
+            return redirect(url_for('admin.manage_users'))
         result = db.users.update_one(
-            {'_id': ObjectId(user_id)},
+            user_query,
             {'$set': {
                 'language': language,
                 'updated_at': datetime.now(timezone.utc)
             }}
         )
-        
         if result.modified_count > 0:
             log_audit_action('toggle_user_language', {
                 'user_id': user_id,
@@ -1120,15 +1099,13 @@ def toggle_user_language(user_id, language):
             flash(trans('admin_language_updated', default=f'User language updated to {language.upper()}'), 'success')
         else:
             flash(trans('admin_user_not_found', default='User not found'), 'danger')
-        
         return redirect(url_for('admin.manage_users'))
-        
     except Exception as e:
         logger.error(f"Error toggling user language for {user_id}: {str(e)}",
                      extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
         flash(trans('admin_database_error', default='An error occurred while updating language'), 'danger')
         return redirect(url_for('admin.manage_users'))
-
+        
 # Enhanced Admin Routes
 @admin_bp.route('/analytics/enhanced', methods=['GET'])
 @login_required
@@ -1246,3 +1223,4 @@ def manage_feedback():
                      extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
         flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
         return render_template('error/500.html'), 500
+
