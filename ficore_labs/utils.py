@@ -465,7 +465,7 @@ ADMIN_EXPLORE = [
 ALL_TOOLS = []
 
 def initialize_tools_with_urls(app):
-    global TRADER_TOOLS, TRADER_NAV, ADMIN_TOOLS, ADMIN_NAV, ALL_TOOLS
+    global TRADER_TOOLS, TRADER_NAV, TRADER_EXPLORE, ADMIN_TOOLS, ADMIN_NAV, ADMIN_EXPLORE, ALL_TOOLS
     try:
         with app.app_context():
             TRADER_TOOLS = generate_tools_with_urls(TRADER_TOOLS)
@@ -2959,6 +2959,7 @@ def create_dashboard_safe_response(stats, recent_data, additional_data=None):
             'timestamp': datetime.now(timezone.utc).isoformat()
 
         }
+
 
 
 
