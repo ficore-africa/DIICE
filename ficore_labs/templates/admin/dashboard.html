@@ -25,38 +25,6 @@
         <div class="col-md-4">
             <div class="card mb-3">
                 <div class="card-body">
-                    <h5 class="card-title">{{ t('admin_records', default='Income Records') }}</h5>
-                    <p class="card-text">{{ stats.records }}</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card mb-3">
-                <div class="card-body">
-                    <h5 class="card-title">{{ t('admin_cashflows', default='Payment Outflows') }}</h5>
-                    <p class="card-text">{{ stats.cashflows }}</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card mb-3">
-                <div class="card-body">
-                    <h5 class="card-title">{{ t('admin_debtors', default='Debtors') }}</h5>
-                    <p class="card-text">{{ stats.debtors }}</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card mb-3">
-                <div class="card-body">
-                    <h5 class="card-title">{{ t('admin_creditors', default='Creditors') }}</h5>
-                    <p class="card-text">{{ stats.creditors }}</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card mb-3">
-                <div class="card-body">
                     <h5 class="card-title">{{ t('admin_audit_logs', default='Audit Logs') }}</h5>
                     <p class="card-text">{{ stats.audit_logs }}</p>
                 </div>
@@ -91,18 +59,12 @@
         <div class="col-md-4 mb-2">
             <a href="{{ url_for('admin.manage_user_trials') }}" class="btn btn-success w-100">{{ t('admin_manage_user_trials', default='Manage User Trials') }}</a>
         </div>
-        <div class="col-md-4 mb-2">
-            <a href="{{ url_for('admin.bulk_operations') }}" class="btn btn-warning w-100">{{ t('admin_bulk_operations', default='Bulk Operations') }}</a>
-        </div>
     </div>
 
     <!-- Reports & Analytics Section -->
     <div class="row mb-4">
         <div class="col-md-4 mb-2">
             <a href="{{ url_for('admin.analytics_dashboard') }}" class="btn btn-info w-100">{{ t('admin_analytics_dashboard', default='Analytics Dashboard') }}</a>
-        </div>
-        <div class="col-md-4 mb-2">
-            <a href="{{ url_for('admin.enhanced_analytics_dashboard') }}" class="btn btn-info w-100">{{ t('admin_enhanced_analytics', default='Enhanced Analytics') }}</a>
         </div>
     </div>
 
