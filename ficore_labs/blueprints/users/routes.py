@@ -4,7 +4,9 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, jsonify, session, make_response
 from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, TextAreaField, SelectField, SubmitField, BooleanField, validators
+from wtforms import StringField, PasswordField, TextAreaField, SelectField, SubmitField, BooleanField, SelectMultipleField
+from wtforms.widgets import ListWidget, CheckboxInput
+from wtforms.validators import DataRequired, Length, Email, Regexp, EqualTo
 from flask_login import login_required, current_user, login_user, logout_user
 from pymongo import errors
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -72,10 +74,6 @@ class SignupForm(FlaskForm):
         validators.Length(min=6, message=trans('general_password_length', default='Password must be at least 6 characters')),
         validators.Regexp(PASSWORD_REGEX, message=trans('general_password_format', default='Password must be at least 6 characters'))
     ], render_kw={'class': 'form-control'})
-    language = SelectField(trans('general_language', default='Language'), choices=[
-        ('en', trans('general_english', default='English')),
-        ('ha', trans('general_hausa', default='Hausa'))
-    ], validators=[validators.DataRequired(message=trans('general_language_required', default='Language is required'))], render_kw={'class': 'form-select'})
     submit = SubmitField(trans('general_signup', default='Sign Up'), render_kw={'class': 'btn btn-primary w-100'})
 
 class ForgotPasswordForm(FlaskForm):
@@ -133,6 +131,19 @@ class BusinessSetupForm(FlaskForm):
                           ],
                           validators=[validators.DataRequired(message=trans('general_language_required', default='Language is required'))],
                           render_kw={'class': 'form-select'})
+    goals = SelectMultipleField(
+        trans('general_main_goal', default="What's your main goal?"),
+        choices=[
+            ('track_expenses', trans('goals_track_expenses', default='Track expenses')),
+            ('manage_customers', trans('goals_manage_customers', default='Manage customers')),
+            ('improve_savings', trans('goals_improve_savings', default='Improve savings')),
+            ('monitor_income_debt', trans('goals_monitor_income_debt', default='Monitor income/debt'))
+        ],
+        widget=ListWidget(prefix_label=False),
+        coerce=str,
+        validators=[validators.DataRequired(message=trans('general_select_at_least_one_goal', default='Please select at least one goal.'))],
+        render_kw={'class': 'form-check-input'}
+    )
     terms = BooleanField(trans('general_terms', default='I accept the Terms and Conditions'),
                         validators=[validators.DataRequired(message=trans('general_terms_required', default='You must accept the terms'))],
                         render_kw={'class': 'form-check-input'})
@@ -147,13 +158,10 @@ def log_audit_action(action, details=None):
             'details': details or {},
             'timestamp': datetime.now(timezone.utc),
         }
-        
-        # Only add admin_id if user is authenticated, otherwise leave it as None for system actions
         if current_user.is_authenticated:
             log_entry['admin_id'] = str(current_user.id)
         else:
             log_entry['admin_id'] = None
-            
         db.audit_logs.insert_one(log_entry)
     except pymongo.errors.PyMongoError as e:
         logger.error(f"Error logging audit action '{action}': {str(e)}")
@@ -161,23 +169,19 @@ def log_audit_action(action, details=None):
         logger.error(f"Unexpected error logging audit action '{action}': {str(e)}")
 
 def get_setup_wizard_route(role):
-    """Get the appropriate setup wizard route based on user role."""
     if role in ['trader', 'admin']:
         return 'users.setup_wizard'
     logger.error(f"Invalid role '{role}' for setup wizard route")
     raise ValueError(f"Invalid role: {role}")
 
 def get_post_login_redirect(role):
-    """Determine the redirect URL after login based on user role and trial/subscription status."""
     try:
-        # Check if user has an active trial or subscription
         if current_user.is_trial_active() or current_user.is_subscribed:
             if role in ['trader', 'admin']:
                 return url_for('business.home')
             logger.error(f"Invalid role '{role}' for post-login redirect")
             raise ValueError(f"Invalid role: {role}")
         else:
-            # Redirect to subscription page if trial expired and not subscribed
             return url_for('subscribe_bp.subscribe')
     except Exception as e:
         current_app.logger.error(
@@ -187,7 +191,6 @@ def get_post_login_redirect(role):
         return url_for('general_bp.landing')
 
 def get_explore_tools_redirect(role):
-    """Determine where to redirect user when they click 'Explore Your Tools' based on their role."""
     try:
         if role == 'trader':
             return url_for('general_bp.home')
@@ -223,7 +226,6 @@ def login():
             try:
                 identifier = form.username.data.strip().lower()
                 logger.info(f"Login attempt for identifier: {identifier}, session_id: {session['session_id']}")
-                
                 db = utils.get_mongo_db()
                 if '@' in identifier:
                     user = db.users.find_one({'email': {'$regex': f'^{identifier}$', '$options': 'i'}})
@@ -438,9 +440,8 @@ def signup():
             username = form.username.data.strip().lower()
             email = form.email.data.strip().lower()
             role = 'trader'  # Fixed role for all signups
-            language = form.language.data
             logger.debug(f"Signup attempt: {username}, {email}, role={role}, session_id: {session.get('session_id')}")
-            logger.info(f"Signup attempt: username={username}, email={email}, role={role}, language={language}")
+            logger.info(f"Signup attempt: username={username}, email={email}, role={role}")
 
             db = utils.get_mongo_db()
 
@@ -459,7 +460,6 @@ def signup():
                 'email': email,
                 'password_hash': generate_password_hash(form.password.data),
                 'role': role,
-                'language': language,
                 'dark_mode': False,
                 'is_admin': False,
                 'setup_complete': False,
@@ -481,7 +481,7 @@ def signup():
                 return render_template('users/signup.html', form=form, title=trans('general_signup', lang=session.get('lang', 'en'))), 500
 
             db.audit_logs.insert_one({
-                'admin_id': None,  # System action, no admin involved
+                'admin_id': None,
                 'action': 'signup',
                 'details': {'user_id': username, 'role': role},
                 'timestamp': datetime.now(timezone.utc)
@@ -494,7 +494,6 @@ def signup():
                 role=role,
                 is_admin=False,
                 setup_complete=False,
-                language=language,
                 is_trial=True,
                 trial_start=datetime.utcnow(),
                 trial_end=datetime.utcnow() + timedelta(days=30),
@@ -504,7 +503,6 @@ def signup():
                 subscription_end=None
             )
             login_user(user_obj, remember=True)
-            session['lang'] = language
             session.pop('is_anonymous', None)
             session['is_anonymous'] = False
             logger.info(f"New user created and logged in: {username} (role: {role}). Session: {dict(session)}")
@@ -679,12 +677,17 @@ def setup_wizard():
                             'phone_number': form.phone_number.data.strip()
                         },
                         'language': form.language.data,
+                        'goals': form.goals.data,  # Store list of selected goals
                         'setup_complete': True
                     }
                 }
             )
-            log_audit_action('complete_setup_wizard', {'user_id': user_id, 'updated_by': current_user.id})
-            logger.info(f"Business setup completed for user: {user_id} by {current_user.id}, session_id: {session.get('session_id')}")
+            log_audit_action('complete_setup_wizard', {
+                'user_id': user_id,
+                'updated_by': current_user.id,
+                'goals': form.goals.data
+            })
+            logger.info(f"Business setup completed for user: {user_id} by {current_user.id}, goals: {form.goals.data}, session_id: {session.get('session_id')}")
             flash(trans('general_business_setup_success', default='Business setup completed'), 'success')
             if user.get('trial_end') and user.get('trial_end') < datetime.utcnow() and not user.get('is_subscribed', False):
                 return redirect(url_for('subscribe_bp.subscription_required'))
@@ -693,7 +696,7 @@ def setup_wizard():
             for field, errors in form.errors.items():
                 for error in errors:
                     flash(f"{field}: {error}", 'danger')
-        return render_template('users/business_setup.html', form=form, title=trans('general_business_setup', lang=session.get('lang', 'en')))
+        return render_template('users/business_setup.html', form=form, title=trans('general_business_setup', lang=session.get('lang', 'en')), current_user=current_user)
     except pymongo.errors.PyMongoError as e:
         logger.error(f"MongoDB error during business setup for {user_id}: {str(e)}")
         flash(trans('general_database_error', default='An error occurred while accessing the database. Please try again later.'), 'danger')
