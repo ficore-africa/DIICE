@@ -15,16 +15,6 @@
         </div>
     </div>
 
-    <div class="profile-card profile-kyc-status-card">
-        <div class="profile-card-body">
-            <h5 class="profile-heading">{{ t('kyc_status', default='KYC Status') }}</h5>
-            <p class="profile-text">{{ user.kyc_status|capitalize }}</p>
-            {% if user.kyc_status != 'approved' %}
-                <a href="{{ url_for('kyc.submit') }}" class="profile-btn profile-btn-primary">{{ t('submit_kyc', default='Submit KYC') }}</a>
-            {% endif %}
-        </div>
-    </div>
-
     <div class="profile-grid">
         <button class="profile-btn profile-btn-primary profile-explore-tools-btn" onclick="location.href='{{ url_for('general_bp.home') }}'">
             <i class="bi bi-briefcase profile-icon"></i> {{ t('settings_explore_business_tools', default='Explore Your Business Tools') }}
