@@ -269,6 +269,7 @@ def migrate_users_schema(db):
         if db.system_config.find_one({'_id': 'users_schema_migration_2025_09_30'}):
             logger.info("Users schema migration already applied, skipping.")
             return
+
         # Process users with setup_complete=False: Remove language
         users_no_setup = db.users.find({'setup_complete': False, 'language': {'$exists': True}})
         no_setup_count = 0
@@ -297,7 +298,6 @@ def migrate_users_schema(db):
             # Move language to business_details.language if it exists
             if 'language' in user:
                 updates['business_details.language'] = user['language']
-                updates['language'] = None  # Will be unset
             # Add goals array if not already present
             if not user.get('business_details') or 'goals' not in user.get('business_details', {}):
                 updates['business_details.goals'] = []
@@ -306,7 +306,7 @@ def migrate_users_schema(db):
                     {'_id': user['_id']},
                     {
                         '$set': updates,
-                        '$unset': {'language': ''} if 'language' in updates else {}
+                        '$unset': {'language': ''} if 'language' in user else {}  # Only unset if language exists
                     }
                 )
                 setup_count += 1
