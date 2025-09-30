@@ -3,7 +3,6 @@ from bson import ObjectId
 from datetime import datetime, timedelta, timezone
 import logging
 from werkzeug.security import generate_password_hash
-from pymongo.errors import ConnectionFailure, DuplicateKeyError, OperationFailure
 from translations import trans
 from utils import get_mongo_db, logger, normalize_datetime
 from zoneinfo import ZoneInfo
@@ -12,7 +11,7 @@ import os
 import time
 import uuid
 
-# Configure logger for the application
+# Configure logger in this  models.py for the application
 logger = logging.getLogger('business_finance_app')
 logger.setLevel(logging.INFO)
 
@@ -264,6 +263,65 @@ def verify_no_naive_datetimes(db):
             if naive_count > 0:
                 logger.warning(f"Found {naive_count} naive datetimes in {collection_name}")
 
+def migrate_users_schema(db):
+    """
+    Migrate the users collection to remove language from top-level and add it to business_details,
+    and add goals array to business_details for users with setup_complete=True.
+    """
+    try:
+        # Check if migration has already been applied
+        if db.system_config.find_one({'_id': 'users_schema_migration_2025_09_30'}):
+            logger.info("Users schema migration already applied, skipping.")
+            return
+
+        # Process users with setup_complete=False: Remove language
+        users_no_setup = db.users.find({'setup_complete': False, 'language': {'$exists': True}})
+        no_setup_count = 0
+        for user in users_no_setup:
+            db.users.update_one(
+                {'_id': user['_id']},
+                {'$unset': {'language': ''}}
+            )
+            no_setup_count += 1
+        if no_setup_count > 0:
+            logger.info(f"Removed language field from {no_setup_count} users with setup_complete=False")
+
+        # Process users with setup_complete=True: Move language to business_details and add goals
+        users_with_setup = db.users.find({'setup_complete': True, 'business_details': {'$exists': True}})
+        setup_count = 0
+        for user in users_with_setup:
+            updates = {}
+            # Move language to business_details.language if it exists
+            if 'language' in user:
+                updates['business_details.language'] = user['language']
+                updates['language'] = None  # Will be unset
+            # Add goals array if not already present
+            if 'business_details' not in user or 'goals' not in user.get('business_details', {}):
+                updates['business_details.goals'] = []
+            if updates:
+                db.users.update_one(
+                    {'_id': user['_id']},
+                    {
+                        '$set': updates,
+                        '$unset': {'language': ''} if 'language' in updates else {}
+                    }
+                )
+                setup_count += 1
+        if setup_count > 0:
+            logger.info(f"Updated {setup_count} users with setup_complete=True: moved language to business_details and added goals")
+
+        # Mark migration as complete
+        db.system_config.update_one(
+            {'_id': 'users_schema_migration_2025_09_30'},
+            {'$set': {'value': True, 'migrated_at': datetime.now(timezone.utc)}},
+            upsert=True
+        )
+        logger.info("Users schema migration completed and marked in system_config")
+
+    except Exception as e:
+        logger.error(f"Failed to migrate users schema: {str(e)}", exc_info=True)
+        raise
+
 def initialize_app_data(app):
     """
     Initialize MongoDB collections, indexes, and perform one-off migrations.
@@ -300,13 +358,22 @@ def initialize_app_data(app):
                         'is_admin': True,
                         'display_name': 'Admin',
                         'setup_complete': True,
-                        'language': 'en',
+                        'language': None,
                         'is_trial': False,
                         'is_subscribed': True,
                         'subscription_plan': 'admin',
                         'subscription_start': datetime.now(timezone.utc),
                         'subscription_end': None,
-                        'created_at': datetime.now(timezone.utc)
+                        'created_at': datetime.now(timezone.utc),
+                        'business_details': {
+                            'name': 'Admin Business',
+                            'address': 'N/A',
+                            'industry': 'Administration',
+                            'products_services': 'Admin Services',
+                            'phone_number': 'N/A',
+                            'language': 'en',
+                            'goals': []
+                        }
                     }
                     try:
                         if admin_user:
@@ -363,8 +430,17 @@ def initialize_app_data(app):
                                         'address': {'bsonType': 'string'},
                                         'industry': {'bsonType': 'string'},
                                         'products_services': {'bsonType': 'string'},
-                                        'phone_number': {'bsonType': 'string'}
-                                    }
+                                        'phone_number': {'bsonType': 'string'},
+                                        'language': {'bsonType': ['string', 'null'], 'enum': [None, 'en', 'ha']},
+                                        'goals': {
+                                            'bsonType': 'array',
+                                            'items': {
+                                                'bsonType': 'string',
+                                                'enum': ['track_expenses', 'manage_customers', 'improve_savings', 'increase_sales', 'streamline_operations']
+                                            }
+                                        }
+                                    },
+                                    'required': ['name', 'address', 'industry', 'products_services', 'phone_number', 'language', 'goals']
                                 },
                                 'profile_picture': {'bsonType': ['string', 'null']},
                                 'phone': {'bsonType': ['string', 'null']},
@@ -881,6 +957,13 @@ def initialize_app_data(app):
                 except Exception as e:
                     logger.error(f"Failed to fix user documents: {str(e)}", exc_info=True)
                     raise
+
+                # Run users schema migration for language and goals
+                try:
+                    migrate_users_schema(db_instance)
+                except Exception as e:
+                    logger.error(f"Failed to migrate users schema: {str(e)}", exc_info=True)
+                    raise
             
             try:
                 convert_naive_to_aware_datetimes(db_instance)
@@ -899,11 +982,11 @@ def initialize_app_data(app):
             raise
 
 class User:
-    def __init__(self, id, email, display_name=None, role='trader', is_admin=False, setup_complete=False, language='en', 
+    def __init__(self, id, email, display_name=None, role='trader', is_admin=False, setup_complete=False, language=None, 
                  is_trial=True, trial_start=None, trial_end=None, is_subscribed=False, 
                  subscription_plan=None, subscription_start=None, subscription_end=None,
                  profile_picture=None, phone=None, coin_balance=0, dark_mode=False, 
-                 settings=None, security_settings=None, annual_rent=None):
+                 settings=None, security_settings=None, annual_rent=None, business_details=None):
         self.id = id
         self.email = email
         self.username = display_name or email.split('@')[0]
@@ -926,6 +1009,7 @@ class User:
         self.settings = settings or {}
         self.security_settings = security_settings or {}
         self.annual_rent = annual_rent or 0
+        self.business_details = business_details or {}
 
     @property
     def is_authenticated(self):
@@ -985,7 +1069,7 @@ def create_user(db, user_data):
             'display_name': user_data.get('display_name', user_id),
             'is_admin': user_data.get('is_admin', False),
             'setup_complete': user_data.get('setup_complete', False),
-            'language': user_data.get('language', 'en'),
+            'language': None,
             'is_trial': True,
             'trial_start': datetime.now(timezone.utc),
             'trial_end': datetime.now(timezone.utc) + timedelta(days=30),
@@ -994,7 +1078,7 @@ def create_user(db, user_data):
             'subscription_start': None,
             'subscription_end': None,
             'created_at': datetime.now(timezone.utc),
-            'business_details': user_data.get('business_details'),
+            'business_details': user_data.get('business_details', {}),
             'profile_picture': user_data.get('profile_picture', None),
             'phone': user_data.get('phone', None),
             'coin_balance': user_data.get('coin_balance', 0),
@@ -1038,7 +1122,8 @@ def create_user(db, user_data):
             coin_balance=user_doc['coin_balance'],
             dark_mode=user_doc['dark_mode'],
             settings=user_doc['settings'],
-            security_settings=user_doc['security_settings']
+            security_settings=user_doc['security_settings'],
+            business_details=user_doc['business_details']
         )
     except Exception as e:
         logger.error(f"Error creating user: {str(e)}", exc_info=True)
@@ -1061,7 +1146,7 @@ def get_user_by_email(db, email):
                 display_name=user_doc.get('display_name'),
                 is_admin=user_doc.get('is_admin', False),
                 setup_complete=user_doc.get('setup_complete', False),
-                language=user_doc.get('language', 'en'),
+                language=user_doc.get('language', None),
                 is_trial=user_doc.get('is_trial', True),
                 trial_start=user_doc.get('trial_start'),
                 trial_end=user_doc.get('trial_end'),
@@ -1074,7 +1159,8 @@ def get_user_by_email(db, email):
                 coin_balance=user_doc.get('coin_balance', 0),
                 dark_mode=user_doc.get('dark_mode', False),
                 settings=user_doc.get('settings', {}),
-                security_settings=user_doc.get('security_settings', {})
+                security_settings=user_doc.get('security_settings', {}),
+                business_details=user_doc.get('business_details', {})
             )
         return None
     except Exception as e:
@@ -1096,7 +1182,7 @@ def get_user(db, user_id):
                 display_name=user_doc.get('display_name'),
                 is_admin=user_doc.get('is_admin', False),
                 setup_complete=user_doc.get('setup_complete', False),
-                language=user_doc.get('language', 'en'),
+                language=user_doc.get('language', None),
                 is_trial=user_doc.get('is_trial', True),
                 trial_start=user_doc.get('trial_start'),
                 trial_end=user_doc.get('trial_end'),
@@ -1109,7 +1195,8 @@ def get_user(db, user_id):
                 coin_balance=user_doc.get('coin_balance', 0),
                 dark_mode=user_doc.get('dark_mode', False),
                 settings=user_doc.get('settings', {}),
-                security_settings=user_doc.get('security_settings', {})
+                security_settings=user_doc.get('security_settings', {}),
+                business_details=user_doc.get('business_details', {})
             )
         return None
     except Exception as e:
@@ -1332,7 +1419,8 @@ def to_dict_user(user):
         'phone': user.phone,
         'dark_mode': user.dark_mode,
         'settings': user.settings,
-        'security_settings': user.security_settings
+        'security_settings': user.security_settings,
+        'business_details': user.business_details
     }
 
 def create_kyc_record(db, kyc_data):
