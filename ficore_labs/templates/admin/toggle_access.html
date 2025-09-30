@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Toggle User Access{% endblock %}
+{% block content %}
+<div class="container mt-5">
+    <h1 class="mb-4">Toggle User Trial/Subscription</h1>
+    <a href="{{ url_for('admin.dashboard') }}" class="btn btn-primary mb-4">Back to Dashboard</a>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                    {{ message | escape }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+    <div class="table-responsive">
+        <table class="table table-striped table-bordered">
+            <thead class="table-light">
+                <tr>
+                    <th>User ID</th>
+                    <th>Email</th>
+                    <th>Trial Status</th>
+                    <th>Subscription Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr>
+                    <td>{{ user._id }}</td>
+                    <td>{{ user.email }}</td>
+                    <td>
+                        <span class="badge {{ 'bg-success' if user.is_trial else 'bg-secondary' }}">{{ 'Active' if user.is_trial else 'Inactive' }}</span>
+                    </td>
+                    <td>
+                        <span class="badge {{ 'bg-success' if user.is_subscribed else 'bg-secondary' }}">{{ 'Active' if user.is_subscribed else 'Inactive' }}</span>
+                    </td>
+                    <td>
+                        <form action="{{ url_for('admin_toggle.toggle_access') }}" method="POST" class="d-inline">
+                            <input type="hidden" name="user_id" value="{{ user._id }}">
+                            <input type="hidden" name="toggle_type" value="trial">
+                            <button type="submit" class="btn btn-outline-primary btn-sm">Toggle Trial</button>
+                        </form>
+                        <form action="{{ url_for('admin_toggle.toggle_access') }}" method="POST" class="d-inline">
+                            <input type="hidden" name="user_id" value="{{ user._id }}">
+                            <input type="hidden" name="toggle_type" value="subscription">
+                            <button type="submit" class="btn btn-outline-success btn-sm">Toggle Subscription</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,49 @@
+{% extends 'admin/base.html' %}
+{% block content %}
+<h2>{{ title }}</h2>
+<table class="table table-bordered table-hover">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>User ID</th>
+            <th>Filename</th>
+            <th>Plan</th>
+            <th>Amount</th>
+            <th>Status</th>
+            <th>Payment Date</th>
+            <th>Uploaded At</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for r in receipts %}
+        <tr>
+            <td>{{ r._id }}</td>
+            <td>{{ r.user_id }}</td>
+            <td>{{ r.filename }}</td>
+            <td>{{ r.plan_type|capitalize }}</td>
+            <td>{{ r.amount_paid }}</td>
+            <td>{{ r.status|capitalize }}</td>
+            <td>{{ r.payment_date.strftime('%Y-%m-%d') if r.payment_date else '' }}</td>
+            <td>{{ r.uploaded_at.strftime('%Y-%m-%d %H:%M') if r.uploaded_at else '' }}</td>
+            <td>
+                {% if r.status == 'pending' %}
+                <form method="post" action="{{ url_for('admin.approve_payment_receipt', receipt_id=r._id) }}" style="display:inline;">
+                    <button class="btn btn-success btn-sm" type="submit">Approve</button>
+                </form>
+                <form method="post" action="{{ url_for('admin.reject_payment_receipt', receipt_id=r._id) }}" style="display:inline;">
+                    <input type="text" name="rejection_reason" placeholder="Reason" class="form-control form-control-sm" style="width:100px;display:inline;" required>
+                    <button class="btn btn-danger btn-sm" type="submit">Reject</button>
+                </form>
+                {% elif r.status == 'approved' %}
+                    <span class="badge bg-success">Approved</span>
+                {% elif r.status == 'rejected' %}
+                    <span class="badge bg-danger">Rejected</span>
+                    <br><small>{{ r.rejection_reason }}</small>
+                {% endif %}
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

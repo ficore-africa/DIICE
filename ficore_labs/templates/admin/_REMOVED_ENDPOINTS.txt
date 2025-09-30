@@ -1,0 +1,17 @@
+The following admin endpoints and their templates have been removed from the backend and should not be referenced in navigation, links, or includes:
+
+- Receipts (receipts.html, receipt_detail.html)
+- Debtors (debtors.html)
+- Creditors (creditors.html)
+- Records (records.html)
+- Cashflows (cashflows.html)
+- KYC (kyc.html)
+- Customer Reports (customer_reports.html)
+- Waitlist (waitlist.html)
+- System Settings (system_settings.html)
+- Tax Config/Tax Rates (tax_config.html, tax_rates.html)
+- View Data (view_data.html)
+- Toggle Access (toggle_access.html) [if not used]
+- Any other removed endpoints
+
+Please ensure all navigation bars, dropdowns, and links in admin templates do not reference these endpoints or templates. Only keep links to: dashboard, users, user_roles, user_subscriptions, user_trials, feedback, and any other explicitly retained endpoints.

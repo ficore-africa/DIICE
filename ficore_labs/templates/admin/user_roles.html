@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ title }}</h1>
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+            <div class="alert alert-{{ category }}">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+<h2>{{ trans('user_update_role', default='Update User Role') }}</h2>
+<form method="POST" action="{{ url_for('admin.manage_user_roles') }}">
+    {{ form.hidden_tag() }}
+    <div class="form-group">
+        <label>{{ trans('general_user', default='User') }}</label>
+        <select name="user_id" class="form-select" required>
+            <option value="">{{ trans('general_select_user', default='Select User') }}</option>
+            {% for user in users %}
+                <option value="{{ user._id }}">{{ user.email }} ({{ user._id }})</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="form-group">
+        <label>{{ form.role.label }}</label>
+        {{ form.role }}
+    </div>
+    {{ form.submit }}
+</form>
+<h2>{{ trans('admin_users_list', default='Users List') }}</h2>
+<table class="table">
+    <thead>
+        <tr>
+            <th>{{ trans('admin_username', default='Username') }}</th>
+            <th>{{ trans('admin_email', default='Email') }}</th>
+            <th>{{ trans('user_role', default='Role') }}</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for user in users %}
+        <tr>
+            <td>{{ user._id }}</td>
+            <td>{{ user.email }}</td>
+            <td>{{ user.role }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
