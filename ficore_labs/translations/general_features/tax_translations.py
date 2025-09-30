@@ -8,6 +8,7 @@ TAX_TRANSLATIONS = {
         'tax_summary_title': 'Your Tax Estimate',
         'tax_calculator_tooltip': 'Calculate your tax liability based on Nigerian tax laws',
         'tax_calculator': 'Tax Calculator',
+        'tax_education_desc': 'Learn how taxes impact your finances and how to manage them smartly.',
         'tax_education_tooltip': 'Access comprehensive tax education and compliance guides',
         'tax_education': 'Tax Education',
     'tax_calculator_desc': 'Tax calculator for Nigeria.',
@@ -603,6 +604,7 @@ TAX_TRANSLATIONS = {
             'tax_pension_max': 'Matsakaicin Gudummawar Fensho',
             'tax_entity_type_required': 'Nau\'in Kamfani da ake Bukata',
             'tax_entity_type_length': 'Tsawon Nau\'in Kamfani',
+        'tax_education_desc': 'Koyi yadda haraji ke shafar kuɗin ku da yadda za ku sarrafa su cikin hikima.',
         
         # New keys from latest warnings
         'general_personal_finance_tools': 'Kayan Aikin Kuɗi na Kai',
@@ -620,5 +622,6 @@ TAX_TRANSLATIONS = {
         'tax_category_statutory_legal': 'Gudummawa ta Dokoki da Shari\'a'
     }
 }
+
 
 
