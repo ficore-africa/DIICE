@@ -1,4 +1,3 @@
-
 import logging
 import os
 from io import BytesIO
@@ -28,43 +27,6 @@ from admin_tax_config import TaxRateForm, TaxBandForm, TaxExemptionForm, get_tax
 logger = logging.getLogger(__name__)
 
 admin_bp = Blueprint('admin', __name__, template_folder='templates/admin', url_prefix='/admin')
-
-# Helper to ensure all datetimes are UTC-aware
-def safe_utc(dt):
-    """
-    Convert a datetime to UTC-aware datetime, returning None if input is None.
-    """
-    if dt is None:
-        return None
-    return to_utc_aware(dt)
-    
-def to_utc_aware(dt):
-    """Convert a datetime or string to UTC-aware datetime."""
-    try:
-        if not dt:
-            # Always return a valid UTC datetime
-            return datetime.min.replace(tzinfo=timezone.utc)
-        if isinstance(dt, str):
-            try:
-                dt = datetime.fromisoformat(dt)
-            except ValueError:
-                try:
-                    dt = datetime.strptime(dt, '%Y-%m-%d')
-                except ValueError:
-                    logger.error(f"Invalid datetime string format: {dt}",
-                                 extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-                    return datetime.min.replace(tzinfo=timezone.utc)
-        if isinstance(dt, datetime):
-            if dt.tzinfo is None:
-                return dt.replace(tzinfo=timezone.utc)
-            return dt.astimezone(timezone.utc)
-        logger.error(f"Invalid datetime type: {type(dt)}",
-                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-        return datetime.min.replace(tzinfo=timezone.utc)
-    except Exception as e:
-        logger.error(f"Exception in to_utc_aware: {e}",
-                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-        return datetime.min.replace(tzinfo=timezone.utc)
 
 # Form Definitions
 class RoleForm(FlaskForm):
@@ -216,15 +178,9 @@ def dashboard():
             trial_end = user.get('trial_end')
             subscription_end = user.get('subscription_end')
             try:
-                trial_end_aware = to_utc_aware(trial_end)
-                subscription_end_aware = to_utc_aware(subscription_end)
-                now_aware = datetime.now(timezone.utc)
-                user['is_trial_active'] = False
-                user['broken_dates'] = False
-                if user.get('is_trial') and trial_end_aware:
-                    user['is_trial_active'] = now_aware <= trial_end_aware
-                elif user.get('is_subscribed') and subscription_end_aware:
-                    user['is_trial_active'] = now_aware <= subscription_end_aware
+                trial_end_aware = utils.safe_parse_datetime(trial_end)
+                subscription_end_aware = utils.safe_parse_datetime(subscription_end)
+                # No more is_trial_active logic here; template will handle status
             except Exception as e:
                 logger.warning(f"Datetime error for user {user.get('_id')}: {e}")
                 user['is_trial_active'] = False
@@ -261,15 +217,9 @@ def manage_users():
             trial_end = user.get('trial_end')
             subscription_end = user.get('subscription_end')
             try:
-                trial_end_aware = to_utc_aware(trial_end)
-                subscription_end_aware = to_utc_aware(subscription_end)
-                now_aware = datetime.now(timezone.utc)
-                user['is_trial_active'] = False
-                user['broken_dates'] = False
-                if user.get('is_trial') and trial_end_aware:
-                    user['is_trial_active'] = now_aware <= trial_end_aware
-                elif user.get('is_subscribed') and subscription_end_aware:
-                    user['is_trial_active'] = now_aware <= subscription_end_aware
+                trial_end_aware = utils.safe_parse_datetime(trial_end)
+                subscription_end_aware = utils.safe_parse_datetime(subscription_end)
+                # No more is_trial_active logic here; template will handle status
             except Exception as e:
                 logger.warning(f"Datetime error for user {user.get('_id')}: {e}")
                 user['is_trial_active'] = False
@@ -421,7 +371,7 @@ def manage_user_roles():
                 return redirect(url_for('admin.manage_user_roles'))
             new_role = form.role.data
             try:
-                updated_at = to_utc_aware(datetime.now(timezone.utc))
+                updated_at = utils.safe_parse_datetime(datetime.now(timezone.utc))
             except Exception as e:
                 logger.error(f"Error processing updated_at for user {user_id}: {str(e)}",
                              extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
@@ -445,8 +395,8 @@ def manage_user_roles():
             trial_end = user.get('trial_end')
             subscription_end = user.get('subscription_end')
             try:
-                trial_end_aware = to_utc_aware(trial_end)
-                subscription_end_aware = to_utc_aware(subscription_end)
+                trial_end_aware = utils.safe_parse_datetime(trial_end)
+                subscription_end_aware = utils.safe_parse_datetime(subscription_end)
                 now_aware = datetime.now(timezone.utc)
                 user['is_trial_active'] = False
                 user['broken_dates'] = False
@@ -502,18 +452,15 @@ def manage_user_subscriptions():
                 'subscription_end': None,
                 'updated_at': datetime.now(timezone.utc)
             }
-            # Handle subscription_end from form
+            # Handle subscription_end from form, always ensure UTC-aware
             try:
                 if form.subscription_end.data:
-                    # Convert form date to timezone-aware datetime using helper
                     subscription_end_dt = datetime.combine(form.subscription_end.data, datetime.min.time())
-                    update_data['subscription_end'] = to_utc_aware(subscription_end_dt)
+                    update_data['subscription_end'] = utils.safe_parse_datetime(subscription_end_dt)
                 elif form.is_subscribed.data == 'True' and form.subscription_plan.data:
                     duration = plan_durations.get(form.subscription_plan.data, 30)
                     update_data['subscription_end'] = datetime.now(timezone.utc) + timedelta(days=duration)
-                # Defensive: always normalize before DB update
-                if update_data['subscription_end']:
-                    update_data['subscription_end'] = to_utc_aware(update_data['subscription_end'])
+                    update_data['subscription_end'] = utils.safe_parse_datetime(update_data['subscription_end'])
             except Exception as e:
                 logger.error(f"Error processing subscription_end for user {user_id}: {str(e)}",
                              extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
@@ -540,14 +487,9 @@ def manage_user_subscriptions():
             return redirect(url_for('admin.manage_user_subscriptions'))
         for user in users:
             user['_id'] = str(user['_id'])
-            trial_end = safe_utc(user.get('trial_end'))
-            subscription_end = safe_utc(user.get('subscription_end'))
-            now_aware = datetime.now(timezone.utc)
-            user['is_trial_active'] = False
-            if user.get('is_trial'):
-                user['is_trial_active'] = now_aware <= trial_end
-            elif user.get('is_subscribed'):
-                user['is_trial_active'] = now_aware <= subscription_end
+            user['trial_end'] = utils.safe_parse_datetime(user.get('trial_end')) if user.get('trial_end') else None
+            user['subscription_end'] = utils.safe_parse_datetime(user.get('subscription_end')) if user.get('subscription_end') else None
+            # No more complex status logic here; template will handle status display
         return render_template('admin/user_subscriptions.html', form=form, users=users, title=trans('admin_manage_user_subscriptions_title', default='Manage User Subscriptions'), now=datetime.now(timezone.utc))
     except Exception as e:
         logger.error(f"Error in manage_user_subscriptions for admin {current_user.id}: {str(e)}",
@@ -586,10 +528,10 @@ def manage_user_trials():
                 try:
                     if form.trial_end.data:
                         trial_end_dt = datetime.combine(form.trial_end.data, datetime.min.time())
-                        update_data['trial_end'] = to_utc_aware(trial_end_dt)
+                        update_data['trial_end'] = utils.safe_parse_datetime(trial_end_dt)
                     elif form.is_trial.data == 'True' and not form.trial_end.data:
-                        update_data['trial_end'] = to_utc_aware(datetime.now(timezone.utc) + timedelta(days=30))
-                    update_data['updated_at'] = to_utc_aware(update_data['updated_at'])
+                        update_data['trial_end'] = utils.safe_parse_datetime(datetime.now(timezone.utc) + timedelta(days=30))
+                    update_data['updated_at'] = utils.safe_parse_datetime(update_data['updated_at'])
                 except Exception as e:
                     logger.error(f"Error processing trial_end for user {user_id}: {str(e)}",
                                  extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
@@ -652,8 +594,8 @@ def manage_user_trials():
             trial_end = user.get('trial_end')
             subscription_end = user.get('subscription_end')
             try:
-                trial_end_aware = to_utc_aware(trial_end)
-                subscription_end_aware = to_utc_aware(subscription_end)
+                trial_end_aware = utils.safe_parse_datetime(trial_end)
+                subscription_end_aware = utils.safe_parse_datetime(subscription_end)
                 now_aware = datetime.now(timezone.utc)
                 user['is_trial_active'] = False
                 user['broken_dates'] = False
@@ -1277,7 +1219,7 @@ def system_health_monitor():
         logger.error(f"Error loading system health: {str(e)}")
         flash(trans('admin_health_error', default='Error loading system health data'), 'danger')
         return redirect(url_for('admin.dashboard'))
-
+    
 @admin_bp.route('/feedback', methods=['GET', 'POST'])
 @login_required
 @utils.requires_role('admin')
@@ -1316,4 +1258,3 @@ def manage_feedback():
                      extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
         flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
         return render_template('error/500.html'), 500
-
