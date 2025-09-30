@@ -1,19 +1,27 @@
 {% extends "base.html" %}
+
 {% block title %}{{ title }} - FiCore{% endblock %}
+
 {% block content %}
 <div class="container mt-5">
     <!-- Language Toggler -->
-    <form method="post" action="{{ url_for('admin.toggle_user_language', user_id=current_user.id, language='en') }}" class="mb-3 d-inline">
-        {{ csrf_token() }}
-        <input type="hidden" name="language" value="en">
-        <button type="submit" class="btn btn-outline-primary btn-sm {% if current_user.language == 'en' %}active{% endif %}">{{ t('general_english', default='English') }}</button>
-    </form>
-    <form method="post" action="{{ url_for('admin.toggle_user_language', user_id=current_user.id, language='ha') }}" class="mb-3 d-inline">
-        {{ csrf_token() }}
-        <input type="hidden" name="language" value="ha">
-        <button type="submit" class="btn btn-outline-primary btn-sm {% if current_user.language == 'ha' %}active{% endif %}">{{ t('general_hausa', default='Hausa') }}</button>
-    </form>
-    <span class="ms-2 text-muted">{{ t('admin_language_toggle', default='Switch Language') }}</span>
+    <div class="mb-3">
+        <form method="post" action="{{ url_for('admin.toggle_user_language', user_id=current_user.id, language='en') }}" class="d-inline">
+            {{ csrf_token() }}
+            <input type="hidden" name="language" value="en">
+            <button type="submit" class="btn btn-outline-primary btn-sm {% if current_user.language == 'en' %}active{% endif %}">
+                {{ t('general_english', default='English') }}
+            </button>
+        </form>
+        <form method="post" action="{{ url_for('admin.toggle_user_language', user_id=current_user.id, language='ha') }}" class="d-inline">
+            {{ csrf_token() }}
+            <input type="hidden" name="language" value="ha">
+            <button type="submit" class="btn btn-outline-primary btn-sm {% if current_user.language == 'ha' %}active{% endif %}">
+                {{ t('general_hausa', default='Hausa') }}
+            </button>
+        </form>
+        <span class="ms-2 text-muted">{{ t('admin_language_toggle', default='Switch Language') }}</span>
+    </div>
 
     <h1>{{ title }}</h1>
     <div class="row">
@@ -140,6 +148,9 @@
                         {{ t('admin_status_subscribed', default='Subscribed') if user.is_subscribed else t('admin_status_trial', default='Trial') }}
                     {% else %}
                         {{ t('subscription_expired', default='Expired') }}
+                    {% endif %}
+                    {% if user.broken_dates %}
+                        <span class="text-danger">{{ t('admin_invalid_dates', default='(Invalid Dates)') }}</span>
                     {% endif %}
                 </td>
             </tr>
