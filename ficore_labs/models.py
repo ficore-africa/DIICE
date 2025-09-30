@@ -406,7 +406,7 @@ def initialize_app_data(app):
                                 '_id': {'bsonType': 'string'},
                                 'email': {'bsonType': 'string', 'pattern': r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'},
                                 'password_hash': {'bsonType': 'string'},
-                                'role': {'enum': ['trader', 'admin', 'startup']}
+                                'role': {'enum': ['trader', 'admin', 'startup']},
                                 'is_trial': {'bsonType': 'bool'},
                                 'trial_start': {'bsonType': ['date', 'null']},
                                 'trial_end': {'bsonType': ['date', 'null']},
