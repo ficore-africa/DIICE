@@ -103,6 +103,11 @@
                     <div class="form-check-group" id="goals-group">
                         {{ form.goals(class="form-check-input" + (" is-invalid" if form.goals.errors else ""), required=True, id="goals", **{"aria-describedby": "goalsFeedback" if form.goals.errors else "", "aria-required": "true"}) | safe }}
                     </div>
+                    <div id="savingsHint" style="display: none; margin-top: 1rem; color: #22488D; font-weight: 500;" role="alert" aria-live="polite">
+                        💡 {{ t('general_savings_hint', default='You may also check out our') | escape }} 
+                        <a href="https://personal.ficoreafrica.com/" target="_blank" aria-label="{{ t('general_personal_finance_app', default='Personal finance app') | escape }}">{{ t('general_personal_finance_app', default='personal finance app') | escape }}</a> 
+                        {{ t('general_to_support_savings', default='to support this goal.') | escape }}
+                    </div>
                     {% if form.goals.errors %}
                         <div id="goalsFeedback" class="invalid-feedback" role="alert">
                             {% for error in form.goals.errors %}
@@ -235,6 +240,16 @@
         }
         updateTrialCountdown();
         setInterval(updateTrialCountdown, 24 * 60 * 60 * 1000); // Update daily
+
+        // Goals hint for "Improve savings"
+        const goalsGroup = document.getElementById('goals-group');
+        goalsGroup.addEventListener('change', function () {
+            const checkboxes = this.querySelectorAll('input[type="checkbox"]');
+            const savingsChecked = Array.from(checkboxes).some(cb => cb.checked && cb.value === 'improve_savings');
+            const onlySavingsChecked = savingsChecked && Array.from(checkboxes).filter(cb => cb.checked).length === 1;
+            const savingsHint = document.getElementById('savingsHint');
+            savingsHint.style.display = onlySavingsChecked ? 'block' : 'none';
+        });
     })();
 </script>
 <style>
