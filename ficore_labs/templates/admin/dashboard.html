@@ -4,21 +4,24 @@
 <div class="container mt-5">
     <!-- Language Toggler -->
     <form method="post" action="{{ url_for('admin.toggle_user_language', user_id=current_user.id, language='en') }}" class="mb-3 d-inline">
+        {{ csrf_token() }}
         <input type="hidden" name="language" value="en">
-        <button type="submit" class="btn btn-outline-primary btn-sm {% if current_user.language == 'en' %}active{% endif %}">English</button>
+        <button type="submit" class="btn btn-outline-primary btn-sm {% if current_user.language == 'en' %}active{% endif %}">{{ t('general_english', default='English') }}</button>
     </form>
     <form method="post" action="{{ url_for('admin.toggle_user_language', user_id=current_user.id, language='ha') }}" class="mb-3 d-inline">
+        {{ csrf_token() }}
         <input type="hidden" name="language" value="ha">
-        <button type="submit" class="btn btn-outline-primary btn-sm {% if current_user.language == 'ha' %}active{% endif %}">Hausa</button>
+        <button type="submit" class="btn btn-outline-primary btn-sm {% if current_user.language == 'ha' %}active{% endif %}">{{ t('general_hausa', default='Hausa') }}</button>
     </form>
     <span class="ms-2 text-muted">{{ t('admin_language_toggle', default='Switch Language') }}</span>
+
     <h1>{{ title }}</h1>
     <div class="row">
         <div class="col-md-4">
             <div class="card mb-3">
                 <div class="card-body">
                     <h5 class="card-title">{{ t('admin_users', default='Users') }}</h5>
-                    <p class="card-text">{{ stats.users }}</p>
+                    <p class="card-text">{{ stats.users|format_number }}</p>
                 </div>
             </div>
         </div>
@@ -26,7 +29,7 @@
             <div class="card mb-3">
                 <div class="card-body">
                     <h5 class="card-title">{{ t('admin_audit_logs', default='Audit Logs') }}</h5>
-                    <p class="card-text">{{ stats.audit_logs }}</p>
+                    <p class="card-text">{{ stats.audit_logs|format_number }}</p>
                 </div>
             </div>
         </div>
@@ -34,7 +37,7 @@
             <div class="card mb-3">
                 <div class="card-body">
                     <h5 class="card-title">{{ t('admin_feedback', default='Feedback') }}</h5>
-                    <p class="card-text">{{ stats.feedback }}</p>
+                    <p class="card-text">{{ stats.feedback|format_number }}</p>
                 </div>
             </div>
         </div>
@@ -63,6 +66,9 @@
 
     <!-- Reports & Analytics Section -->
     <div class="row mb-4">
+        <div class="col-12">
+            <h4 class="text-muted">{{ t('admin_reports_analytics', default='Reports & Analytics') }}</h4>
+        </div>
         <div class="col-md-4 mb-2">
             <a href="{{ url_for('admin.analytics_dashboard') }}" class="btn btn-info w-100">{{ t('admin_analytics_dashboard', default='Analytics Dashboard') }}</a>
         </div>
@@ -77,7 +83,7 @@
             <a href="{{ url_for('admin.system_settings') }}" class="btn btn-dark w-100">{{ t('admin_system_settings', default='System Settings') }}</a>
         </div>
         <div class="col-md-4 mb-2">
-            <a href="{{ url_for('admin.payment_receipts') }}" class="btn btn-dark w-100">{{ t('admin_payment_receipts', default='Subscription Receipts') }}</a>
+            <a href="{{ url_for('admin.list_payment_receipts') }}" class="btn btn-dark w-100">{{ t('admin_payment_receipts', default='Subscription Receipts') }}</a>
         </div>
     </div>
 
@@ -114,7 +120,7 @@
     </div>
 
     <h2 class="mt-4">{{ t('admin_recent_users', default='Recent Users') }}</h2>
-    <table class="table">
+    <table class="table table-bordered table-hover">
         <thead>
             <tr>
                 <th>{{ t('admin_username', default='Username') }}</th>
@@ -128,10 +134,10 @@
             <tr>
                 <td>{{ user._id }}</td>
                 <td>{{ user.email }}</td>
-                <td>{{ user.role }}</td>
+                <td>{{ user.role|capitalize }}</td>
                 <td>
                     {% if user.is_trial_active %}
-                        {{ 'Subscribed' if user.is_subscribed else 'Trial' }}
+                        {{ t('admin_status_subscribed', default='Subscribed') if user.is_subscribed else t('admin_status_trial', default='Trial') }}
                     {% else %}
                         {{ t('subscription_expired', default='Expired') }}
                     {% endif %}
