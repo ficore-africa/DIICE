@@ -291,8 +291,8 @@ function renderRecentActivities(activities) {
                         <i class="bi ${activity.icon || getActivityIcon(activity.type)} ${getActivityColor(activity.type)}"></i>
                     </div>
                     <div class="activity-content">
-                        <div class="activity-description fw-semibold">${activity.description || translations.no_recent_activity}</div>
-                        <div class="activity-time text-muted">${activity.timestamp && !isNaN(new Date(activity.timestamp).getTime()) ? formatTimeAgo(activity.timestamp) : translations.no_recent_activity}</div>
+                        <div class="activity-description fw-semibold">${activity.description || (activity.amount ? translations.no_recent_activity : '')}</div>
+                        <div class="activity-time text-muted">${activity.timestamp && !isNaN(new Date(activity.timestamp).getTime()) ? formatTimeAgo(activity.timestamp) : (activity.amount ? translations.no_recent_activity : '')}</div>
                     </div>
                     ${activity.amount ? `<div class="activity-amount text-nowrap ms-2 fw-bold">${format_currency(activity.amount)}</div>` : ''}
                 </div>
