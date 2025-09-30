@@ -4,6 +4,7 @@ GENERAL_TRANSLATIONS = {
         'subscribe_no_subscription_message': 'You do not have an active subscription. Subscribe to unlock all features and your dashboard.',
         'subscribe_instructions': 'Choose a subscription plan below to regain access. If you have questions, contact support.',
         'general_login': 'Login',
+        'profile_settings_desc': 'Update your personal info, preferences, and account details here.',
         'general_login_identifier': 'Username or Email',
         'general_identifier_required': 'Username or Email is required',
         'general_database_connection_established': 'MongoDB connection established',
@@ -2566,6 +2567,7 @@ GENERAL_TRANSLATIONS = {
             'subscribe_alternative_payment': 'Hanyoyin Biyan Kuɗi na Daban',
             'subscribe_paystack_option': 'Biya da Paystack',
             'subscribe_pay_online': 'Biya ta Kan Layi',
+        'profile_settings_desc': 'Sabunta bayanan ka na sirri, zaɓuka, da bayanan asusun anan.',
         
         # Search and Navigation (Hausa)
         'search_results_for': 'Sakamakon bincike don',
