@@ -125,14 +125,6 @@ TRADER_TOOLS = [
         "tooltip_key": "payments_tooltip",
         "icon": "bi-calculator"
     },
-    {
-        "endpoint": "reports.index",
-        "label": "Profit Summary",
-        "label_key": "profit_summary",
-        "description_key": "profit_summary_desc",
-        "tooltip_key": "profit_summary_tooltip",
-        "icon": "bi-graph-up-arrow"
-    }
 ]
 
 TRADER_NAV = [
@@ -2759,6 +2751,7 @@ def create_dashboard_safe_response(stats, recent_data, additional_data=None):
             'timestamp': datetime.now(timezone.utc).isoformat()
 
         }
+
 
 
 
