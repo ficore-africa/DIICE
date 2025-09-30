@@ -380,7 +380,7 @@ ADMIN_EXPLORE = [
         "icon": "bi-hourglass-split"
     },
     {
-        "endpoint": "admin.payment_receipts",
+        "endpoint": "admin.list_payment_receipts",
         "label": "Subscription Receipts",
         "label_key": "admin_manage_receipts",
         "description_key": "admin_manage_receipts_desc",
@@ -2959,6 +2959,7 @@ def create_dashboard_safe_response(stats, recent_data, additional_data=None):
             'timestamp': datetime.now(timezone.utc).isoformat()
 
         }
+
 
 
 
