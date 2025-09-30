@@ -324,22 +324,26 @@
 /* Button Style Overrides */
 .btn-primary {
     background-color: var(--button-primary-bg);
-    color: #fff;
+    color: #fff; /* EN text color */
     transition: var(--transition-base), transform 0.2s;
 }
+
 .btn-primary:hover,
 .btn-primary:focus {
     background-color: var(--button-primary-hover);
     transform: translateY(-2px);
 }
+
 .btn-outline-primary {
     border: 0.5px solid var(--button-secondary-border);
-    color: var(--button-secondary-bg);
-    box-shadow: 0 0 0 1px var(--button-secondary-border);
+    color: #000000; /* HA text color */
     background-color: transparent;
+    box-shadow: 0 0 0 1px var(--button-secondary-border);
     transition: var(--transition-base), transform 0.2s;
 }
+
 .btn-outline-primary:hover,
+.btn-outline-primary:focus {
     background-color: rgba(34, 72, 141, 0.1);
     color: var(--button-secondary-bg);
     border-color: var(--button-secondary-border);
@@ -347,3 +351,11 @@
     transform: translateY(-2px);
 }
 
+/* Language toggle explicit overrides */
+.language-buttons .language-btn.btn-primary.active {
+    color: #ffffff; /* EN active: white */
+}
+
+.language-buttons .language-btn.btn-outline-primary.active {
+    color: #000000; /* HA active: black */
+}
