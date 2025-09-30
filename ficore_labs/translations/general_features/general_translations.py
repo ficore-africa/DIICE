@@ -3,6 +3,7 @@ GENERAL_TRANSLATIONS = {
         'subscribe_trial_expired_message': 'Your free trial has ended. To continue accessing your dashboard and features, please subscribe below.',
         'subscribe_no_subscription_message': 'You do not have an active subscription. Subscribe to unlock all features and your dashboard.',
         'subscribe_instructions': 'Choose a subscription plan below to regain access. If you have questions, contact support.',
+        'profile_settings_desc': 'Update your personal info, preferences, and account details here.',
         'general_login': 'Login',
         'general_login_identifier': 'Username or Email',
         'general_identifier_required': 'Username or Email is required',
@@ -2424,6 +2425,7 @@ GENERAL_TRANSLATIONS = {
         'general_waitlist_created': 'An ƙirƙiri shigarwar jerin jira da ID',
         'general_waitlist_creation_error': 'Kuskure wajen ƙirƙirar shigarwar jerin jira',
         'general_waitlist_duplicate_error': 'Imel ko lambar WhatsApp sun riga sun kasance a cikin jerin jira',
+        'profile_settings_desc': 'Sabunta bayanan ka, da bayanan akawun anan.',
         
         # Search and Navigation (Hausa)
         'search_results_for': 'Sakamakon bincike don',
