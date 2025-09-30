@@ -25,11 +25,99 @@
                         </div>
                         <div class="card-body">
                             <form method="POST">
+                                {{ form.hidden_tag() }} <!-- CSRF token for Flask-WTF -->
                                 <div class="row">
                                     <div class="col-md-6">
                                         <div class="mb-3">
-                                            <label class="form-label">{{ trans('admin_maintenance_mode', default='Maintenance Mode') }}</label>
+                                            <label class="form-label" for="maintenance_mode">
+                                                {{ trans('admin_maintenance_mode', default='Maintenance Mode') }}
+                                            </label>
                                             <div class="form-check form-switch">
-                                                <input class="form-check-input" type="checkbox" id="maintenance_mode" name="maintenance_mode"
-                                                       {% if settings.maintenance_mode %}checked{% endif %}>
-                                                <label class="form-check-label" for="mainte
+                                                {{ form.maintenance_mode(class="form-check-input", id="maintenance_mode") }}
+                                                <label class="form-check-label" for="maintenance_mode">
+                                                    {{ trans('admin_maintenance_mode_desc', default='Enable to restrict access to admins only') }}
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label" for="registration_enabled">
+                                                {{ trans('admin_registration_enabled', default='Registration Enabled') }}
+                                            </label>
+                                            <div class="form-check form-switch">
+                                                {{ form.registration_enabled(class="form-check-input", id="registration_enabled") }}
+                                                <label class="form-check-label" for="registration_enabled">
+                                                    {{ trans('admin_registration_enabled_desc', default='Allow new user registrations') }}
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label" for="trial_duration_days">
+                                                {{ trans('admin_trial_duration_days', default='Trial Duration (Days)') }}
+                                            </label>
+                                            {{ form.trial_duration_days(class="form-control", id="trial_duration_days") }}
+                                            {% if form.trial_duration_days.errors %}
+                                                {% for error in form.trial_duration_days.errors %}
+                                                    <div class="text-danger">{{ error }}</div>
+                                                {% endfor %}
+                                            {% endif %}
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label" for="max_users_per_trial">
+                                                {{ trans('admin_max_users_per_trial', default='Max Users per Trial') }}
+                                            </label>
+                                            {{ form.max_users_per_trial(class="form-control", id="max_users_per_trial") }}
+                                            {% if form.max_users_per_trial.errors %}
+                                                {% for error in form.max_users_per_trial.errors %}
+                                                    <div class="text-danger">{{ error }}</div>
+                                                {% endfor %}
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mt-3">
+                                    {{ form.submit(class="btn btn-primary") }}
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <!-- System Statistics -->
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">
+                                <i class="bi bi-graph-up"></i>
+                                {{ trans('admin_system_stats', default='System Statistics') }}
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <ul class="list-group list-group-flush">
+                                <li class="list-group-item">
+                                    {{ trans('admin_total_users', default='Total Users') }}: {{ stats.total_users }}
+                                </li>
+                                <li class="list-group-item">
+                                    {{ trans('admin_active_trials', default='Active Trials') }}: {{ stats.active_trials }}
+                                </li>
+                                <li class="list-group-item">
+                                    {{ trans('admin_active_subscriptions', default='Active Subscriptions') }}: {{ stats.active_subscriptions }}
+                                </li>
+                                <li class="list-group-item">
+                                    {{ trans('admin_total_records', default='Total Records') }}: {{ stats.total_records }}
+                                </li>
+                                <li class="list-group-item">
+                                    {{ trans('admin_total_feedback', default='Total Feedback') }}: {{ stats.total_feedback }}
+                                </li>
+                                <li class="list-group-item">
+                                    {{ trans('admin_database_collections', default='Database Collections') }}: {{ stats.database_size }}
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
