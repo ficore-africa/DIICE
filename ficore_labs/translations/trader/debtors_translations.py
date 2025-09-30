@@ -5,8 +5,8 @@ Debtors management translations for accounting tools
 DEBTORS_TRANSLATIONS = {
     'en': {
         'debtors_dashboard': 'Debtors',
-        'debtors_dashboard_desc': 'Track outstanding receivables and manage customer payment schedules to optimize cash flow.',
-        'debtors_tooltip': 'Monitor customer debts and send payment reminders to maintain healthy accounts receivable.',
+        'debtors_dashboard_desc': 'Track outstanding receivables and payables.',
+        'debtors_tooltip': 'Monitor customer debts and send reminders.',
         'debtors_list': 'Debtors List',
         'debtors_add_debtor': 'Add Debtor',
         'debtors_recent_debtors': 'Recent Debtors',
@@ -17,7 +17,7 @@ DEBTORS_TRANSLATIONS = {
         'debtors_description': 'Description',
         'debtors_manage': 'Manage Debtors',
         'debtors_insufficient_credits': 'Insufficient Credits',
-        'debtors_creditors_description': 'Track outstanding receivables and payables to manage cash flow effectively.',
+        'debtors_creditors_description': 'Track outstanding receivables and payables.',
         'debtors_add_success': 'Debtor added successfully!',
         'debtors_title': 'Debtors',
         'debtors_subtitle': 'Kula da wadanda Sanaar ke bi bashi',
