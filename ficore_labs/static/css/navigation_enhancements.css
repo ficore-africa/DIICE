@@ -360,15 +360,16 @@
 }
 /* Default (desktop/tablet) */
 .btn-outline-primary {
-    border: 0.1px solid var(--button-secondary-border);
+    border: 0.1px solid var(--button-secondary-border) !important;
 }
 
 /* Mobile: reduce border thickness */
 @media (max-width: 576px) {
     .btn-outline-primary {
-        border-width: 0.1px;
+        border-width: 0.1px !important;
     }
 }
+
 
 
 
