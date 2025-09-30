@@ -2,11 +2,12 @@ import os
 import logging
 import uuid
 from datetime import datetime, timedelta, timezone
+from wtforms.validators import ValidationError
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, jsonify, session, make_response
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, TextAreaField, SelectField, SubmitField, BooleanField, SelectMultipleField
 from wtforms.widgets import ListWidget, CheckboxInput
-from wtforms.validators import DataRequired, Length, Email, Regexp, EqualTo
+from wtforms.validators import DataRequired, Length, Email, Regexp, EqualTo, ValidationError
 from flask_login import login_required, current_user, login_user, logout_user
 from pymongo import errors
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -31,78 +32,78 @@ def validate_identifier(form, field):
     identifier = field.data
     if '@' not in identifier:
         if not USERNAME_REGEX.match(identifier):
-            raise validators.ValidationError(trans('general_username_format', default='Username must be alphanumeric with underscores'))
+            raise ValidationError(trans('general_username_format', default='Username must be alphanumeric with underscores'))
 
 class LoginForm(FlaskForm):
     username = StringField(
         trans('general_login_identifier', default='Username or Email'),
         [
-            validators.DataRequired(message=trans('general_identifier_required', default='Username or Email is required')),
-            validators.Length(min=3, max=50, message=trans('general_identifier_length', default='Identifier must be between 3 and 50 characters')),
+            DataRequired(message=trans('general_identifier_required', default='Username or Email is required')),
+            Length(min=3, max=50, message=trans('general_identifier_length', default='Identifier must be between 3 and 50 characters')),
             validate_identifier
         ],
         render_kw={'class': 'form-control'}
     )
     password = PasswordField(trans('general_password', default='Password'), [
-        validators.DataRequired(message=trans('general_password_required', default='Password is required')),
-        validators.Length(min=6, message=trans('general_password_length', default='Password must be at least 6 characters'))
+        DataRequired(message=trans('general_password_required', default='Password is required')),
+        Length(min=6, message=trans('general_password_length', default='Password must be at least 6 characters'))
     ], render_kw={'class': 'form-control'})
     remember = BooleanField(trans('general_remember_me', default='Remember me'), render_kw={'class': 'form-check-input'})
     submit = SubmitField(trans('general_login', default='Sign In'), render_kw={'class': 'btn btn-primary w-100'})
 
 class TwoFactorForm(FlaskForm):
     otp = StringField(trans('general_otp', default='One-Time Password'), [
-        validators.DataRequired(message=trans('general_otp_required', default='OTP is required')),
-        validators.Length(min=6, max=6, message=trans('general_otp_length', default='OTP must be 6 digits'))
+        DataRequired(message=trans('general_otp_required', default='OTP is required')),
+        Length(min=6, max=6, message=trans('general_otp_length', default='OTP must be 6 digits'))
     ], render_kw={'class': 'form-control'})
     submit = SubmitField(trans('general_verify_otp', default='Verify OTP'), render_kw={'class': 'btn btn-primary w-100'})
 
 class SignupForm(FlaskForm):
     username = StringField(trans('general_username', default='Username'), [
-        validators.DataRequired(message=trans('general_username_required', default='Username is required')),
-        validators.Length(min=3, max=50, message=trans('general_username_length', default='Username must be between 3 and 50 characters')),
-        validators.Regexp(USERNAME_REGEX, message=trans('general_username_format', default='Username must be alphanumeric with underscores'))
+        DataRequired(message=trans('general_username_required', default='Username is required')),
+        Length(min=3, max=50, message=trans('general_username_length', default='Username must be between 3 and 50 characters')),
+        Regexp(USERNAME_REGEX, message=trans('general_username_format', default='Username must be alphanumeric with underscores'))
     ], render_kw={'class': 'form-control'})
     email = StringField(trans('general_email', default='Email'), [
-        validators.DataRequired(message=trans('general_email_required', default='Email is required')),
-        validators.Email(message=trans('general_email_invalid', default='Invalid email address')),
-        validators.Length(max=254),
-        lambda form, field: utils.is_valid_email(field.data) or validators.ValidationError(trans('general_email_domain_invalid', default='Invalid email domain'))
+        DataRequired(message=trans('general_email_required', default='Email is required')),
+        Email(message=trans('general_email_invalid', default='Invalid email address')),
+        Length(max=254),
+        lambda form, field: utils.is_valid_email(field.data) or ValidationError(trans('general_email_domain_invalid', default='Invalid email domain'))
     ], render_kw={'class': 'form-control'})
     password = PasswordField(trans('general_password', default='Password'), [
-        validators.DataRequired(message=trans('general_password_required', default='Password is required')),
-        validators.Length(min=6, message=trans('general_password_length', default='Password must be at least 6 characters')),
-        validators.Regexp(PASSWORD_REGEX, message=trans('general_password_format', default='Password must be at least 6 characters'))
+        DataRequired(message=trans('general_password_required', default='Password is required')),
+        Length(min=6, message=trans('general_password_length', default='Password must be at least 6 characters')),
+        Regexp(PASSWORD_REGEX, message=trans('general_password_format', default='Password must be at least 6 characters'))
     ], render_kw={'class': 'form-control'})
     submit = SubmitField(trans('general_signup', default='Sign Up'), render_kw={'class': 'btn btn-primary w-100'})
 
 class ForgotPasswordForm(FlaskForm):
     email = StringField(trans('general_email', default='Email'), [
-        validators.DataRequired(message=trans('general_email_required', default='Email is required')),
-        validators.Email(message=trans('general_email_invalid', default='Invalid email address'))
+        DataRequired(message=trans('general_email_required', default='Email is required')),
+        Email(message=trans('general_email_invalid', default='Invalid email address'))
     ], render_kw={'class': 'form-control'})
     submit = SubmitField(trans('general_send_reset_link', default='Send Reset Link'), render_kw={'class': 'btn btn-primary w-100'})
 
 class ResetPasswordForm(FlaskForm):
     password = PasswordField(trans('general_password', default='Password'), [
-        validators.DataRequired(message=trans('general_password_required', default='Password is required')),
-        validators.Length(min=6, message=trans('general_password_length', default='Password must be at least 6 characters')),
-        validators.Regexp(PASSWORD_REGEX, message=trans('general_password_format', default='Password must be at least 6 characters'))
+        DataRequired(message=trans('general_password_required', default='Password is required')),
+        Length(min=6, message=trans('general_password_length', default='Password must be at least 6 characters')),
+        Regexp(PASSWORD_REGEX, message=trans('general_password_format', default='Password must be at least 6 characters'))
     ], render_kw={'class': 'form-control'})
     confirm_password = PasswordField(trans('general_confirm_password', default='Confirm Password'), [
-        validators.DataRequired(message=trans('general_confirm_password_required', default='Confirm password is required')),
-        validators.EqualTo('password', message=trans('general_passwords_must_match', default='Passwords must match'))
+        DataRequired(message=trans('general_confirm_password_required', default='Confirm password is required')),
+        EqualTo('password', message=trans('general_passwords_must_match', default='Passwords must match'))
     ], render_kw={'class': 'form-control'})
     submit = SubmitField(trans('general_reset_password', default='Reset Password'), render_kw={'class': 'btn btn-primary w-100'})
 
 class BusinessSetupForm(FlaskForm):
     business_name = StringField(trans('general_business_name', default='Business Name'),
-                               validators=[validators.DataRequired(message=trans('general_business_name_required', default='Business name is required')),
-                                           validators.Length(min=1, max=255)],
+                               validators=[DataRequired(message=trans('general_business_name_required', default='Business name is required')),
+                                           Length(min=1, max=255)],
                                render_kw={'class': 'form-control'})
     address = TextAreaField(trans('general_address', default='Address'),
-                            validators=[validators.DataRequired(message=trans('general_address_required', default='Address is required')),
-                                        validators.Length(max=500)],
+                            validators=[DataRequired(message=trans('general_address_required', default='Address is required')),
+                                        Length(max=500)],
                             render_kw={'class': 'form-control'})
     industry = SelectField(trans('general_industry', default='Industry'),
                           choices=[
@@ -112,16 +113,16 @@ class BusinessSetupForm(FlaskForm):
                               ('technology', trans('general_technology', default='Technology')),
                               ('other', trans('general_other', default='Other'))
                           ],
-                          validators=[validators.DataRequired(message=trans('general_industry_required', default='Industry is required'))],
+                          validators=[DataRequired(message=trans('general_industry_required', default='Industry is required'))],
                           render_kw={'class': 'form-control'})
     products_services = TextAreaField(trans('general_products_services', default='Products/Services'),
-                                     validators=[validators.DataRequired(message=trans('general_products_services_required', default='Products/Services is required')),
-                                                 validators.Length(max=500)],
+                                     validators=[DataRequired(message=trans('general_products_services_required', default='Products/Services is required')),
+                                                 Length(max=500)],
                                      render_kw={'class': 'form-control'})
     phone_number = StringField(trans('general_phone_number', default='Phone Number'),
                               validators=[
-                                  validators.DataRequired(message=trans('general_phone_number_required', default='Phone number is required')),
-                                  validators.Regexp(PHONE_REGEX, message=trans('general_phone_number_format', default='Phone number must be 10-15 digits'))
+                                  DataRequired(message=trans('general_phone_number_required', default='Phone number is required')),
+                                  Regexp(PHONE_REGEX, message=trans('general_phone_number_format', default='Phone number must be 10-15 digits'))
                               ],
                               render_kw={'class': 'form-control'})
     language = SelectField(trans('general_language', default='Language'),
@@ -129,7 +130,7 @@ class BusinessSetupForm(FlaskForm):
                               ('en', trans('general_english', default='English')),
                               ('ha', trans('general_hausa', default='Hausa'))
                           ],
-                          validators=[validators.DataRequired(message=trans('general_language_required', default='Language is required'))],
+                          validators=[DataRequired(message=trans('general_language_required', default='Language is required'))],
                           render_kw={'class': 'form-select'})
     goals = SelectMultipleField(
         trans('general_main_goal', default="What's your main goal?"),
@@ -141,11 +142,11 @@ class BusinessSetupForm(FlaskForm):
         ],
         widget=ListWidget(prefix_label=False),
         coerce=str,
-        validators=[validators.DataRequired(message=trans('general_select_at_least_one_goal', default='Please select at least one goal.'))],
+        validators=[DataRequired(message=trans('general_select_at_least_one_goal', default='Please select at least one goal.'))],
         render_kw={'class': 'form-check-input'}
     )
     terms = BooleanField(trans('general_terms', default='I accept the Terms and Conditions'),
-                        validators=[validators.DataRequired(message=trans('general_terms_required', default='You must accept the terms'))],
+                        validators=[DataRequired(message=trans('general_terms_required', default='You must accept the terms'))],
                         render_kw={'class': 'form-check-input'})
     submit = SubmitField(trans('general_save_and_continue', default='Save and Continue'), render_kw={'class': 'btn btn-primary w-100'})
     back = SubmitField(trans('general_back', default='Back'), render_kw={'class': 'btn btn-secondary w-100 mt-2'})
