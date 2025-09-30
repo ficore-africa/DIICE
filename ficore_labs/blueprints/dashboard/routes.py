@@ -8,7 +8,7 @@ from translations import trans
 import utils
 from utils import format_date, serialize_for_json, safe_json_response, clean_document_for_json, bulk_clean_documents_for_json, create_dashboard_safe_response, safe_parse_datetime
 from helpers import reminders
-from models import get_records
+from models import get_records, get_cashflows, parse_and_normalize_datetime, to_dict_record, to_dict_cashflow
 
 logger = logging.getLogger(__name__)
 
@@ -16,21 +16,18 @@ dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
 
 def safe_to_float(value, default=0.0):
     """Convert a value to float, return default if conversion fails."""
-    if value is None:
-        logger.warning(f"Received None value for conversion to float")
+    if value is None or value == "":
+        logger.warning(f"Received None or empty value for conversion to float")
         return default
     try:
         result = float(value)
+        if result == float('inf') or result == float('-inf') or result != result:  # Check for NaN/inf
+            logger.warning(f"Invalid float value: {value}")
+            return default
         return result
     except (ValueError, TypeError) as e:
         logger.warning(f"Failed to convert value to float: {value} (type: {type(value)}), error: {str(e)}")
         return default
-
-def normalize_datetime(doc):
-    """Convert created_at to timezone-aware datetime if it's a string or naive datetime."""
-    if 'created_at' in doc:
-        doc['created_at'] = safe_parse_datetime(doc['created_at'])
-    return doc
 
 @dashboard_bp.route('/test-notifications')
 @login_required
@@ -55,28 +52,50 @@ def weekly_profit_data():
     try:
         db = utils.get_mongo_db()
         user_id = str(current_user.id)
-        today = safe_parse_datetime(datetime.now(timezone.utc))
+        today = parse_and_normalize_datetime(datetime.now(timezone.utc))
         days = [(today - timedelta(days=i)).date() for i in range(6, -1, -1)]
         profit_per_day = []
 
         for day in days:
-            start = safe_parse_datetime(datetime(day.year, day.month, day.day, tzinfo=timezone.utc))
+            start = parse_and_normalize_datetime(datetime(day.year, day.month, day.day, tzinfo=timezone.utc))
             end = start + timedelta(days=1)
             try:
                 # Sum receipts (income) for the day
                 receipts = db.cashflows.aggregate([
                     {'$match': {'user_id': user_id, 'type': 'receipt', 'created_at': {'$gte': start, '$lt': end}}},
-                    {'$group': {'_id': None, 'total': {'$sum': {'$toDouble': '$amount'}}}}
+                    {'$group': {
+                        '_id': None,
+                        'total': {
+                            '$sum': {
+                                '$cond': {
+                                    'if': {'$isNumber': '$amount'},
+                                    'then': {'$toDouble': '$amount'},
+                                    'else': 0.0
+                                }
+                            }
+                        }
+                    }}
                 ])
-                receipts_total = float(safe_to_float(next(receipts, {}).get('total', 0)))
+                receipts_total = safe_to_float(next(receipts, {}).get('total', 0))
                 logger.debug(f"Day {day}: receipts_total = {receipts_total} (type: {type(receipts_total)})")
 
                 # Sum payments (expenses) for the day
                 payments = db.cashflows.aggregate([
                     {'$match': {'user_id': user_id, 'type': 'payment', 'created_at': {'$gte': start, '$lt': end}}},
-                    {'$group': {'_id': None, 'total': {'$sum': {'$toDouble': '$amount'}}}}
+                    {'$group': {
+                        '_id': None,
+                        'total': {
+                            '$sum': {
+                                '$cond': {
+                                    'if': {'$isNumber': '$amount'},
+                                    'then': {'$toDouble': '$amount'},
+                                    'else': 0.0
+                                }
+                            }
+                        }
+                    }}
                 ])
-                payments_total = float(safe_to_float(next(payments, {}).get('total', 0)))
+                payments_total = safe_to_float(next(payments, {}).get('total', 0))
                 logger.debug(f"Day {day}: payments_total = {payments_total} (type: {type(payments_total)})")
 
                 profit = receipts_total - payments_total
@@ -119,7 +138,19 @@ def refresh_dashboard_data():
             # Calculate receipts
             receipts_result = db.cashflows.aggregate([
                 {'$match': {**query, 'type': 'receipt'}},
-                {'$group': {'_id': None, 'total_amount': {'$sum': {'$toDouble': '$amount'}}, 'count': {'$sum': 1}}}
+                {'$group': {
+                    '_id': None,
+                    'total_amount': {
+                        '$sum': {
+                            '$cond': {
+                                'if': {'$isNumber': '$amount'},
+                                'then': {'$toDouble': '$amount'},
+                                'else': 0.0
+                            }
+                        }
+                    },
+                    'count': {'$sum': 1}
+                }}
             ])
             receipts_data = next(receipts_result, {})
             stats['total_receipts'] = receipts_data.get('count', 0)
@@ -129,7 +160,19 @@ def refresh_dashboard_data():
             # Calculate payments
             payments_result = db.cashflows.aggregate([
                 {'$match': {**query, 'type': 'payment'}},
-                {'$group': {'_id': None, 'total_amount': {'$sum': {'$toDouble': '$amount'}}, 'count': {'$sum': 1}}}
+                {'$group': {
+                    '_id': None,
+                    'total_amount': {
+                        '$sum': {
+                            '$cond': {
+                                'if': {'$isNumber': '$amount'},
+                                'then': {'$toDouble': '$amount'},
+                                'else': 0.0
+                            }
+                        }
+                    },
+                    'count': {'$sum': 1}
+                }}
             ])
             payments_data = next(payments_result, {})
             stats['total_payments'] = payments_data.get('count', 0)
@@ -139,7 +182,19 @@ def refresh_dashboard_data():
             # Calculate debtors
             debtors_result = db.records.aggregate([
                 {'$match': {**query, 'type': 'debtor'}},
-                {'$group': {'_id': None, 'total_amount': {'$sum': {'$toDouble': '$amount_owed'}}, 'count': {'$sum': 1}}}
+                {'$group': {
+                    '_id': None,
+                    'total_amount': {
+                        '$sum': {
+                            '$cond': {
+                                'if': {'$isNumber': '$amount_owed'},
+                                'then': {'$toDouble': '$amount_owed'},
+                                'else': 0.0
+                            }
+                        }
+                    },
+                    'count': {'$sum': 1}
+                }}
             ])
             debtors_data = next(debtors_result, {})
             stats['total_debtors'] = debtors_data.get('count', 0)
@@ -149,7 +204,19 @@ def refresh_dashboard_data():
             # Calculate creditors
             creditors_result = db.records.aggregate([
                 {'$match': {**query, 'type': 'creditor'}},
-                {'$group': {'_id': None, 'total_amount': {'$sum': {'$toDouble': '$amount_owed'}}, 'count': {'$sum': 1}}}
+                {'$group': {
+                    '_id': None,
+                    'total_amount': {
+                        '$sum': {
+                            '$cond': {
+                                'if': {'$isNumber': '$amount_owed'},
+                                'then': {'$toDouble': '$amount_owed'},
+                                'else': 0.0
+                            }
+                        }
+                    },
+                    'count': {'$sum': 1}
+                }}
             ])
             creditors_data = next(creditors_result, {})
             stats['total_creditors'] = creditors_data.get('count', 0)
@@ -159,7 +226,19 @@ def refresh_dashboard_data():
             # Calculate inventory
             inventory_result = db.records.aggregate([
                 {'$match': {**query, 'type': 'inventory'}},
-                {'$group': {'_id': None, 'total_cost': {'$sum': {'$toDouble': '$cost'}}, 'count': {'$sum': 1}}}
+                {'$group': {
+                    '_id': None,
+                    'total_cost': {
+                        '$sum': {
+                            '$cond': {
+                                'if': {'$isNumber': '$cost'},
+                                'then': {'$toDouble': '$cost'},
+                                'else': 0.0
+                            }
+                        }
+                    },
+                    'count': {'$sum': 1}
+                }}
             ])
             inventory_data = next(inventory_result, {})
             stats['total_inventory'] = inventory_data.get('count', 0)
@@ -167,9 +246,9 @@ def refresh_dashboard_data():
             logger.debug(f"Inventory: total_inventory_cost = {stats['total_inventory_cost']} (type: {type(stats['total_inventory_cost'])})")
 
             # Calculate profits
-            stats['gross_profit'] = float(stats['total_receipts_amount']) - float(stats['total_payments_amount'])
-            stats['true_profit'] = float(stats['gross_profit']) - float(stats['total_inventory_cost'])
-            stats['profit_only'] = stats['true_profit']  # Ensure profit_only is included for template
+            stats['gross_profit'] = stats['total_receipts_amount'] - stats['total_payments_amount']
+            stats['true_profit'] = stats['gross_profit'] - stats['total_inventory_cost']
+            stats['profit_only'] = stats['true_profit']
             logger.debug(f"Profits: gross_profit = {stats['gross_profit']} (type: {type(stats['gross_profit'])}), true_profit = {stats['true_profit']} (type: {type(stats['true_profit'])})")
 
         except Exception as stats_error:
@@ -194,7 +273,7 @@ def refresh_dashboard_data():
         return safe_json_response({
             'stats': formatted_stats,
             'success': True,
-            'timestamp': safe_parse_datetime(datetime.now(timezone.utc)).isoformat(),
+            'timestamp': parse_and_normalize_datetime(datetime.now(timezone.utc)).isoformat(),
             'validation': {'is_valid': is_valid, 'warnings': warnings}
         })
 
@@ -213,149 +292,244 @@ def index():
         db = utils.get_mongo_db()
         query = {'user_id': str(current_user.id)}
         stats = utils.standardize_stats_dictionary()
+        recent_debtors = []
+        recent_creditors = []
+        recent_receipts = []
+        recent_payments = []
+        recent_inventory = []
+        unpaid_debtors = []
+        unpaid_creditors = []
+        inventory_loss = False
+        show_daily_log_reminder = False
+        streak = 0
+        tax_prep_mode = request.args.get('tax_prep') == '1'
 
-        # Only allow interaction if user is admin, subscribed, or trial active
-        can_interact = True
-        if not (getattr(current_user, 'is_subscribed', False) or getattr(current_user, 'is_trial_active', lambda: False)() or getattr(current_user, 'role', None) == 'admin'):
+        # Check subscription status
+        try:
+            can_interact = utils.can_user_interact(current_user)
+        except Exception as e:
+            logger.error(
+                f"Error checking user interaction status: {str(e)}",
+                extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
+            )
+            flash(trans('interaction_check_error', default='Unable to verify interaction status.'), 'warning')
             can_interact = False
 
-        # Always show dashboard data, but only allow actions if can_interact
+        # Fetch reminders and streak data
         try:
+            show_daily_log_reminder = reminders.needs_daily_log_reminder(db, current_user.id)
+            rewards_data = db.rewards.find_one({'user_id': str(current_user.id)})
+            streak = rewards_data.get('streak', 0) if rewards_data else 0
+            unpaid_debtors, unpaid_creditors = reminders.get_unpaid_debts_credits(db, current_user.id)
+            unpaid_debtors = [to_dict_record(doc) for doc in unpaid_debtors]
+            unpaid_creditors = [to_dict_record(doc) for doc in unpaid_creditors]
+            inventory_loss = reminders.detect_inventory_loss(db, current_user.id)
+            logger.debug(
+                f"Calculated streak: {streak} for user_id: {current_user.id}",
+                extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
+            )
+        except Exception as e:
+            logger.warning(
+                f"Failed to calculate reminders or streak: {str(e)}",
+                extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
+            )
+            flash(trans('reminder_load_error', default='Unable to load reminders or streak data.'), 'warning')
+
+        # Fetch recent records
+        try:
+            recent_debtors = [to_dict_record(doc) for doc in db.records.find({**query, 'type': 'debtor'}).sort('created_at', -1).limit(5)]
+            recent_creditors = [to_dict_record(doc) for doc in db.records.find({**query, 'type': 'creditor'}).sort('created_at', -1).limit(5)]
+            recent_receipts = [to_dict_cashflow(doc) for doc in db.cashflows.find({**query, 'type': 'receipt'}).sort('created_at', -1).limit(5)]
+            recent_payments = [to_dict_cashflow(doc) for doc in db.cashflows.find({**query, 'type': 'payment'}).sort('created_at', -1).limit(5)]
+            recent_inventory = [to_dict_record(doc) for doc in db.records.find({**query, 'type': 'inventory'}).sort('created_at', -1).limit(5)]
+        except Exception as e:
+            logger.warning(
+                f"Failed to fetch recent records: {str(e)}",
+                extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
+            )
+            flash(trans('recent_records_error', default='Unable to load recent records.'), 'warning')
+
+        # Calculate stats
+        try:
+            # Counts
+            stats['total_debtors'] = db.records.count_documents({**query, 'type': 'debtor'}, hint=[('user_id', 1), ('type', 1)]) or len(recent_debtors)
+            stats['total_creditors'] = db.records.count_documents({**query, 'type': 'creditor'}, hint=[('user_id', 1), ('type', 1)]) or len(recent_creditors)
+            stats['total_payments'] = db.cashflows.count_documents({**query, 'type': 'payment'}, hint=[('user_id', 1), ('type', 1)]) or len(recent_payments)
+            stats['total_receipts'] = db.cashflows.count_documents({**query, 'type': 'receipt'}, hint=[('user_id', 1), ('type', 1)]) or len(recent_receipts)
+            stats['total_inventory'] = db.records.count_documents({**query, 'type': 'inventory'}, hint=[('user_id', 1), ('type', 1)]) or len(recent_inventory)
+
+            # Amounts
             receipts_result = db.cashflows.aggregate([
                 {'$match': {**query, 'type': 'receipt'}},
-                {'$group': {'_id': None, 'total_amount': {'$sum': {'$toDouble': '$amount'}}, 'count': {'$sum': 1}}}
+                {'$group': {
+                    '_id': None,
+                    'total_amount': {
+                        '$sum': {
+                            '$cond': {
+                                'if': {'$isNumber': '$amount'},
+                                'then': {'$toDouble': '$amount'},
+                                'else': 0.0
+                            }
+                        }
+                    }
+                }}
             ])
-            receipts_data = next(receipts_result, {})
-            stats['total_receipts'] = int(receipts_data.get('count', 0) or 0)
-            stats['total_receipts_amount'] = utils.safe_to_float(receipts_data.get('total_amount', 0))
+            stats['total_receipts_amount'] = safe_to_float(next(receipts_result, {}).get('total_amount', 0))
 
             payments_result = db.cashflows.aggregate([
                 {'$match': {**query, 'type': 'payment'}},
-                {'$group': {'_id': None, 'total_amount': {'$sum': {'$toDouble': '$amount'}}, 'count': {'$sum': 1}}}
+                {'$group': {
+                    '_id': None,
+                    'total_amount': {
+                        '$sum': {
+                            '$cond': {
+                                'if': {'$isNumber': '$amount'},
+                                'then': {'$toDouble': '$amount'},
+                                'else': 0.0
+                            }
+                        }
+                    }
+                }}
             ])
-            payments_data = next(payments_result, {})
-            stats['total_payments'] = int(payments_data.get('count', 0) or 0)
-            stats['total_payments_amount'] = utils.safe_to_float(payments_data.get('total_amount', 0))
+            stats['total_payments_amount'] = safe_to_float(next(payments_result, {}).get('total_amount', 0))
 
-            debtors_result = db.cashflows.aggregate([
+            debtors_result = db.records.aggregate([
                 {'$match': {**query, 'type': 'debtor'}},
-                {'$group': {'_id': None, 'total_amount': {'$sum': {'$toDouble': '$amount_owed'}}, 'count': {'$sum': 1}}}
+                {'$group': {
+                    '_id': None,
+                    'total_amount': {
+                        '$sum': {
+                            '$cond': {
+                                'if': {'$isNumber': '$amount_owed'},
+                                'then': {'$toDouble': '$amount_owed'},
+                                'else': 0.0
+                            }
+                        }
+                    }
+                }}
             ])
-            debtors_data = next(debtors_result, {})
-            stats['total_debtors'] = int(debtors_data.get('count', 0) or 0)
-            stats['total_debtors_amount'] = utils.safe_to_float(debtors_data.get('total_amount', 0))
+            stats['total_debtors_amount'] = safe_to_float(next(debtors_result, {}).get('total_amount', 0))
 
-            creditors_result = db.cashflows.aggregate([
+            creditors_result = db.records.aggregate([
                 {'$match': {**query, 'type': 'creditor'}},
-                {'$group': {'_id': None, 'total_amount': {'$sum': {'$toDouble': '$amount_owed'}}, 'count': {'$sum': 1}}}
+                {'$group': {
+                    '_id': None,
+                    'total_amount': {
+                        '$sum': {
+                            '$cond': {
+                                'if': {'$isNumber': '$amount_owed'},
+                                'then': {'$toDouble': '$amount_owed'},
+                                'else': 0.0
+                            }
+                        }
+                    }
+                }}
             ])
-            creditors_data = next(creditors_result, {})
-            stats['total_creditors'] = int(creditors_data.get('count', 0) or 0)
-            stats['total_creditors_amount'] = utils.safe_to_float(creditors_data.get('total_amount', 0))
+            stats['total_creditors_amount'] = safe_to_float(next(creditors_result, {}).get('total_amount', 0))
 
-            inventory_result = db.cashflows.aggregate([
+            inventory_result = db.records.aggregate([
                 {'$match': {**query, 'type': 'inventory'}},
-                {'$group': {'_id': None, 'total_cost': {'$sum': {'$toDouble': '$cost'}}, 'count': {'$sum': 1}}}
+                {'$group': {
+                    '_id': None,
+                    'total_cost': {
+                        '$sum': {
+                            '$cond': {
+                                'if': {'$isNumber': '$cost'},
+                                'then': {'$toDouble': '$cost'},
+                                'else': 0.0
+                            }
+                        }
+                    }
+                }}
             ])
-            inventory_data = next(inventory_result, {})
-            stats['total_inventory'] = int(inventory_data.get('count', 0) or 0)
-            stats['total_inventory_cost'] = utils.safe_to_float(inventory_data.get('total_cost', 0))
+            stats['total_inventory_cost'] = safe_to_float(next(inventory_result, {}).get('total_cost', 0))
 
-            # Ensure all are floats before arithmetic
-            stats['gross_profit'] = float(stats['total_receipts_amount']) - float(stats['total_payments_amount'])
-            stats['true_profit'] = float(stats['gross_profit']) - float(stats['total_inventory_cost'])
-            stats['profit_only'] = stats['true_profit']
-        except Exception as stats_error:
+            # Handle tax prep mode calculations
+            if tax_prep_mode:
+                stats['profit_only'] = stats['total_receipts_amount'] - (stats['total_payments_amount'] + stats['total_inventory_cost'])
+                stats['total_receipts'] = stats['total_payments'] = 0
+                stats['total_receipts_amount'] = stats['total_payments_amount'] = 0
+            else:
+                stats['gross_profit'] = stats['total_receipts_amount'] - stats['total_payments_amount']
+                stats['true_profit'] = stats['gross_profit'] - stats['total_inventory_cost']
+                stats['profit_only'] = stats['true_profit']
+
+        except Exception as e:
             logger.error(
-                f"Error calculating dashboard stats: {str(stats_error)}",
+                f"Error calculating stats for dashboard: {str(e)}",
                 extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
             )
-            flash(trans('general_error', default='Unable to load dashboard data'), 'danger')
-            return render_template('error/500.html', error_message=str(stats_error), title="Error"), 500
+            flash(trans('dashboard_stats_error', default='Unable to calculate dashboard statistics. Displaying defaults.'), 'warning')
+            stats.update({
+                'total_debtors': len(recent_debtors),
+                'total_creditors': len(recent_creditors),
+                'total_payments': len(recent_payments),
+                'total_receipts': len(recent_receipts),
+                'total_inventory': len(recent_inventory),
+                'total_debtors_amount': sum(safe_to_float(item.get('amount_owed', 0)) for item in recent_debtors),
+                'total_creditors_amount': sum(safe_to_float(item.get('amount_owed', 0)) for item in recent_creditors),
+                'total_payments_amount': sum(safe_to_float(item.get('amount', 0)) for item in recent_payments),
+                'total_receipts_amount': sum(safe_to_float(item.get('amount', 0)) for item in recent_receipts),
+                'total_inventory_cost': sum(safe_to_float(item.get('cost', 0)) for item in recent_inventory),
+                'total_sales_amount': sum(safe_to_float(item.get('amount', 0)) for item in recent_receipts),
+                'total_expenses_amount': sum(safe_to_float(item.get('amount', 0)) for item in recent_payments),
+                'gross_profit': sum(safe_to_float(item.get('amount', 0)) for item in recent_receipts) - sum(safe_to_float(item.get('amount', 0)) for item in recent_payments),
+                'true_profit': (sum(safe_to_float(item.get('amount', 0)) for item in recent_receipts) - sum(safe_to_float(item.get('amount', 0)) for item in recent_payments)) - sum(safe_to_float(item.get('cost', 0)) for item in recent_inventory),
+                'profit_only': (sum(safe_to_float(item.get('amount', 0)) for item in recent_receipts) - sum(safe_to_float(item.get('amount', 0)) for item in recent_payments)) - sum(safe_to_float(item.get('cost', 0)) for item in recent_inventory)
+            })
 
-        try:
-            recent_debtors = list(db.records.find({**query, 'type': 'debtor'}).sort('created_at', -1).limit(5))
-            recent_debtors = [normalize_datetime(clean_document_for_json(doc)) for doc in recent_debtors]
-
-            recent_creditors = list(db.records.find({**query, 'type': 'creditor'}).sort('created_at', -1).limit(5))
-            recent_creditors = [normalize_datetime(clean_document_for_json(doc)) for doc in recent_creditors]
-
-            recent_receipts = list(db.cashflows.find({**query, 'type': 'receipt'}).sort('created_at', -1).limit(5))
-            recent_receipts = [normalize_datetime(clean_document_for_json(doc)) for doc in recent_receipts]
-
-            recent_payments = list(db.cashflows.find({**query, 'type': 'payment'}).sort('created_at', -1).limit(5))
-            recent_payments = [normalize_datetime(clean_document_for_json(doc)) for doc in recent_payments]
-
-            recent_inventory = list(db.records.find({**query, 'type': 'inventory'}).sort('created_at', -1).limit(5))
-            recent_inventory = [normalize_datetime(clean_document_for_json(doc)) for doc in recent_inventory]
-        except Exception as activity_error:
-            logger.error(
-                f"Error fetching recent activity: {str(activity_error)}",
+        # Standardize and validate stats
+        standardized_stats = utils.standardize_stats_dictionary(stats, log_defaults=True)
+        is_valid, missing_keys, warnings = utils.validate_stats_completeness(standardized_stats, 'dashboard_index')
+        if not is_valid:
+            logger.warning(
+                f"Stats validation failed in dashboard index: missing {missing_keys}",
                 extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
             )
-            recent_debtors = recent_creditors = recent_receipts = recent_payments = recent_inventory = []
-
-
-        # Calculate streak (same as before)
-        try:
-            streak = 0
-            records = db.cashflows.find({**query}).sort('created_at', -1).limit(100)
-            last_date = None
-            for record in records:
-                record_date = safe_parse_datetime(record['created_at']).date()
-                if last_date is None:
-                    last_date = record_date
-                    streak = 1
-                elif (last_date - record_date).days == 1:
-                    streak += 1
-                    last_date = record_date
-                else:
-                    break
-        except Exception as streak_error:
-            logger.error(
-                f"Error calculating streak: {str(streak_error)}",
+        if warnings:
+            logger.info(
+                f"Stats validation warnings in dashboard index: {warnings}",
                 extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
             )
-            streak = 0
 
-        inventory_loss = stats['total_inventory_cost'] < 0
-
-        try:
-            unpaid_debtors = list(db.records.find({**query, 'type': 'debtor', 'status': 'unpaid'}).limit(5))
-            unpaid_debtors = [clean_document_for_json(doc) for doc in unpaid_debtors]
-            unpaid_creditors = list(db.records.find({**query, 'type': 'creditor', 'status': 'unpaid'}).limit(5))
-            unpaid_creditors = [clean_document_for_json(doc) for doc in unpaid_creditors]
-        except Exception as notify_error:
-            logger.error(
-                f"Error fetching notifications data: {str(notify_error)}",
-                extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
-            )
-            unpaid_debtors = unpaid_creditors = []
-
-        tax_prep_mode = request.args.get('tax_prep') == '1'
-        show_daily_log_reminder = reminders.needs_daily_log_reminder(db, str(current_user.id))
-        formatted_stats = utils.format_stats_for_template(stats)
+        # Render dashboard
         return render_template(
             'dashboard/index.html',
-            stats=formatted_stats,
-            recent_debtors=recent_debtors,
-            recent_creditors=recent_creditors,
-            recent_receipts=recent_receipts,
-            recent_payments=recent_payments,
-            recent_inventory=recent_inventory,
-            streak=streak,
-            tax_prep_mode=tax_prep_mode,
+            stats=standardized_stats,
             can_interact=can_interact,
             show_daily_log_reminder=show_daily_log_reminder,
-            inventory_loss=inventory_loss,
+            streak=streak,
             unpaid_debtors=unpaid_debtors,
-            unpaid_creditors=unpaid_creditors
+            unpaid_creditors=unpaid_creditors,
+            tax_prep_mode=tax_prep_mode,
+            inventory_loss=inventory_loss,
+            recent_debtors=recent_debtors,
+            recent_creditors=recent_creditors,
+            recent_payments=recent_payments,
+            recent_receipts=recent_receipts,
+            recent_inventory=recent_inventory
         )
 
     except Exception as e:
-        logger.error(
-            f"Error rendering dashboard: {str(e)}",
+        logger.critical(
+            f"Critical error in dashboard route: {str(e)}",
             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
         )
-        flash(trans('general_error', default='An error occurred while loading the dashboard'), 'danger')
-        return render_template('error/500.html', error_message=str(e), title="Error"), 500
+        flash(trans('dashboard_critical_error', default='An error occurred while loading the dashboard. Please try again later.'), 'danger')
+        safe_stats = utils.standardize_stats_dictionary({}, log_defaults=True)
+        return render_template(
+            'dashboard/index.html',
+            stats=safe_stats,
+            can_interact=False,
+            show_daily_log_reminder=False,
+            streak=0,
+            unpaid_debtors=[],
+            unpaid_creditors=[],
+            tax_prep_mode=False,
+            inventory_loss=False,
+            recent_debtors=[],
+            recent_creditors=[],
+            recent_payments=[],
+            recent_receipts=[],
+            recent_inventory=[]
+        ), 500
