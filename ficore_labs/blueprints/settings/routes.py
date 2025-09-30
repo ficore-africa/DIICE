@@ -5,10 +5,10 @@ from flask_wtf.file import FileAllowed
 from flask_wtf.csrf import CSRFError
 from translations import trans
 from utils import requires_role, is_valid_email, format_currency, get_mongo_db, sanitize_input
-from models import User, get_user, update_user, create_kyc_record, update_kyc_record, get_kyc_record, to_dict_kyc_record, to_dict_user, get_user_by_email
+from models import User, get_user, update_user, create_kyc_record, update_kyc_record, get_kyc_record, to_dict_kyc_record, to_dict_user, get_user_by_email, update_user_language, get_user_goals, update_user_goals
 from bson import ObjectId
 from datetime import datetime, timezone
-from wtforms import StringField, TextAreaField, SubmitField, FileField, SelectMultipleField
+from wtforms import StringField, TextAreaField, SubmitField, FileField, SelectMultipleField, SelectField
 from wtforms.validators import DataRequired, Length, Email, Optional
 from wtforms.widgets import ListWidget, CheckboxInput
 from gridfs import GridFS
@@ -64,6 +64,32 @@ class ProfileForm(FlaskForm):
         option_widget=CheckboxInput(),
         render_kw={'class': 'form-check-input'}
     )
+    language = SelectField(
+        trans('settings_language', default='Language'),
+        choices=[
+            ('en', trans('settings_language_en', default='English')),
+            ('ha', trans('settings_language_ha', default='Hausa')),
+            ('es', trans('settings_language_es', default='Spanish')),
+            ('fr', trans('settings_language_fr', default='French')),
+            ('yo', trans('settings_language_yo', default='Yoruba'))
+        ],
+        validators=[DataRequired(message=trans('settings_language_required', default='Language is required'))],
+        render_kw={'class': 'form-control'}
+    )
+    goals = SelectMultipleField(
+        trans('settings_goals', default='Business Goals'),
+        choices=[
+            ('track_expenses', trans('settings_goal_track_expenses', default='Track Expenses')),
+            ('manage_customers', trans('settings_goal_manage_customers', default='Manage Customers')),
+            ('improve_savings', trans('settings_goal_improve_savings', default='Improve Savings')),
+            ('increase_sales', trans('settings_goal_increase_sales', default='Increase Sales')),
+            ('streamline_operations', trans('settings_goal_streamline_operations', default='Streamline Operations'))
+        ],
+        validators=[Optional()],
+        widget=ListWidget(prefix_label=False),
+        option_widget=CheckboxInput(),
+        render_kw={'class': 'form-check-input'}
+    )
     submit = SubmitField(trans('general_save_changes', default='Save Changes'), render_kw={'class': 'btn btn-primary w-100'})
 
 def get_role_based_nav():
@@ -113,7 +139,7 @@ def index():
 @requires_role(['trader', 'startup', 'admin'])
 @utils.limiter.limit('10 per minute')
 def profile():
-    """Unified profile management page with KYC status and reminder settings."""
+    """Unified profile management page with KYC status, reminder settings, language, and goals."""
     try:
         db = get_mongo_db()
         user_id = str(current_user.id)
@@ -131,13 +157,14 @@ def profile():
             form.full_name.data = user.display_name
             form.email.data = user.email
             form.phone.data = user.phone
+            form.language.data = user.business_details.get('language', 'en')
+            form.goals.data = user.business_details.get('goals', [])
             user_dict = to_dict_user(user)
             if user.role in ['trader', 'startup'] and user_dict.get('business_details'):
                 form.business_name.data = user_dict['business_details'].get('name', '')
                 form.business_address.data = user_dict['business_details'].get('address', '')
                 form.industry.data = user_dict['business_details'].get('industry', '')
                 form.products_services.data = user_dict['business_details'].get('products_services', '')
-            # Set default reminder frequencies if not already set
             form.debt_reminder_frequency.data = user_dict.get('settings', {}).get('debt_reminder_frequency', ['3_days', '7_days', '30_days', '60_days', '90_days'])
 
         if form.validate_on_submit():
@@ -162,31 +189,47 @@ def profile():
                         user=to_dict_user(user),
                         title=trans('settings_profile_title', default='Profile Settings', lang=session.get('lang', 'en'))
                     )
+                # Prepare update data
                 update_data = {
                     'display_name': sanitize_input(form.full_name.data, max_length=100),
                     'email': email,
                     'phone': sanitize_input(form.phone.data, max_length=20) if form.phone.data else None,
                     'setup_complete': True,
-                    'settings': user.settings.copy()  # Preserve existing settings
+                    'settings': user.settings.copy(),
+                    'business_details': user.business_details.copy() if user.business_details else {}
                 }
                 update_data['settings']['debt_reminder_frequency'] = selected_frequencies
+                update_data['business_details']['language'] = sanitize_input(form.language.data, max_length=2)
+                update_data['business_details']['goals'] = [sanitize_input(goal, max_length=50) for goal in form.goals.data]
                 if user.role in ['trader', 'startup']:
-                    update_data['business_details'] = {
+                    update_data['business_details'].update({
                         'name': sanitize_input(form.business_name.data, max_length=100) if form.business_name.data else '',
                         'address': sanitize_input(form.business_address.data, max_length=500) if form.business_address.data else '',
                         'industry': sanitize_input(form.industry.data, max_length=50) if form.industry.data else '',
                         'products_services': sanitize_input(form.products_services.data, max_length=200) if form.products_services.data else '',
                         'phone_number': sanitize_input(form.phone.data, max_length=20) if form.phone.data else ''
-                    }
+                    })
                 if update_user(db, user_id, update_data):
                     logger.info(
-                        f"Profile updated for user {user_id}, reminder frequencies: {selected_frequencies}",
+                        f"Profile updated for user {user_id}, language: {form.language.data}, goals: {form.goals.data}, reminder frequencies: {selected_frequencies}",
                         extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
                     )
                     flash(trans('general_profile_updated', default='Profile updated successfully'), 'success')
                 else:
                     flash(trans('general_no_changes', default='No changes made to profile'), 'info')
                 return redirect(url_for('settings.profile'))
+            except ValueError as ve:
+                logger.error(
+                    f"Validation error updating profile for user {user_id}: {str(ve)}",
+                    extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
+                )
+                flash(str(ve), 'danger')
+                return render_template(
+                    'settings/profile.html',
+                    form=form,
+                    user=to_dict_user(user),
+                    title=trans('settings_profile_title', default='Profile Settings', lang=session.get('lang', 'en'))
+                )
             except Exception as e:
                 logger.error(
                     f"Error updating profile for user {user_id}: {str(e)}",
@@ -199,7 +242,7 @@ def profile():
         user_dict['kyc_status'] = kyc_records[0]['status'] if kyc_records else 'not_submitted'
         session['kyc_status'] = user_dict['kyc_status']
         logger.info(
-            f"Rendering profile page for user {user_id}, KYC status: {user_dict['kyc_status']}",
+            f"Rendering profile page for user {user_id}, KYC status: {user_dict['kyc_status']}, language: {user_dict['business_details'].get('language', 'en')}, goals: {user_dict['business_details'].get('goals', [])}",
             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id}
         )
         return render_template(
