@@ -14,6 +14,18 @@ logger = logging.getLogger(__name__)
 
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
 
+def safe_to_float(value, default=0.0):
+    """Convert a value to float, return default if conversion fails."""
+    if value is None:
+        logger.warning(f"Received None value for conversion to float")
+        return default
+    try:
+        result = float(value)
+        return result
+    except (ValueError, TypeError) as e:
+        logger.warning(f"Failed to convert value to float: {value} (type: {type(value)}), error: {str(e)}")
+        return default
+
 def normalize_datetime(doc):
     """Convert created_at to timezone-aware datetime if it's a string or naive datetime."""
     if 'created_at' in doc:
@@ -56,7 +68,7 @@ def weekly_profit_data():
                     {'$match': {'user_id': user_id, 'type': 'receipt', 'created_at': {'$gte': start, '$lt': end}}},
                     {'$group': {'_id': None, 'total': {'$sum': {'$toDouble': '$amount'}}}}
                 ])
-                receipts_total = safe_to_float(next(receipts, {}).get('total', 0))
+                receipts_total = float(safe_to_float(next(receipts, {}).get('total', 0)))
                 logger.debug(f"Day {day}: receipts_total = {receipts_total} (type: {type(receipts_total)})")
 
                 # Sum payments (expenses) for the day
@@ -64,7 +76,7 @@ def weekly_profit_data():
                     {'$match': {'user_id': user_id, 'type': 'payment', 'created_at': {'$gte': start, '$lt': end}}},
                     {'$group': {'_id': None, 'total': {'$sum': {'$toDouble': '$amount'}}}}
                 ])
-                payments_total = safe_to_float(next(payments, {}).get('total', 0))
+                payments_total = float(safe_to_float(next(payments, {}).get('total', 0)))
                 logger.debug(f"Day {day}: payments_total = {payments_total} (type: {type(payments_total)})")
 
                 profit = receipts_total - payments_total
@@ -81,9 +93,9 @@ def weekly_profit_data():
                 )
                 profit_per_day.append({
                     'date': day.strftime('%a'),
-                    'profit': 0,
-                    'receipts': 0,
-                    'payments': 0
+                    'profit': 0.0,
+                    'receipts': 0.0,
+                    'payments': 0.0
                 })
 
         return safe_json_response({'data': profit_per_day, 'success': True})
@@ -155,8 +167,8 @@ def refresh_dashboard_data():
             logger.debug(f"Inventory: total_inventory_cost = {stats['total_inventory_cost']} (type: {type(stats['total_inventory_cost'])})")
 
             # Calculate profits
-            stats['gross_profit'] = stats['total_receipts_amount'] - stats['total_payments_amount']
-            stats['true_profit'] = stats['gross_profit'] - stats['total_inventory_cost']
+            stats['gross_profit'] = float(stats['total_receipts_amount']) - float(stats['total_payments_amount'])
+            stats['true_profit'] = float(stats['gross_profit']) - float(stats['total_inventory_cost'])
             stats['profit_only'] = stats['true_profit']  # Ensure profit_only is included for template
             logger.debug(f"Profits: gross_profit = {stats['gross_profit']} (type: {type(stats['gross_profit'])}), true_profit = {stats['true_profit']} (type: {type(stats['true_profit'])})")
 
@@ -251,7 +263,7 @@ def index():
 
             # Ensure all are floats before arithmetic
             stats['gross_profit'] = float(stats['total_receipts_amount']) - float(stats['total_payments_amount'])
-            stats['true_profit'] = stats['gross_profit'] - float(stats['total_inventory_cost'])
+            stats['true_profit'] = float(stats['gross_profit']) - float(stats['total_inventory_cost'])
             stats['profit_only'] = stats['true_profit']
         except Exception as stats_error:
             logger.error(
