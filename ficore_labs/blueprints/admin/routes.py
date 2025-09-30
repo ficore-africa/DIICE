@@ -17,6 +17,10 @@ from reportlab.lib.units import inch
 from translations import trans
 import utils
 from models import get_records, get_cashflows, get_feedback, to_dict_feedback, get_waitlist_entries, to_dict_waitlist
+
+# --- Payment Receipt Admin Management ---
+from bson import ObjectId
+
 from admin_enhancement_implementation import (
     SystemSettingsForm, EducationModuleForm, NotificationTemplateForm, BulkUserOperationForm,
     get_system_settings, save_system_settings, get_education_modules, save_education_module,
@@ -91,6 +95,107 @@ def log_audit_action(action, details=None):
     except Exception as e:
         logger.error(f"Error logging audit action '{action}': {str(e)}",
                      extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
+
+
+# --- Admin: List, Approve, Reject Payment Receipts ---
+@admin_bp.route('/payment-receipts', methods=['GET'])
+@login_required
+@utils.requires_role('admin')
+def list_payment_receipts():
+    """List all payment receipts for admin review."""
+    try:
+        db = utils.get_mongo_db()
+        receipts = list(db.payment_receipts.find().sort('uploaded_at', -1))
+        for r in receipts:
+            r['_id'] = str(r['_id'])
+        return render_template('admin/payment_receipts.html', receipts=receipts, title=trans('admin_payment_receipts', default='Payment Receipts'))
+    except Exception as e:
+        logger.error(f"Error fetching payment receipts: {str(e)}", extra={'user_id': current_user.id})
+        flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
+        return redirect(url_for('admin.dashboard'))
+
+@admin_bp.route('/payment-receipts/approve/<receipt_id>', methods=['POST'])
+@login_required
+@utils.requires_role('admin')
+def approve_payment_receipt(receipt_id):
+    """Approve a payment receipt and update user subscription."""
+    try:
+        db = utils.get_mongo_db()
+        receipt = db.payment_receipts.find_one({'_id': ObjectId(receipt_id)})
+        if not receipt:
+            flash(trans('admin_receipt_not_found', default='Receipt not found'), 'danger')
+            return redirect(url_for('admin.list_payment_receipts'))
+        if receipt.get('status') == 'approved':
+            flash(trans('admin_receipt_already_approved', default='Receipt already approved'), 'info')
+            return redirect(url_for('admin.list_payment_receipts'))
+        # Update receipt status
+        db.payment_receipts.update_one({'_id': ObjectId(receipt_id)}, {
+            '$set': {
+                'status': 'approved',
+                'approved_by': str(current_user.id),
+                'approved_at': datetime.now(timezone.utc),
+                'rejected_by': None,
+                'rejected_at': None,
+                'rejection_reason': None
+            }
+        })
+        # Update user subscription
+        user_id = receipt['user_id']
+        plan_type = receipt.get('plan_type')
+        payment_date = receipt.get('payment_date', datetime.now(timezone.utc))
+        if isinstance(payment_date, str):
+            payment_date = utils.safe_parse_datetime(payment_date)
+        duration = 30 if plan_type == 'monthly' else 365 if plan_type == 'yearly' else 30
+        subscription_end = payment_date + timedelta(days=duration)
+        db.users.update_one({'_id': user_id}, {
+            '$set': {
+                'is_subscribed': True,
+                'subscription_plan': plan_type,
+                'subscription_start': payment_date,
+                'subscription_end': subscription_end,
+                'updated_at': datetime.now(timezone.utc)
+            }
+        })
+        log_audit_action('approve_payment_receipt', {'receipt_id': receipt_id, 'user_id': user_id, 'plan_type': plan_type})
+        flash(trans('admin_receipt_approved', default='Receipt approved and subscription updated.'), 'success')
+        return redirect(url_for('admin.list_payment_receipts'))
+    except Exception as e:
+        logger.error(f"Error approving payment receipt: {str(e)}", extra={'user_id': current_user.id})
+        flash(trans('admin_database_error', default='An error occurred while approving receipt'), 'danger')
+        return redirect(url_for('admin.list_payment_receipts'))
+
+@admin_bp.route('/payment-receipts/reject/<receipt_id>', methods=['POST'])
+@login_required
+@utils.requires_role('admin')
+def reject_payment_receipt(receipt_id):
+    """Reject a payment receipt."""
+    try:
+        db = utils.get_mongo_db()
+        receipt = db.payment_receipts.find_one({'_id': ObjectId(receipt_id)})
+        if not receipt:
+            flash(trans('admin_receipt_not_found', default='Receipt not found'), 'danger')
+            return redirect(url_for('admin.list_payment_receipts'))
+        if receipt.get('status') == 'rejected':
+            flash(trans('admin_receipt_already_rejected', default='Receipt already rejected'), 'info')
+            return redirect(url_for('admin.list_payment_receipts'))
+        reason = request.form.get('rejection_reason', '')
+        db.payment_receipts.update_one({'_id': ObjectId(receipt_id)}, {
+            '$set': {
+                'status': 'rejected',
+                'rejected_by': str(current_user.id),
+                'rejected_at': datetime.now(timezone.utc),
+                'rejection_reason': reason,
+                'approved_by': None,
+                'approved_at': None
+            }
+        })
+        log_audit_action('reject_payment_receipt', {'receipt_id': receipt_id, 'reason': reason})
+        flash(trans('admin_receipt_rejected', default='Receipt rejected.'), 'warning')
+        return redirect(url_for('admin.list_payment_receipts'))
+    except Exception as e:
+        logger.error(f"Error rejecting payment receipt: {str(e)}", extra={'user_id': current_user.id})
+        flash(trans('admin_database_error', default='An error occurred while rejecting receipt'), 'danger')
+        return redirect(url_for('admin.list_payment_receipts'))
 
 def generate_customer_report_pdf(users):
     """Generate a PDF report of customer data."""
@@ -627,113 +732,6 @@ def manage_user_trials():
         flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
         return render_template('error/500.html'), 500
 
-@admin_bp.route('/waitlist', methods=['GET'])
-@login_required
-@utils.requires_role('admin')
-@utils.limiter.limit("50 per hour")
-def view_waitlist():
-    """View waitlist entries."""
-    try:
-        db = utils.get_mongo_db()
-        if db is None:
-            raise Exception("Failed to connect to MongoDB")
-        entries = get_waitlist_entries(db, {})
-        return render_template('admin/waitlist.html', entries=[to_dict_waitlist(e) for e in entries], title=trans('admin_waitlist_title', default='Waitlist'))
-    except Exception as e:
-        logger.error(f"Error viewing waitlist: {str(e)}",
-                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-        flash(trans('general_error', default='An error occurred while loading the waitlist'), 'danger')
-        return redirect(url_for('admin.dashboard'))
-
-@admin_bp.route('/waitlist/export', methods=['GET'])
-@login_required
-@utils.requires_role('admin')
-@utils.limiter.limit("10 per hour")
-def export_waitlist():
-    """Export waitlist entries as CSV."""
-    try:
-        db = utils.get_mongo_db()
-        if db is None:
-            raise Exception("Failed to connect to MongoDB")
-        entries = get_waitlist_entries(db, {})
-        output = io.StringIO()
-        writer = csv.writer(output)
-        writer.writerow(['ID', 'Full Name', 'WhatsApp Number', 'Email', 'Business Type', 'Created At', 'Updated At'])
-        for entry in entries:
-            dict_entry = to_dict_waitlist(entry)
-            writer.writerow([
-                dict_entry['id'],
-                dict_entry['full_name'],
-                dict_entry['whatsapp_number'],
-                dict_entry['email'],
-                dict_entry['business_type'],
-                dict_entry['created_at'],
-                dict_entry['updated_at']
-            ])
-        output.seek(0)
-        return send_file(
-            io.BytesIO(output.getvalue().encode('utf-8')),
-            mimetype='text/csv',
-            as_attachment=True,
-            download_name=f'waitlist_{datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")}.csv'
-        )
-    except Exception as e:
-        logger.error(f"Error exporting waitlist: {str(e)}",
-                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-        flash(trans('general_error', default='An error occurred while exporting the waitlist'), 'danger')
-        return redirect(url_for('admin.view_waitlist'))
-
-@admin_bp.route('/waitlist/contact/<string:entry_id>', methods=['GET', 'POST'])
-@login_required
-@utils.requires_role('admin')
-@utils.limiter.limit("10 per hour")
-def contact_waitlist_entry(entry_id):
-    """Contact a waitlist entry."""
-    try:
-        db = utils.get_mongo_db()
-        if db is None:
-            raise Exception("Failed to connect to MongoDB")
-        try:
-            entry_query = {'_id': ObjectId(entry_id)}
-        except errors.InvalidId:
-            entry_query = {'_id': entry_id}
-        entry = db.waitlist.find_one(entry_query)
-        if not entry:
-            flash(trans('admin_waitlist_entry_not_found', default='Waitlist entry not found'), 'danger')
-            return redirect(url_for('admin.view_waitlist'))
-        dict_entry = to_dict_waitlist(entry)
-        if request.method == 'POST':
-            message = request.form.get('message', '')
-            method = request.form.get('method')
-            if not message or not method:
-                flash(trans('general_missing_fields', default='Missing required fields'), 'danger')
-                return render_template('admin/contact.html', entry=dict_entry, title=trans('admin_contact_waitlist_entry', default='Contact Waitlist Entry'))
-            db.waitlist.update_one(
-                entry_query,
-                {
-                    '$set': {
-                        'contacted': True,
-                        'contact_message': message,
-                        'contacted_by': current_user.id,
-                        'contacted_at': datetime.now(timezone.utc)
-                    }
-                }
-            )
-            log_audit_action('contact_waitlist_entry', {
-                'entry_id': entry_id,
-                'email': entry.get('email'),
-                'method': method,
-                'message': message
-            })
-            flash(trans('admin_waitlist_contact_sent', default='Contact message recorded successfully'), 'success')
-            return redirect(url_for('admin.view_waitlist'))
-        return render_template('admin/contact.html', entry=dict_entry, title=trans('admin_contact_waitlist_entry', default='Contact Waitlist Entry'))
-    except Exception as e:
-        logger.error(f"Error contacting waitlist entry {entry_id}: {str(e)}",
-                     extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-        flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
-        return redirect(url_for('admin.view_waitlist'))
-
 @admin_bp.route('/tax/config', methods=['GET'])
 @login_required
 @utils.requires_role('admin')
@@ -1207,25 +1205,6 @@ def education_management():
     except Exception as e:
         logger.error(f"Error in education management for admin {current_user.id}: {str(e)}")
         flash(trans('admin_database_error', default='Database error occurred'), 'danger')
-        return redirect(url_for('admin.dashboard'))
-
-@admin_bp.route('/system/health', methods=['GET'])
-@login_required
-@utils.requires_role('admin')
-@utils.limiter.limit("30 per hour")
-def system_health_monitor():
-    """System health monitoring dashboard"""
-    try:
-        system_health = get_system_health()
-        
-        return render_template(
-            'admin/system_health.html',
-            health_data=system_health,
-            title=trans('admin_system_health', default='System Health Monitor')
-        )
-    except Exception as e:
-        logger.error(f"Error loading system health: {str(e)}")
-        flash(trans('admin_health_error', default='Error loading system health data'), 'danger')
         return redirect(url_for('admin.dashboard'))
     
 @admin_bp.route('/feedback', methods=['GET', 'POST'])
