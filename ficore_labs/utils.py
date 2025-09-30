@@ -428,28 +428,12 @@ ADMIN_EXPLORE = [
         "icon": "bi-gear"
     },
     {
-        "endpoint": "admin.audit",
-        "label": "Audit Logs",
-        "label_key": "admin_audit",
-        "description_key": "admin_audit_desc",
-        "tooltip_key": "admin_audit_tooltip",
-        "icon": "bi-journal-check"
-    },
-    {
         "endpoint": "admin.manage_feedback",
         "label": "Feedback",
         "label_key": "admin_feedback",
         "description_key": "admin_feedback_desc",
         "tooltip_key": "admin_feedback_tooltip",
         "icon": "bi-chat-dots"
-    },
-    {
-        "endpoint": "admin.analytics_dashboard",
-        "label": "Analytics Dashboard",
-        "label_key": "admin_analytics_dashboard",
-        "description_key": "admin_analytics_dashboard_desc",
-        "tooltip_key": "admin_analytics_dashboard_tooltip",
-        "icon": "bi-bar-chart"
     },
     {
         "endpoint": "admin.education_management",
@@ -2959,6 +2943,7 @@ def create_dashboard_safe_response(stats, recent_data, additional_data=None):
             'timestamp': datetime.now(timezone.utc).isoformat()
 
         }
+
 
 
 
