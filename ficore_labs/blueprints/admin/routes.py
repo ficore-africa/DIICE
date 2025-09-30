@@ -32,20 +32,19 @@ logger = logging.getLogger(__name__)
 
 admin_bp = Blueprint('admin', __name__, template_folder='templates/admin', url_prefix='/admin')
 
-# Helper to ensure all datetimes are UTC-aware
-
 # Form Definitions
 class RoleForm(FlaskForm):
     role = SelectField(trans('user_role', default='Role'), choices=[('trader', 'Trader'), ('admin', 'Admin')], validators=[DataRequired()], render_kw={'class': 'form-select'})
     submit = SubmitField(trans('user_update_role', default='Update Role'), render_kw={'class': 'btn btn-primary'})
 
 class SubscriptionForm(FlaskForm):
+    user_id = StringField('User ID', validators=[DataRequired()], render_kw={'class': 'form-control'})
     is_subscribed = SelectField(trans('subscription_status', default='Subscription Status'), choices=[('True', 'Subscribed'), ('False', 'Not Subscribed')], validators=[DataRequired()], render_kw={'class': 'form-select'})
     subscription_plan = SelectField(trans('subscription_plan', default='Subscription Plan'), choices=[('', 'None'), ('monthly', 'Monthly (₦1k)'), ('yearly', 'Yearly (₦10k)')], render_kw={'class': 'form-select'})
+    subscription_start = DateField(trans('subscription_start', default='Subscription Start Date'), format='%Y-%m-%d', validators=[Optional()], render_kw={'class': 'form-control'})
     subscription_end = DateField(trans('subscription_end', default='Subscription End Date'), format='%Y-%m-%d', validators=[Optional()], render_kw={'class': 'form-control'})
     submit = SubmitField(trans('subscription_update', default='Update Subscription'), render_kw={'class': 'btn btn-primary'})
 
-# TrialForm for manage_user_trials
 class TrialForm(FlaskForm):
     is_trial = SelectField(trans('trial_status', default='Trial Status'), choices=[('True', 'Active Trial'), ('False', 'No Trial')], validators=[DataRequired()], render_kw={'class': 'form-select'})
     trial_end = DateField(trans('trial_end', default='Trial End Date'), format='%Y-%m-%d', validators=[Optional()], render_kw={'class': 'form-control'})
@@ -97,107 +96,210 @@ def log_audit_action(action, details=None):
         logger.error(f"Error logging audit action '{action}': {str(e)}",
                      extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
 
-
-# --- Admin: List, Approve, Reject Payment Receipts ---
+# --- Admin: List, View, Approve, Reject Payment Receipts ---
 @admin_bp.route('/payment-receipts', methods=['GET'])
 @login_required
 @utils.requires_role('admin')
+@utils.limiter.limit("50 per hour")
 def list_payment_receipts():
     """List all payment receipts for admin review."""
     try:
         db = utils.get_mongo_db()
+        if db is None:
+            flash(trans('admin_database_error', default='Failed to connect to MongoDB'), 'danger')
+            return redirect(url_for('admin.dashboard'))
+
         receipts = list(db.payment_receipts.find().sort('uploaded_at', -1))
-        for r in receipts:
-            r['_id'] = str(r['_id'])
-        return render_template('admin/payment_receipts.html', receipts=receipts, title=trans('admin_payment_receipts', default='Payment Receipts'))
+        for receipt in receipts:
+            receipt['_id'] = str(receipt['_id'])
+            user = db.users.find_one({'_id': receipt['user_id']})
+            receipt['user_display_name'] = user.get('display_name', 'N/A') if user else 'N/A'
+            receipt['user_email'] = user.get('email', 'N/A') if user else 'N/A'
+            # Normalize datetime fields for template rendering
+            for field in ['payment_date', 'uploaded_at', 'approved_at', 'rejected_at']:
+                if receipt.get(field):
+                    receipt[field] = receipt[field].replace(tzinfo=timezone.utc)
+
+        return render_template('admin/payment_receipts.html', receipts=receipts,
+                             title=trans('admin_payment_receipts', default='Payment Receipts'))
+
     except Exception as e:
         logger.error(f"Error fetching payment receipts: {str(e)}", extra={'user_id': current_user.id})
         flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
         return redirect(url_for('admin.dashboard'))
 
-@admin_bp.route('/payment-receipts/approve/<receipt_id>', methods=['POST'])
+@admin_bp.route('/payment-receipts/view/<receipt_id>', methods=['GET'])
 @login_required
 @utils.requires_role('admin')
-def approve_payment_receipt(receipt_id):
-    """Approve a payment receipt and update user subscription."""
+@utils.limiter.limit("50 per hour")
+def view_payment_receipt(receipt_id):
+    """View details of a single payment receipt."""
     try:
         db = utils.get_mongo_db()
+        if db is None:
+            flash(trans('admin_database_error', default='Failed to connect to MongoDB'), 'danger')
+            return redirect(url_for('admin.list_payment_receipts'))
+
         receipt = db.payment_receipts.find_one({'_id': ObjectId(receipt_id)})
         if not receipt:
             flash(trans('admin_receipt_not_found', default='Receipt not found'), 'danger')
             return redirect(url_for('admin.list_payment_receipts'))
-        if receipt.get('status') == 'approved':
-            flash(trans('admin_receipt_already_approved', default='Receipt already approved'), 'info')
-            return redirect(url_for('admin.list_payment_receipts'))
-        # Update receipt status
-        db.payment_receipts.update_one({'_id': ObjectId(receipt_id)}, {
-            '$set': {
-                'status': 'approved',
-                'approved_by': str(current_user.id),
-                'approved_at': datetime.now(timezone.utc),
-                'rejected_by': None,
-                'rejected_at': None,
-                'rejection_reason': None
-            }
-        })
-        # Update user subscription
-        user_id = receipt['user_id']
-        plan_type = receipt.get('plan_type')
-        payment_date = receipt.get('payment_date', datetime.now(timezone.utc))
-        if isinstance(payment_date, str):
-            payment_date = utils.safe_parse_datetime(payment_date)
-        duration = 30 if plan_type == 'monthly' else 365 if plan_type == 'yearly' else 30
-        subscription_end = payment_date + timedelta(days=duration)
-        db.users.update_one({'_id': user_id}, {
-            '$set': {
-                'is_subscribed': True,
-                'subscription_plan': plan_type,
-                'subscription_start': payment_date,
-                'subscription_end': subscription_end,
-                'updated_at': datetime.now(timezone.utc)
-            }
-        })
-        log_audit_action('approve_payment_receipt', {'receipt_id': receipt_id, 'user_id': user_id, 'plan_type': plan_type})
-        flash(trans('admin_receipt_approved', default='Receipt approved and subscription updated.'), 'success')
+
+        receipt['_id'] = str(receipt['_id'])
+        user = db.users.find_one({'_id': receipt['user_id']})
+        receipt['user_display_name'] = user.get('display_name', 'N/A') if user else 'N/A'
+        receipt['user_email'] = user.get('email', 'N/A') if user else 'N/A'
+        # Normalize datetime fields
+        for field in ['payment_date', 'uploaded_at', 'approved_at', 'rejected_at']:
+            if receipt.get(field):
+                receipt[field] = receipt[field].replace(tzinfo=timezone.utc)
+
+        return render_template('admin/receipt_details.html', receipt=receipt,
+                             title=trans('admin_receipt_details', default='Receipt Details'))
+
+    except errors.InvalidId:
+        logger.error(f"Invalid receipt_id format: {receipt_id}", extra={'user_id': current_user.id})
+        flash(trans('admin_invalid_receipt_id', default='Invalid receipt ID'), 'danger')
         return redirect(url_for('admin.list_payment_receipts'))
     except Exception as e:
-        logger.error(f"Error approving payment receipt: {str(e)}", extra={'user_id': current_user.id})
-        flash(trans('admin_database_error', default='An error occurred while approving receipt'), 'danger')
+        logger.error(f"Error viewing receipt {receipt_id}: {str(e)}", extra={'user_id': current_user.id})
+        flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
+        return render_template('error/500.html'), 500
+
+@admin_bp.route('/payment-receipts/approve/<receipt_id>', methods=['POST'])
+@login_required
+@utils.requires_role('admin')
+@utils.limiter.limit("20 per hour")
+def approve_payment_receipt(receipt_id):
+    """Approve a payment receipt and update user subscription."""
+    try:
+        db = utils.get_mongo_db()
+        if db is None:
+            flash(trans('admin_database_error', default='Failed to connect to MongoDB'), 'danger')
+            return redirect(url_for('admin.list_payment_receipts'))
+
+        receipt = db.payment_receipts.find_one({'_id': ObjectId(receipt_id)})
+        if not receipt:
+            flash(trans('admin_receipt_not_found', default='Receipt not found'), 'danger')
+            return redirect(url_for('admin.list_payment_receipts'))
+
+        if receipt['status'] != 'pending':
+            flash(trans('admin_receipt_already_processed', default='Receipt already processed'), 'warning')
+            return redirect(url_for('admin.list_payment_receipts'))
+
+        with db.client.start_session() as session:
+            with session.start_transaction():
+                subscription_end = (
+                    receipt['payment_date'] + timedelta(days=365)
+                    if receipt['plan_type'] == 'yearly'
+                    else receipt['payment_date'] + timedelta(days=30)
+                )
+                db.payment_receipts.update_one(
+                    {'_id': ObjectId(receipt_id)},
+                    {
+                        '$set': {
+                            'status': 'approved',
+                            'approved_by': str(current_user.id),
+                            'approved_at': datetime.now(timezone.utc),
+                            'rejected_by': None,
+                            'rejected_at': None,
+                            'rejection_reason': None
+                        }
+                    },
+                    session=session
+                )
+                db.users.update_one(
+                    {'_id': receipt['user_id']},
+                    {
+                        '$set': {
+                            'is_subscribed': True,
+                            'subscription_plan': receipt['plan_type'],
+                            'subscription_start': receipt['payment_date'],
+                            'subscription_end': subscription_end,
+                            'is_trial': False,
+                            'trial_start': None,
+                            'trial_end': None,
+                            'updated_at': datetime.now(timezone.utc)
+                        }
+                    },
+                    session=session
+                )
+
+        log_audit_action('approve_payment_receipt', {
+            'receipt_id': receipt_id,
+            'user_id': receipt['user_id'],
+            'plan_type': receipt['plan_type']
+        })
+        flash(trans('admin_receipt_approved', default='Receipt approved and subscription activated'), 'success')
+        return redirect(url_for('admin.list_payment_receipts'))
+
+    except errors.InvalidId:
+        logger.error(f"Invalid receipt_id format: {receipt_id}", extra={'user_id': current_user.id})
+        flash(trans('admin_invalid_receipt_id', default='Invalid receipt ID'), 'danger')
+        return redirect(url_for('admin.list_payment_receipts'))
+    except Exception as e:
+        logger.error(f"Error approving receipt {receipt_id}: {str(e)}", extra={'user_id': current_user.id})
+        flash(trans('admin_database_error', default='An error occurred while processing the receipt'), 'danger')
         return redirect(url_for('admin.list_payment_receipts'))
 
 @admin_bp.route('/payment-receipts/reject/<receipt_id>', methods=['POST'])
 @login_required
 @utils.requires_role('admin')
+@utils.limiter.limit("20 per hour")
 def reject_payment_receipt(receipt_id):
     """Reject a payment receipt."""
     try:
         db = utils.get_mongo_db()
+        if db is None:
+            flash(trans('admin_database_error', default='Failed to connect to MongoDB'), 'danger')
+            return redirect(url_for('admin.list_payment_receipts'))
+
         receipt = db.payment_receipts.find_one({'_id': ObjectId(receipt_id)})
         if not receipt:
             flash(trans('admin_receipt_not_found', default='Receipt not found'), 'danger')
             return redirect(url_for('admin.list_payment_receipts'))
-        if receipt.get('status') == 'rejected':
-            flash(trans('admin_receipt_already_rejected', default='Receipt already rejected'), 'info')
+
+        if receipt['status'] != 'pending':
+            flash(trans('admin_receipt_already_processed', default='Receipt already processed'), 'warning')
             return redirect(url_for('admin.list_payment_receipts'))
+
         reason = request.form.get('rejection_reason', '')
-        db.payment_receipts.update_one({'_id': ObjectId(receipt_id)}, {
-            '$set': {
-                'status': 'rejected',
-                'rejected_by': str(current_user.id),
-                'rejected_at': datetime.now(timezone.utc),
-                'rejection_reason': reason,
-                'approved_by': None,
-                'approved_at': None
+        if not reason:
+            flash(trans('admin_rejection_reason_required', default='Rejection reason is required'), 'danger')
+            return redirect(url_for('admin.list_payment_receipts'))
+
+        db.payment_receipts.update_one(
+            {'_id': ObjectId(receipt_id)},
+            {
+                '$set': {
+                    'status': 'rejected',
+                    'rejected_by': str(current_user.id),
+                    'rejected_at': datetime.now(timezone.utc),
+                    'rejection_reason': reason,
+                    'approved_by': None,
+                    'approved_at': None
+                }
             }
+        )
+
+        log_audit_action('reject_payment_receipt', {
+            'receipt_id': receipt_id,
+            'user_id': receipt['user_id'],
+            'reason': reason
         })
-        log_audit_action('reject_payment_receipt', {'receipt_id': receipt_id, 'reason': reason})
-        flash(trans('admin_receipt_rejected', default='Receipt rejected.'), 'warning')
-        return redirect(url_for('admin.list_payment_receipts'))
-    except Exception as e:
-        logger.error(f"Error rejecting payment receipt: {str(e)}", extra={'user_id': current_user.id})
-        flash(trans('admin_database_error', default='An error occurred while rejecting receipt'), 'danger')
+        flash(trans('admin_receipt_rejected', default='Receipt rejected successfully'), 'success')
         return redirect(url_for('admin.list_payment_receipts'))
 
+    except errors.InvalidId:
+        logger.error(f"Invalid receipt_id format: {receipt_id}", extra={'user_id': current_user.id})
+        flash(trans('admin_invalid_receipt_id', default='Invalid receipt ID'), 'danger')
+        return redirect(url_for('admin.list_payment_receipts'))
+    except Exception as e:
+        logger.error(f"Error rejecting receipt {receipt_id}: {str(e)}", extra={'user_id': current_user.id})
+        flash(trans('admin_database_error', default='An error occurred while processing the receipt'), 'danger')
+        return redirect(url_for('admin.list_payment_receipts'))
+
+# --- Existing Routes ---
 def generate_customer_report_pdf(users):
     """Generate a PDF report of customer data."""
     try:
@@ -213,7 +315,7 @@ def generate_customer_report_pdf(users):
         p.drawString(5.5 * inch, y, trans('subscription_status', default='Subscription Status'))
         y -= 0.3 * inch
         for user in users:
-            status = 'Subscribed' if user.get('is_subscribed') and user.get('is_trial_active') else 'Trial' if user.get('is_trial') and user.get('is_trial_active') else 'Expired'
+            status = 'Subscribed' if user.get('is_subscribed') else 'Trial' if user.get('is_trial') else 'Expired'
             p.drawString(1 * inch, y, user['_id'])
             p.drawString(2.5 * inch, y, user['email'])
             p.drawString(4 * inch, y, user['role'])
@@ -238,7 +340,7 @@ def generate_customer_report_csv(users):
     try:
         output = [[trans('admin_username', default='Username'), trans('admin_email', default='Email'), trans('user_role', default='Role'), trans('subscription_status', default='Subscription Status')]]
         for user in users:
-            status = 'Subscribed' if user.get('is_subscribed') and user.get('is_trial_active') else 'Trial' if user.get('is_trial') and user.get('is_trial_active') else 'Expired'
+            status = 'Subscribed' if user.get('is_subscribed') else 'Trial' if user.get('is_trial') else 'Expired'
             output.append([user['_id'], user['email'], user['role'], status])
         buffer = BytesIO()
         writer = csv.writer(buffer, lineterminator='\n')
@@ -260,7 +362,6 @@ def error_500(error):
     flash(trans('admin_server_error', default='An unexpected error occurred. Please try again later.'), 'danger')
     return render_template('error/500.html'), 500
 
-# Routes
 @admin_bp.route('/dashboard', methods=['GET'])
 @login_required
 @utils.requires_role('admin')
@@ -288,7 +389,6 @@ def dashboard():
             try:
                 trial_end_aware = utils.safe_parse_datetime(trial_end)
                 subscription_end_aware = utils.safe_parse_datetime(subscription_end)
-                # No more is_trial_active logic here; template will handle status
             except Exception as e:
                 logger.warning(f"Datetime error for user {user.get('_id')}: {e}")
                 user['is_trial_active'] = False
@@ -327,7 +427,6 @@ def manage_users():
             try:
                 trial_end_aware = utils.safe_parse_datetime(trial_end)
                 subscription_end_aware = utils.safe_parse_datetime(subscription_end)
-                # No more is_trial_active logic here; template will handle status
             except Exception as e:
                 logger.warning(f"Datetime error for user {user.get('_id')}: {e}")
                 user['is_trial_active'] = False
@@ -407,7 +506,7 @@ def delete_user(user_id):
                      extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
         flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
         return render_template('error/500.html'), 500
-        
+
 @admin_bp.route('/data/delete/<collection>/<item_id>', methods=['POST'])
 @login_required
 @utils.requires_role('admin')
@@ -527,12 +626,7 @@ def manage_user_subscriptions():
         users = list(db.users.find())
         form = SubscriptionForm()
         if request.method == 'POST' and form.validate_on_submit():
-            user_id = request.form.get('user_id')
-            if not user_id:
-                logger.error("No user_id provided in form submission",
-                             extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
-                flash(trans('admin_no_user_id', default='No user ID provided'), 'danger')
-                return redirect(url_for('admin.manage_user_subscriptions'))
+            user_id = form.user_id.data
             user_query = {'_id': user_id}
             user = db.users.find_one(user_query)
             if user is None:
@@ -540,11 +634,10 @@ def manage_user_subscriptions():
                              extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
                 flash(trans('user_not_found', default='User not found'), 'danger')
                 return redirect(url_for('admin.manage_user_subscriptions'))
-            plan_durations = {'monthly': 30, 'yearly': 365}
             update_data = {
                 'is_subscribed': form.is_subscribed.data == 'True',
                 'subscription_plan': form.subscription_plan.data or None,
-                'subscription_start': datetime.now(timezone.utc) if form.is_subscribed.data == 'True' else None,
+                'subscription_start': utils.safe_parse_datetime(form.subscription_start.data) or datetime.now(timezone.utc) if form.is_subscribed.data == 'True' else None,
                 'subscription_end': None,
                 'updated_at': datetime.now(timezone.utc)
             }
@@ -553,7 +646,7 @@ def manage_user_subscriptions():
                     subscription_end_dt = datetime.combine(form.subscription_end.data, datetime.min.time())
                     update_data['subscription_end'] = utils.safe_parse_datetime(subscription_end_dt)
                 elif form.is_subscribed.data == 'True' and form.subscription_plan.data:
-                    duration = plan_durations.get(form.subscription_plan.data, 30)
+                    duration = 365 if form.subscription_plan.data == 'yearly' else 30
                     update_data['subscription_end'] = datetime.now(timezone.utc) + timedelta(days=duration)
                     update_data['subscription_end'] = utils.safe_parse_datetime(update_data['subscription_end'])
             except Exception as e:
@@ -584,7 +677,6 @@ def manage_user_subscriptions():
                 user['_id'] = str(user['_id'])
                 user['trial_end'] = utils.safe_parse_datetime(user.get('trial_end')) if user.get('trial_end') else None
                 user['subscription_end'] = utils.safe_parse_datetime(user.get('subscription_end')) if user.get('subscription_end') else None
-            return render_template('admin/user_subscriptions.html', form=form, users=users, title=trans('admin_manage_user_subscriptions_title', default='Manage User Subscriptions'), now=datetime.now(timezone.utc))
         for user in users:
             user['_id'] = str(user['_id'])
             user['trial_end'] = utils.safe_parse_datetime(user.get('trial_end')) if user.get('trial_end') else None
@@ -900,7 +992,6 @@ def system_settings():
         flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
         return render_template('error/500.html'), 500
 
-# Analytics Dashboard
 @admin_bp.route('/analytics', methods=['GET'])
 @login_required
 @utils.requires_role('admin')
@@ -985,7 +1076,6 @@ def analytics_dashboard():
         flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
         return render_template('error/500.html'), 500
 
-# Language Management
 @admin_bp.route('/language/toggle/<user_id>/<language>', methods=['POST'])
 @login_required
 @utils.requires_role('admin')
@@ -1071,7 +1161,7 @@ def education_management():
         logger.error(f"Error in education management for admin {current_user.id}: {str(e)}")
         flash(trans('admin_database_error', default='Database error occurred'), 'danger')
         return redirect(url_for('admin.dashboard'))
-    
+
 @admin_bp.route('/feedback', methods=['GET', 'POST'])
 @login_required
 @utils.requires_role('admin')
@@ -1110,5 +1200,3 @@ def manage_feedback():
                      extra={'session_id': session.get('sid', 'no-session-id'), 'user_id': current_user.id})
         flash(trans('admin_database_error', default='An error occurred while accessing the database'), 'danger')
         return render_template('error/500.html'), 500
-
-
