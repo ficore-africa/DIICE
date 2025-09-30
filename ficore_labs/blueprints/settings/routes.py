@@ -68,10 +68,7 @@ class ProfileForm(FlaskForm):
         trans('settings_language', default='Language'),
         choices=[
             ('en', trans('settings_language_en', default='English')),
-            ('ha', trans('settings_language_ha', default='Hausa')),
-            ('es', trans('settings_language_es', default='Spanish')),
-            ('fr', trans('settings_language_fr', default='French')),
-            ('yo', trans('settings_language_yo', default='Yoruba'))
+            ('ha', trans('settings_language_ha', default='Hausa'))
         ],
         validators=[DataRequired(message=trans('settings_language_required', default='Language is required'))],
         render_kw={'class': 'form-control'}
