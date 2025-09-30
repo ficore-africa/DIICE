@@ -3,6 +3,7 @@ TAX_TRANSLATIONS = {
         'tax_calculator_title': 'Smart Tax Calculator',
         'income_label': 'Total Annual Income',
         'expenses_label': 'Total Annual Expenses',
+        'tax_education_desc': 'Learn how taxes impact your finances and how to manage them smartly.',
         'rent_label': 'Annual Rent Paid',
         'calculate_button': 'Calculate Tax',
         'tax_summary_title': 'Your Tax Estimate',
@@ -568,6 +569,7 @@ TAX_TRANSLATIONS = {
         'tax_annual_income': 'Kudaden Shiga na Shekara (NGN)',
         'tax_annual_rent_expenses': 'Kudaden Haya na Shekara (NGN)',
         'tax_pension_contribution': 'Gudummawar Fansho na Shekara (NGN)',
+        'tax_education_desc': 'Koyi yadda haraji ke shafar kuɗin ku da yadda za ku sarrafa su cikin hikima.',
         
         # New keys from latest warnings
         'general_personal_finance_tools': 'Kayan Aikin Kuɗi na Kai',
@@ -585,4 +587,5 @@ TAX_TRANSLATIONS = {
         'tax_category_statutory_legal': 'Gudummawa ta Dokoki da Shari\'a'
     }
 }
+
 
