@@ -118,7 +118,7 @@
                             <div class="profile-form-check-group" id="goals-container">
                                 {% for value, label in form.goals.choices %}
                                     <div class="profile-form-check">
-                                        <input type="checkbox" class="profile-form-check-input goals-checkbox" name="goals" value="{{ value }}" id="goals_{{ loop.index0 }}" {% if value in form.goals.data %}checked{% endif %}>
+                                        <input type="checkbox" class="profile-form-check-input goals-checkbox" name="goals" value="{{ value }}" id="goals_{{ loop.index0 }}" {% if form.goals.data and value in form.goals.data %}checked{% endif %}>
                                         <label class="profile-form-check-label" for="goals_{{ loop.index0 }}">{{ label }}</label>
                                     </div>
                                 {% endfor %}
