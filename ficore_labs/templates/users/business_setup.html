@@ -99,12 +99,7 @@
                     <label class="form-label" for="goals">{{ t('general_main_goal', default="What's your main goal?") | escape }}</label>
                     <p class="form-text text-muted mb-2">{{ t('general_goals', default='Select your primary business goals (choose one or more).') | escape }}</p>
                     <div class="form-check-group" id="goals-group" role="group" aria-required="true" aria-describedby="goalsFeedback">
-                        {% for subfield in form.goals %}
-                            <div class="form-check mb-2">
-                                {{ subfield(class="form-check-input goals-checkbox" + (" is-invalid" if form.goals.errors else ""), id=subfield.id) | safe }}
-                                <label class="form-check-label" for="{{ subfield.id }}">{{ subfield.label.text | escape }}</label>
-                            </div>
-                        {% endfor %}
+                        {{ form.goals(class="form-check-input goals-checkbox" + (" is-invalid" if form.goals.errors else "")) | safe }}
                         {% if form.goals.errors %}
                             <div id="goalsFeedback" class="invalid-feedback d-block" role="alert">
                                 {% for error in form.goals.errors %}
@@ -254,49 +249,43 @@
         };
 
         const goalsGroup = document.getElementById('goals-group');
-        goalsGroup.addEventListener('change', function () {
-            const checkboxes = this.querySelectorAll('input[type="checkbox"]');
-            const savingsChecked = Array.from(checkboxes).some(cb => cb.checked && cb.value === 'improve_savings');
-            const onlySavingsChecked = savingsChecked && Array.from(checkboxes).filter(cb => cb.checked).length === 1;
-            const savingsHint = document.getElementById('savingsHint');
-            savingsHint.style.display = onlySavingsChecked ? 'block' : 'none';
+        if (goalsGroup) {
+            goalsGroup.addEventListener('change', function () {
+                const checkboxes = this.querySelectorAll('input[type="checkbox"]');
+                const savingsChecked = Array.from(checkboxes).some(cb => cb.checked && cb.value === 'improve_savings');
+                const onlySavingsChecked = savingsChecked && Array.from(checkboxes).filter(cb => cb.checked).length === 1;
+                const savingsHint = document.getElementById('savingsHint');
+                if (savingsHint) {
+                    savingsHint.style.display = onlySavingsChecked ? 'block' : 'none';
+                }
+            });
+        }
+
+        // Debug: Log the number of checkboxes rendered
+        document.addEventListener('DOMContentLoaded', function() {
+            const checkboxes = document.querySelectorAll('#goals-group input[type="checkbox"]');
+            console.log('Number of goals checkboxes rendered:', checkboxes.length);
+            checkboxes.forEach(cb => console.log('Checkbox value:', cb.value));
         });
     })();
 </script>
 <style>
-    .form-check-group .form-check {
-        display: flex;
-        align-items: center;
-        margin-bottom: 1rem;
-        padding-left: 0;
-        min-height: 2rem;
-    }
-
     .form-check-group .form-check-input {
         width: 1.25rem;
         height: 1.25rem;
         margin-right: 0.75rem;
         vertical-align: middle;
     }
-
-    .form-check-group .form-check-label {
-        flex-grow: 1;
-        vertical-align: middle;
-        line-height: 1.5;
-    }
-
     .form-check-group .form-check-input:checked {
         background-color: #0d6efd;
         border-color: #0d6efd;
     }
-
-    .form-check-group.is-invalid .invalid-feedback {
-        display: block;
-    }
-
     .form-check-group .form-check-input:focus {
         outline: 0;
         box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+    }
+    .form-check-group.is-invalid .invalid-feedback {
+        display: block;
     }
 </style>
 {% endblock %}
