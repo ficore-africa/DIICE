@@ -1,355 +1,242 @@
-{% extends "base.html" %}
-{% block title %}
-{{ t('general_complete_business_setup', default='Complete Business Setup') | escape }}
-{% endblock %}
+{% extends 'base.html' %}
+{% block title %}{{ t('general_business_setup', default='Business Setup') }} - FiCore{% endblock %}
 {% block content %}
-<div class="container my-5">
-    <div class="form-container card p-5 shadow-sm" style="max-width: 800px; margin: 0 auto; min-height: 600px; max-height: 80vh; overflow-y: auto;">
-        <h2 class="card-title text-center mb-4" id="setup-form-title">
-            {{ t('general_complete_business_setup_' + current_user.role, default='Complete ' + (current_user.role | capitalize) + ' Business Setup') | escape }}
-        </h2>
-        <p class="text-center text-muted mb-4">
-            {% if current_user.role == 'trader' %}
-                {{ t('general_trader_setup_desc', default='Provide your business details to set up your trader account with Business Finance.') | escape }}
-            {% else %}
-                {{ t('general_provide_business_details', default='Please provide your business details to complete the setup.') | escape }}
-            {% endif %}
-            <br>
-            {{ t('general_trial_info', default='Your 30-day free trial starts now. ') | escape }}
-            <span id="trial-countdown" aria-live="polite">{{ trial_days_remaining }} days remaining</span>.
-            <a href="{{ url_for('subscribe_bp.subscribe') | escape }}" class="text-primary" aria-label="{{ t('general_learn_subscription', default='Learn about subscription plans') | escape }}" target="_blank">
-                {{ t('general_learn_subscription', default='Learn about subscription plans') | escape }}
-            </a>
-        </p>
+<div class="profile-container">
+    <div class="profile-header">
+        <a href="{{ url_for('users.logout') }}" class="profile-back-arrow">←</a>
+        <h1 class="profile-section-heading">{{ t('general_business_setup', default='Business Setup') }}</h1>
+    </div>
 
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                <div class="mb-4" role="alert">
-                    {% for category, message in messages %}
-                        <div class="alert alert-{{ 'success' if category == 'success' else 'danger' if category == 'danger' else 'info' }} alert-dismissible fade show">
-                            {{ message | escape }}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="{{ t('general_close', default='Close') | escape }}"></button>
-                        </div>
-                    {% endfor %}
-                </div>
-            {% endif %}
-        {% endwith %}
-
-        <div class="progress mb-4" role="progressbar" aria-label="Form progress" aria-valuemin="0" aria-valuemax="100">
-            <div id="progress-bar" class="progress-bar" style="width: 25%;" aria-valuenow="25">Step 1 of 4</div>
+    {% if trial_days_remaining > 0 %}
+    <div class="profile-card profile-account-type-card">
+        <div class="profile-card-body">
+            <p class="profile-text">
+                {{ t('settings_trial_days_remaining', default='Trial Days Remaining') }}: 
+                <strong>{{ trial_days_remaining }}</strong>
+                <span class="profile-info-icon" title="{{ t('settings_trial_info', default='Your trial gives you full access to FiCore features. Subscribe to continue after the trial ends.') }}">ⓘ</span>
+            </p>
         </div>
+    </div>
+    {% endif %}
 
-        <form method="POST" class="needs-validation" novalidate aria-labelledby="setup-form-title" id="setup-form">
-            {{ form.hidden_tag() }}
+    <section class="profile-section">
+        <div class="profile-card">
+            <div class="profile-card-body">
+                <form method="POST" action="{{ url_for('users.setup_wizard') }}" id="business-setup-form">
+                    {{ form.csrf_token }}
 
-            <div id="step-1" class="form-step" style="display: block;">
-                <div class="form-group mb-3">
-                    <label class="form-label" for="business_name">{{ t('general_business_name', default='Business Name') | escape }}</label>
-                    {{ form.business_name(class="form-control" + (" is-invalid" if form.business_name.errors else ""), required=True, id="business_name", placeholder=t('general_business_name_placeholder', default='Enter your business name'), **{"aria-describedby": "businessNameFeedback" if form.business_name.errors else "", "aria-required": "true"}) | safe }}
-                    {% if form.business_name.errors %}
-                        <div id="businessNameFeedback" class="invalid-feedback" role="alert">
-                            {% for error in form.business_name.errors %}
-                                {{ error | escape }}<br>
-                            {% endfor %}
+                    <!-- Progress Indicator -->
+                    <div class="profile-progress">
+                        <div class="profile-progress-step active" data-step="1">
+                            <span class="profile-step-number">1</span>
+                            <span>{{ t('general_business_information', default='Business Information') }}</span>
                         </div>
-                    {% endif %}
-                </div>
-                <div class="form-group mb-3">
-                    <label class="form-label" for="address">{{ t('general_address', default='Address') | escape }}</label>
-                    {{ form.address(class="form-control" + (" is-invalid" if form.address.errors else ""), rows=4, required=True, id="address", placeholder=t('general_address_placeholder', default='Enter your business address'), **{"aria-describedby": "addressFeedback" if form.address.errors else "", "aria-required": "true"}) | safe }}
-                    {% if form.address.errors %}
-                        <div id="addressFeedback" class="invalid-feedback" role="alert">
-                            {% for error in form.address.errors %}
-                                {{ error | escape }}<br>
-                            {% endfor %}
+                        <div class="profile-progress-step" data-step="2">
+                            <span class="profile-step-number">2</span>
+                            <span>{{ t('general_contact_preferences', default='Contact & Preferences') }}</span>
                         </div>
-                    {% endif %}
-                </div>
-                <div class="row g-2">
-                    <div class="col-12 col-md-6 mx-auto">
-                        <button type="button" class="btn btn-primary w-100" onclick="nextStep(2)" aria-label="Go to next step">Next</button>
+                        <div class="profile-progress-step" data-step="3">
+                            <span class="profile-step-number">3</span>
+                            <span>{{ t('general_terms', default='Terms') }}</span>
+                        </div>
                     </div>
-                </div>
-            </div>
 
-            <div id="step-2" class="form-step" style="display: none;">
-                <div class="form-group mb-3">
-                    <label class="form-label" for="goals">{{ t('general_main_goal', default="What's your main goal?") | escape }}</label>
-                    <p class="form-text text-muted mb-2">{{ t('general_goals', default='Select your primary business goals (choose one or more).') | escape }}</p>
-                    <div class="form-check-group" id="goals-group" role="group" aria-required="true" aria-describedby="goalsFeedback">
-                        {{ form.goals(class="form-check-input goals-checkbox" + (" is-invalid" if form.goals.errors else "")) | safe }}
-                        {% if form.goals.errors %}
-                            <div id="goalsFeedback" class="invalid-feedback d-block" role="alert">
-                                {% for error in form.goals.errors %}
-                                    {{ error | escape }}<br>
+                    <!-- Step 1: Business Information -->
+                    <div class="profile-step-content" id="step-1">
+                        <h2 class="profile-section-heading">{{ t('general_business_information', default='Business Information') }}</h2>
+                        <div class="profile-form-group">
+                            <label for="business_name" class="profile-form-label">{{ t('general_business_name', default='Business Name') }}</label>
+                            {{ form.business_name(placeholder=t('settings_business_name_placeholder', default='Your Business Name'), class='profile-form-control') }}
+                            {% if form.business_name.errors %}
+                                {% for error in form.business_name.errors %}
+                                    <p class="profile-text-danger">{{ error }}</p>
                                 {% endfor %}
+                            {% endif %}
+                        </div>
+
+                        <div class="profile-form-group">
+                            <label for="address" class="profile-form-label">{{ t('general_address', default='Address') }}</label>
+                            {{ form.address(placeholder=t('settings_business_address_placeholder', default='Your Business Address'), class='profile-form-control') }}
+                            {% if form.address.errors %}
+                                {% for error in form.address.errors %}
+                                    <p class="profile-text-danger">{{ error }}</p>
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+
+                        <div class="profile-form-group">
+                            <label for="industry" class="profile-form-label">{{ t('general_industry', default='Industry') }}</label>
+                            {{ form.industry(class='profile-form-control') }}
+                            {% if form.industry.errors %}
+                                {% for error in form.industry.errors %}
+                                    <p class="profile-text-danger">{{ error }}</p>
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+
+                        <div class="profile-form-group">
+                            <label for="products_services" class="profile-form-label">{{ t('general_products_services', default='Products/Services') }}</label>
+                            {{ form.products_services(placeholder=t('settings_products_services_placeholder', default='e.g., Clothing, Consulting'), class='profile-form-control') }}
+                            {% if form.products_services.errors %}
+                                {% for error in form.products_services.errors %}
+                                    <p class="profile-text-danger">{{ error }}</p>
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+
+                        <div class="profile-text-center">
+                            <button type="button" class="profile-btn profile-btn-primary" onclick="nextStep(2)">{{ t('general_next', default='Next') }}</button>
+                            {{ form.back(class='profile-btn profile-btn-secondary') }}
+                        </div>
+                    </div>
+
+                    <!-- Step 2: Contact and Preferences -->
+                    <div class="profile-step-content" id="step-2" style="display: none;">
+                        <h2 class="profile-section-heading">{{ t('general_contact_preferences', default='Contact & Preferences') }}</h2>
+                        <div class="profile-form-group">
+                            <label for="phone_number" class="profile-form-label">{{ t('general_phone_number', default='Phone Number') }}</label>
+                            {{ form.phone_number(placeholder=t('settings_phone_placeholder', default='+234xxxxxxxxx'), class='profile-form-control') }}
+                            {% if form.phone_number.errors %}
+                                {% for error in form.phone_number.errors %}
+                                    <p class="profile-text-danger">{{ error }}</p>
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+
+                        <div class="profile-form-group">
+                            <label for="language" class="profile-form-label">{{ t('general_language', default='Language') }}</label>
+                            {{ form.language(class='profile-form-control') }}
+                            {% if form.language.errors %}
+                                {% for error in form.language.errors %}
+                                    <p class="profile-text-danger">{{ error }}</p>
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+
+                        <div class="profile-form-group">
+                            <label for="goals" class="profile-form-label">{{ t('general_main_goal', default="What's your main goal?") }}</label>
+                            <div class="profile-form-check-group">
+                                {% for choice in form.goals %}
+                                    <div class="profile-form-check">
+                                        {{ choice(class='profile-form-check-input') }}
+                                        {{ choice.label(class='profile-form-check-label') }}
+                                    </div>
+                                {% endfor %}
+                                {% if form.goals.errors %}
+                                    {% for error in form.goals.errors %}
+                                        <p class="profile-text-danger">{{ error }}</p>
+                                    {% endfor %}
+                                {% endif %}
                             </div>
-                        {% endif %}
-                    </div>
-                    <div id="savingsHint" style="display: none; margin-top: 1rem; color: #22488D; font-weight: 500;" role="alert" aria-live="polite">
-                        💡 {{ t('general_savings_hint', default='You may also check out our') | escape }}
-                        <a href="https://personal.ficoreafrica.com/" target="_blank" aria-label="{{ t('general_personal_finance_app', default='Personal finance app') | escape }}">{{ t('general_personal_finance_app', default='personal finance app') | escape }}</a>
-                        {{ t('general_to_support_savings', default='to support this goal.') | escape }}
-                    </div>
-                </div>
-                <div class="row g-2">
-                    <div class="col-12 col-md-6 mx-auto">
-                        <button type="button" class="btn btn-secondary w-100" onclick="prevStep(1)" aria-label="Go to previous step">Previous</button>
-                    </div>
-                    <div class="col-12 col-md-6 mx-auto">
-                        <button type="button" class="btn btn-primary w-100" onclick="nextStep(3)" aria-label="Go to next step">Next</button>
-                    </div>
-                </div>
-            </div>
+                        </div>
 
-            <div id="step-3" class="form-step" style="display: none;">
-                <div class="form-group mb-3">
-                    <label class="form-label" for="industry">{{ t('general_industry', default='Industry') | escape }}</label>
-                    {{ form.industry(class="form-select" + (" is-invalid" if form.industry.errors else ""), required=True, id="industry", **{"aria-describedby": "industryFeedback" if form.industry.errors else "", "aria-required": "true"}) | safe }}
-                    {% if form.industry.errors %}
-                        <div id="industryFeedback" class="invalid-feedback" role="alert">
-                            {% for error in form.industry.errors %}
-                                {{ error | escape }}<br>
-                            {% endfor %}
+                        <div class="profile-text-center">
+                            <button type="button" class="profile-btn profile-btn-primary" onclick="nextStep(3)">{{ t('general_next', default='Next') }}</button>
+                            <button type="button" class="profile-btn profile-btn-secondary" onclick="prevStep(1)">{{ t('general_previous', default='Previous') }}</button>
                         </div>
-                    {% endif %}
-                </div>
-                <div class="form-group mb-3">
-                    <label class="form-label" for="products_services">{{ t('general_products_services', default='Products/Services') | escape }}</label>
-                    {{ form.products_services(class="form-control" + (" is-invalid" if form.products_services.errors else ""), rows=4, required=True, id="products_services", placeholder=t('general_products_services_placeholder', default='Describe your products or services'), **{"aria-describedby": "productsServicesFeedback" if form.products_services.errors else "", "aria-required": "true"}) | safe }}
-                    {% if form.products_services.errors %}
-                        <div id="productsServicesFeedback" class="invalid-feedback" role="alert">
-                            {% for error in form.products_services.errors %}
-                                {{ error | escape }}<br>
-                            {% endfor %}
-                        </div>
-                    {% endif %}
-                </div>
-                <div class="row g-2">
-                    <div class="col-12 col-md-6 mx-auto">
-                        <button type="button" class="btn btn-secondary w-100" onclick="prevStep(2)" aria-label="Go to previous step">Previous</button>
                     </div>
-                    <div class="col-12 col-md-6 mx-auto">
-                        <button type="button" class="btn btn-primary w-100" onclick="nextStep(4)" aria-label="Go to next step">Next</button>
-                    </div>
-                </div>
-            </div>
 
-            <div id="step-4" class="form-step" style="display: none;">
-                <div class="form-group mb-3">
-                    <label class="form-label" for="phone_number">{{ t('general_phone_number', default='Phone Number') | escape }}</label>
-                    {{ form.phone_number(class="form-control" + (" is-invalid" if form.phone_number.errors else ""), required=True, id="phone_number", placeholder=t('general_phone_number_placeholder', default='Enter your phone number (e.g., +2341234567890)'), **{"aria-describedby": "phoneNumberFeedback" if form.phone_number.errors else "", "aria-required": "true"}) | safe }}
-                    {% if form.phone_number.errors %}
-                        <div id="phoneNumberFeedback" class="invalid-feedback" role="alert">
-                            {% for error in form.phone_number.errors %}
-                                {{ error | escape }}<br>
-                            {% endfor %}
+                    <!-- Step 3: Terms and Submission -->
+                    <div class="profile-step-content" id="step-3" style="display: none;">
+                        <h2 class="profile-section-heading">{{ t('general_terms', default='Terms') }}</h2>
+                        <div class="profile-form-group">
+                            <div class="profile-form-check">
+                                {{ form.terms(class='profile-form-check-input') }}
+                                <label for="terms" class="profile-form-check-label">
+                                    {{ t('general_terms', default='I accept the Terms and Conditions') }}
+                                    <a href="{{ url_for('general_bp.terms') }}" target="_blank">{{ t('general_terms_link', default='View Terms') }}</a>
+                                </label>
+                                {% if form.terms.errors %}
+                                    {% for error in form.terms.errors %}
+                                        <p class="profile-text-danger">{{ error }}</p>
+                                    {% endfor %}
+                                {% endif %}
+                            </div>
                         </div>
-                    {% endif %}
-                </div>
-                <div class="form-group mb-3">
-                    <label class="form-label" for="language">{{ t('general_language', default='Language') | escape }}</label>
-                    {{ form.language(class="form-select" + (" is-invalid" if form.language.errors else ""), required=True, id="language", **{"aria-describedby": "languageFeedback" if form.language.errors else "", "aria-required": "true"}) | safe }}
-                    {% if form.language.errors %}
-                        <div id="languageFeedback" class="invalid-feedback" role="alert">
-                            {% for error in form.language.errors %}
-                                {{ error | escape }}<br>
-                            {% endfor %}
+
+                        <div class="profile-text-center">
+                            {{ form.submit(class='profile-btn profile-btn-primary') }}
+                            <button type="button" class="profile-btn profile-btn-secondary" onclick="prevStep(2)">{{ t('general_previous', default='Previous') }}</button>
                         </div>
-                    {% endif %}
-                </div>
-                <div class="form-group mb-4">
-                    <div class="form-check">
-                        {{ form.terms(class="form-check-input" + (" is-invalid" if form.terms.errors else ""), required=True, id="terms", **{"aria-describedby": "termsFeedback" if form.terms.errors else "", "aria-required": "true"}) | safe }}
-                        <label class="form-check-label" for="terms">
-                            {{ t('general_agree_to_terms', default='By signing up, you agree to our') | escape }}
-                            <a href="{{ url_for('general_bp.terms') | escape }}" aria-label="{{ t('general_terms', default='Terms of Service') | escape }}" target="_blank">{{ t('general_terms', default='Terms of Service') | escape }}</a>
-                        </label>
-                        {% if form.terms.errors %}
-                            <div id="termsFeedback" class="invalid-feedback" role="alert">
-                                {% for error in form.terms.errors %}
-                                {{ error | escape }}<br>
-                            {% endfor %}
-                        </div>
-                    {% endif %}
-                </div>
+                    </div>
+                </form>
             </div>
-            <div class="row g-2">
-                <div class="col-12 col-md-6 mx-auto">
-                    <button type="button" class="btn btn-secondary w-100" onclick="prevStep(3)" aria-label="Go to previous step">Previous</button>
-                </div>
-                <div class="col-12 col-md-6 mx-auto">
-                    {{ form.submit(class="btn btn-primary w-100", **{"aria-label": t('general_submit', default='Submit business details') | escape}) | safe }}
-                </div>
-            </div>
-        </form>
+        </div>
+    </section>
+
+    <div class="profile-grid">
+        <button class="profile-btn profile-btn-danger" onclick="location.href='{{ url_for('users.logout') }}'">
+            <i class="bi bi-box-arrow-right profile-icon"></i> {{ t('general_logout', default='Log out') }}
+        </button>
     </div>
 </div>
-{% endblock %}
-{% block extra_scripts %}
+
 <script>
-    (function () {
-        'use strict';
-        const forms = document.querySelectorAll('.needs-validation');
-        Array.from(forms).forEach(form => {
-            form.addEventListener('submit', event => {
-                if (!form.checkValidity()) {
-                    event.preventDefault();
-                    event.stopPropagation();
-                }
-                form.classList.add('was-validated');
-            }, false);
+    function showStep(stepNumber) {
+        document.querySelectorAll('.profile-step-content').forEach(step => {
+            step.style.display = 'none';
+        });
+        document.getElementById(`step-${stepNumber}`).style.display = 'block';
+
+        document.querySelectorAll('.profile-progress-step').forEach(step => {
+            step.classList.remove('active');
+        });
+        document.querySelector(`.profile-progress-step[data-step="${stepNumber}"]`).classList.add('active');
+    }
+
+    function nextStep(stepNumber) {
+        // Basic client-side validation for the current step
+        const currentStep = document.querySelector('.profile-step-content:not([style*="display: none"])');
+        const inputs = currentStep.querySelectorAll('input, select, textarea');
+        let isValid = true;
+
+        inputs.forEach(input => {
+            if (input.required && !input.value.trim()) {
+                isValid = false;
+                input.classList.add('is-invalid');
+            } else {
+                input.classList.remove('is-invalid');
+            }
         });
 
-        window.nextStep = function(step) {
-            const currentStep = document.querySelector('.form-step[style*="block"]');
-            const inputs = currentStep.querySelectorAll('input[required], select[required], textarea[required]');
-            let valid = true;
-
-            if (currentStep.id === 'step-2') {
-                const goalsCheckboxes = document.querySelectorAll('#goals-group input[type="checkbox"]');
-                const goalsGroup = document.getElementById('goals-group');
-                const goalsFeedback = document.getElementById('goalsFeedback');
-                const checkedGoals = Array.from(goalsCheckboxes).some(cb => cb.checked);
-
-                if (!checkedGoals) {
-                    valid = false;
-                    goalsGroup.classList.add('is-invalid');
-                    if (goalsFeedback) {
-                        goalsFeedback.style.display = 'block';
-                    }
-                } else {
-                    goalsGroup.classList.remove('is-invalid');
-                    if (goalsFeedback) {
-                        goalsFeedback.style.display = 'none';
-                    }
+        if (stepNumber === 2) {
+            const goals = document.querySelectorAll('input[name="goals"]:checked');
+            if (goals.length === 0) {
+                isValid = false;
+                const goalsError = document.querySelector('.profile-form-check-group');
+                if (goalsError) {
+                    goalsError.insertAdjacentHTML('beforeend', '<p class="profile-text-danger">{{ t('general_select_at_least_one_goal', default='Please select at least one goal.') }}</p>');
                 }
             }
-
-            inputs.forEach(input => {
-                if (!input.checkValidity()) {
-                    input.reportValidity();
-                    valid = false;
-                }
-            });
-
-            if (valid) {
-                document.querySelectorAll('.form-step').forEach(s => s.style.display = 'none');
-                document.getElementById(`step-${step}`).style.display = 'block';
-                const progress = document.getElementById('progress-bar');
-                progress.style.width = `${step * 25}%`;
-                progress.setAttribute('aria-valuenow', step * 25);
-                progress.textContent = `Step ${step} of 4`;
-            }
-        };
-
-        window.prevStep = function(step) {
-            document.querySelectorAll('.form-step').forEach(s => s.style.display = 'none');
-            document.getElementById(`step-${step}`).style.display = 'block';
-            const progress = document.getElementById('progress-bar');
-            progress.style.width = `${step * 25}%`;
-            progress.setAttribute('aria-valuenow', step * 25);
-            progress.textContent = `Step ${step} of 4`;
-            const goalsGroup = document.getElementById('goals-group');
-            const goalsFeedback = document.getElementById('goalsFeedback');
-            if (goalsGroup && goalsFeedback) {
-                goalsGroup.classList.remove('is-invalid');
-                goalsFeedback.style.display = 'none';
-            }
-        };
-
-        const goalsGroup = document.getElementById('goals-group');
-        if (goalsGroup) {
-            goalsGroup.addEventListener('change', function () {
-                const checkboxes = this.querySelectorAll('input[type="checkbox"]');
-                const savingsChecked = Array.from(checkboxes).some(cb => cb.checked && cb.value === 'improve_savings');
-                const onlySavingsChecked = savingsChecked && Array.from(checkboxes).filter(cb => cb.checked).length === 1;
-                const savingsHint = document.getElementById('savingsHint');
-                if (savingsHint) {
-                    savingsHint.style.display = onlySavingsChecked ? 'block' : 'none';
-                }
-            });
         }
 
-        // Debug: Log the number of checkboxes rendered
-        document.addEventListener('DOMContentLoaded', function() {
-            const checkboxes = document.querySelectorAll('#goals-group input[type="checkbox"]');
-            console.log('Number of goals checkboxes rendered:', checkboxes.length);
-            checkboxes.forEach(cb => console.log('Checkbox value:', cb.value));
+        if (isValid) {
+            showStep(stepNumber);
+        } else {
+            alert('{{ t('general_fill_required_fields', default='Please fill out all required fields.') }}');
+        }
+    }
+
+    function prevStep(stepNumber) {
+        // Remove any client-side added error messages
+        document.querySelectorAll('.profile-text-danger:not([data-server-error])').forEach(error => error.remove());
+        showStep(stepNumber);
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        showStep(1); // Initialize with first step
+
+        // Mark server-side errors to distinguish from client-side
+        document.querySelectorAll('.profile-text-danger').forEach(error => {
+            error.setAttribute('data-server-error', 'true');
         });
-    })();
+
+        // Remove invalid class on input change
+        document.querySelectorAll('input, select, textarea').forEach(input => {
+            input.addEventListener('input', () => {
+                input.classList.remove('is-invalid');
+            });
+        });
+    });
 </script>
-<style>
-    .form-container {
-        box-sizing: border-box;
-        width: 100%;
-    }
-    .form-step {
-        width: 100%;
-        box-sizing: border-box;
-    }
-    .form-group {
-        width: 100%;
-        margin-bottom: 2.5rem;
-    }
-    .form-control, .form-select {
-        width: 100%;
-        box-sizing: border-box;
-        font-size: 1rem;
-    }
-    .form-label {
-        font-size: 1.1rem;
-        font-weight: 500;
-    }
-    .invalid-feedback {
-        font-size: 0.875rem;
-        margin-top: 0.25rem;
-    }
-    .form-check-group {
-        display: flex;
-        flex-direction: column;
-        gap: 1rem;
-        padding: 0.75rem;
-        border-radius: 0.25rem;
-    }
-    .form-check-group .form-check {
-        margin-bottom: 0.5rem;
-    }
-    .form-check-group .form-check-input {
-        width: 1.25rem;
-        height: 1.25rem;
-        margin-right: 0.75rem;
-        vertical-align: middle;
-    }
-    .form-check-group .form-check-input:checked {
-        background-color: #0d6efd;
-        border-color: #0d6efd;
-    }
-    .form-check-group .form-check-input:focus {
-        outline: 0;
-        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
-    }
-    .form-check-group.is-invalid .invalid-feedback {
-        display: block;
-    }
-    .btn {
-        padding: 0.75rem 1.5rem;
-        font-size: 1.1rem;
-    }
-    @media (max-width: 576px) {
-        .form-container {
-            padding: 1.5rem;
-        }
-        .form-group {
-            margin-bottom: 1.5rem;
-        }
-        .form-label {
-            font-size: 1rem;
-        }
-        .btn {
-            font-size: 1rem;
-            padding: 0.5rem 1rem;
-        }
-    }
-</style>
 {% endblock %}
