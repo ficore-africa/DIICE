@@ -669,12 +669,17 @@ def setup_wizard():
             trial_days_remaining = max(0, int(math.ceil(days_left)))
 
         form = BusinessSetupForm()
+        logger.debug(f"Goals field choices: {form.goals.choices}")
+        logger.debug(f"Goals field data: {form.goals.data}")
+        logger.debug(f"Request method: {request.method}, Form data: {request.form}")
+
         if form.validate_on_submit():
             if form.back.data:
                 flash(trans('general_setup_canceled', default='Business setup canceled'), 'info')
                 logger.info(f"Business setup canceled for user: {user_id}, session_id: {session.get('session_id')}")
                 return redirect(url_for('settings.profile', user_id=user_id) if utils.is_admin() else url_for('settings.profile'))
 
+            logger.debug(f"Form submitted with goals: {form.goals.data}")
             db.users.update_one(
                 {'_id': user_id},
                 {
@@ -703,6 +708,7 @@ def setup_wizard():
                 return redirect(url_for('subscribe_bp.subscription_required'))
             return redirect(url_for('settings.profile', user_id=user_id) if utils.is_admin() else get_post_login_redirect(user.get('role', 'trader')))
         else:
+            logger.debug(f"Form validation failed: {form.errors}")
             for field, errors in form.errors.items():
                 for error in errors:
                     flash(f"{field}: {error}", 'danger')
@@ -714,7 +720,7 @@ def setup_wizard():
             current_user=current_user,
             trial_days_remaining=trial_days_remaining
         )
-    except pymongo.errors.PyMongoError as e:
+    except errors.PyMongoError as e:  # Updated to use imported pymongo.errors
         logger.error(f"MongoDB error during business setup for {user_id}: {str(e)}")
         flash(trans('general_database_error', default='An error occurred while accessing the database. Please try again later.'), 'danger')
         return render_template('users/business_setup.html', form=form, title=trans('general_business_setup', lang=session.get('lang', 'en'))), 500
