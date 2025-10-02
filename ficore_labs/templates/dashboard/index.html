@@ -8,7 +8,6 @@
 <!-- External CSS for dashboard-specific components -->
 <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-notifications.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-realtime.css') }}">
-<!-- Custom CSS Enhancements -->
 <style>
     /* Ensure tables are scrollable on smaller screens */
     .table-responsive-scroll {
@@ -31,11 +30,30 @@
     /* Profit Summary Card specific styling */
     .profit-summary-card {
         background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); /* Deep Blue gradient */
-        color: white;
+        color: white; /* Base color for the card */
     }
     .profit-summary-card.negative {
         background: linear-gradient(135deg, #7f1d1d 0%, #dc2626 100%); /* Deep Red gradient for negative profit */
     }
+    
+    /* Target all text within the profit summary card and force it to white */
+    .profit-summary-card *,
+    .profit-summary-card .card-title,
+    .profit-summary-card .card-text,
+    .profit-summary-card .text-white-50 {
+        color: white !important;
+    }
+    /* Ensure the icon is also explicitly white */
+    .profit-summary-card i {
+        color: white !important;
+    }
+    /* Ensure the profit value retains its bold/large styling, but is white */
+    .profit-summary-card .profit-summary-value {
+        font-weight: 700;
+        letter-spacing: -0.5px;
+        color: white !important;
+    }
+
     .profit-summary-card .btn-outline-light {
         border-color: rgba(255, 255, 255, 0.5);
         color: white !important;
@@ -58,19 +76,16 @@
         animation: spin 1.5s linear infinite;
     }
 
-    /* Enforce platinum background for all cards except profit-summary-card */
+    /* ⭐ UPDATED STYLES: Enforce platinum background for all cards except profit-summary-card ⭐ */
+    /* Target the card itself and apply background with !important to ensure override */
     .dashboard-stat-card:not(.profit-summary-card) {
         background-color: #D9D9D9 !important; /* Platinum background */
-        color: #000 !important; /* Ensure text is black */
+        color: #000 !important; /* Ensure base text color is black */
     }
 
     /* Ensure all text elements within non-profit-summary cards are black */
-    .dashboard-stat-card:not(.profit-summary-card) .card-title,
-    .dashboard-stat-card:not(.profit-summary-card) .card-text,
-    .dashboard-stat-card:not(.profit-summary-card) p,
-    .dashboard-stat-card:not(.profit-summary-card) small,
-    .dashboard-stat-card:not(.profit-summary-card) span,
-    .dashboard-stat-card:not(.profit-summary-card) i {
+    /* Use the universal selector * to catch span, small, p, etc., without listing them all */
+    .dashboard-stat-card:not(.profit-summary-card) * {
         color: #000 !important;
     }
 
