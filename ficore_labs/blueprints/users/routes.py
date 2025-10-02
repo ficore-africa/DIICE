@@ -8,7 +8,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, TextAreaField, SelectField, SubmitField, BooleanField, SelectMultipleField
 from wtforms.widgets import ListWidget, CheckboxInput
-from wtforms.validators import DataRequired, Length, Email, Regexp, EqualTo, ValidationError
+from wtforms.validators import DataRequired, Length, Email, Regexp, EqualTo
 from flask_login import login_required, current_user, login_user, logout_user
 from pymongo import errors
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -18,7 +18,7 @@ import random
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
 import utils
 from translations import trans
-from models import User  # Import User class from models
+from models import User
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +28,6 @@ USERNAME_REGEX = re.compile(r'^[a-zA-Z0-9_]{3,50}$')
 PASSWORD_REGEX = re.compile(r'.{6,}')
 PHONE_REGEX = re.compile(r'^\+?\d{10,15}$')
 
-# Custom validator for the login identifier
 def validate_identifier(form, field):
     identifier = field.data
     if '@' not in identifier:
@@ -144,7 +143,7 @@ class BusinessSetupForm(FlaskForm):
         widget=ListWidget(prefix_label=False),
         coerce=str,
         validators=[DataRequired(message=trans('general_select_at_least_one_goal', default='Please select at least one goal.'))],
-        render_kw={'class': 'form-check-input'}
+        render_kw={'class': 'form-check-input goals-checkbox'}
     )
     terms = BooleanField(trans('general_terms', default='I accept the Terms and Conditions'),
                         validators=[DataRequired(message=trans('general_terms_required', default='You must accept the terms'))],
@@ -441,7 +440,7 @@ def signup():
         try:
             username = form.username.data.strip().lower()
             email = form.email.data.strip().lower()
-            role = 'trader'  # Fixed role for all signups
+            role = 'trader'
             logger.debug(f"Signup attempt: {username}, {email}, role={role}, session_id: {session.get('session_id')}")
             logger.info(f"Signup attempt: username={username}, email={email}, role={role}")
 
@@ -642,7 +641,6 @@ def reset_password(token):
 @utils.limiter.limit("50/hour")
 def setup_wizard():
     try:
-        
         db = utils.get_mongo_db()
         user_id = request.args.get('user_id', current_user.id) if utils.is_admin() and request.args.get('user_id') else current_user.id
         user = db.users.find_one({'_id': user_id})
@@ -661,15 +659,12 @@ def setup_wizard():
             logger.error(f"Invalid role '{user.get('role')}' for user {user_id} in setup wizard")
             return redirect(url_for('users.logout'))
 
-        # --- FIX 1: Calculate trial days remaining based on server time ---
-        trial_days_remaining = 30 # Default for a newly created user 
+        trial_days_remaining = 30
         trial_end = user.get('trial_end')
-
         if trial_end:
-            # Calculate difference in days. Use ceil to round up to the next full day.
             time_left = trial_end - datetime.utcnow()
             days_left = time_left.total_seconds() / (60 * 60 * 24)
-            trial_days_remaining = max(0, int(math.ceil(days_left))) 
+            trial_days_remaining = max(0, int(math.ceil(days_left)))
 
         form = BusinessSetupForm()
         if form.validate_on_submit():
@@ -690,7 +685,7 @@ def setup_wizard():
                             'phone_number': form.phone_number.data.strip()
                         },
                         'language': form.language.data,
-                        'goals': form.goals.data,  # Store list of selected goals
+                        'goals': form.goals.data,
                         'setup_complete': True
                     }
                 }
@@ -706,16 +701,14 @@ def setup_wizard():
                 return redirect(url_for('subscribe_bp.subscription_required'))
             return redirect(url_for('settings.profile', user_id=user_id) if utils.is_admin() else get_post_login_redirect(user.get('role', 'trader')))
         else:
-            # Flashing form errors to aid client-side validation logic
             for field, errors in form.errors.items():
                 for error in errors:
                     flash(f"{field}: {error}", 'danger')
         
-        # --- PASS trial_days_remaining to the template ---
         return render_template(
-            'users/business_setup.html', 
-            form=form, 
-            title=trans('general_business_setup', lang=session.get('lang', 'en')), 
+            'users/business_setup.html',
+            form=form,
+            title=trans('general_business_setup', lang=session.get('lang', 'en')),
             current_user=current_user,
             trial_days_remaining=trial_days_remaining
         )
