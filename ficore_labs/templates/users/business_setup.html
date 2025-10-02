@@ -4,7 +4,7 @@
 {% endblock %}
 {% block content %}
 <div class="container my-5">
-    <div class="form-container card p-4 shadow-sm" style="max-width: 600px; margin: 0 auto; min-height: 400px; max-height: 80vh; overflow-y: auto;">
+    <div class="form-container card p-5 shadow-sm" style="max-width: 800px; margin: 0 auto; min-height: 500px; max-height: 80vh; overflow-y: auto;">
         <h2 class="card-title text-center mb-4" id="setup-form-title">
             {{ t('general_complete_business_setup_' + current_user.role, default='Complete ' + (current_user.role | capitalize) + ' Business Setup') | escape }}
         </h2>
@@ -36,7 +36,7 @@
         {% endwith %}
 
         <div class="progress mb-4" role="progressbar" aria-label="Form progress" aria-valuemin="0" aria-valuemax="100">
-            <div id="progress-bar" class="progress-bar" style="width: 33%;" aria-valuenow="33">Step 1 of 3</div>
+            <div id="progress-bar" class="progress-bar" style="width: 25%;" aria-valuenow="25">Step 1 of 4</div>
         </div>
 
         <form method="POST" class="needs-validation" novalidate aria-labelledby="setup-form-title" id="setup-form">
@@ -74,28 +74,6 @@
 
             <div id="step-2" class="form-step" style="display: none;">
                 <div class="form-group mb-3">
-                    <label class="form-label" for="industry">{{ t('general_industry', default='Industry') | escape }}</label>
-                    {{ form.industry(class="form-select" + (" is-invalid" if form.industry.errors else ""), required=True, id="industry", **{"aria-describedby": "industryFeedback" if form.industry.errors else "", "aria-required": "true"}) | safe }}
-                    {% if form.industry.errors %}
-                        <div id="industryFeedback" class="invalid-feedback" role="alert">
-                            {% for error in form.industry.errors %}
-                                {{ error | escape }}<br>
-                            {% endfor %}
-                        </div>
-                    {% endif %}
-                </div>
-                <div class="form-group mb-3">
-                    <label class="form-label" for="products_services">{{ t('general_products_services', default='Products/Services') | escape }}</label>
-                    {{ form.products_services(class="form-control" + (" is-invalid" if form.products_services.errors else ""), rows=4, required=True, id="products_services", placeholder=t('general_products_services_placeholder', default='Describe your products or services'), **{"aria-describedby": "productsServicesFeedback" if form.products_services.errors else "", "aria-required": "true"}) | safe }}
-                    {% if form.products_services.errors %}
-                        <div id="productsServicesFeedback" class="invalid-feedback" role="alert">
-                            {% for error in form.products_services.errors %}
-                                {{ error | escape }}<br>
-                            {% endfor %}
-                        </div>
-                    {% endif %}
-                </div>
-                <div class="form-group mb-3">
                     <label class="form-label" for="goals">{{ t('general_main_goal', default="What's your main goal?") | escape }}</label>
                     <p class="form-text text-muted mb-2">{{ t('general_goals', default='Select your primary business goals (choose one or more).') | escape }}</p>
                     <div class="form-check-group" id="goals-group" role="group" aria-required="true" aria-describedby="goalsFeedback">
@@ -125,6 +103,39 @@
             </div>
 
             <div id="step-3" class="form-step" style="display: none;">
+                <div class="form-group mb-3">
+                    <label class="form-label" for="industry">{{ t('general_industry', default='Industry') | escape }}</label>
+                    {{ form.industry(class="form-select" + (" is-invalid" if form.industry.errors else ""), required=True, id="industry", **{"aria-describedby": "industryFeedback" if form.industry.errors else "", "aria-required": "true"}) | safe }}
+                    {% if form.industry.errors %}
+                        <div id="industryFeedback" class="invalid-feedback" role="alert">
+                            {% for error in form.industry.errors %}
+                                {{ error | escape }}<br>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="form-group mb-3">
+                    <label class="form-label" for="products_services">{{ t('general_products_services', default='Products/Services') | escape }}</label>
+                    {{ form.products_services(class="form-control" + (" is-invalid" if form.products_services.errors else ""), rows=4, required=True, id="products_services", placeholder=t('general_products_services_placeholder', default='Describe your products or services'), **{"aria-describedby": "productsServicesFeedback" if form.products_services.errors else "", "aria-required": "true"}) | safe }}
+                    {% if form.products_services.errors %}
+                        <div id="productsServicesFeedback" class="invalid-feedback" role="alert">
+                            {% for error in form.products_services.errors %}
+                                {{ error | escape }}<br>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="row g-2">
+                    <div class="col-12 col-md-6 mx-auto">
+                        <button type="button" class="btn btn-secondary w-100" onclick="prevStep(2)" aria-label="Go to previous step">Previous</button>
+                    </div>
+                    <div class="col-12 col-md-6 mx-auto">
+                        <button type="button" class="btn btn-primary w-100" onclick="nextStep(4)" aria-label="Go to next step">Next</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="step-4" class="form-step" style="display: none;">
                 <div class="form-group mb-3">
                     <label class="form-label" for="phone_number">{{ t('general_phone_number', default='Phone Number') | escape }}</label>
                     {{ form.phone_number(class="form-control" + (" is-invalid" if form.phone_number.errors else ""), required=True, id="phone_number", placeholder=t('general_phone_number_placeholder', default='Enter your phone number (e.g., +2341234567890)'), **{"aria-describedby": "phoneNumberFeedback" if form.phone_number.errors else "", "aria-required": "true"}) | safe }}
@@ -165,7 +176,7 @@
                 </div>
                 <div class="row g-2">
                     <div class="col-12 col-md-6 mx-auto">
-                        <button type="button" class="btn btn-secondary w-100" onclick="prevStep(2)" aria-label="Go to previous step">Previous</button>
+                        <button type="button" class="btn btn-secondary w-100" onclick="prevStep(3)" aria-label="Go to previous step">Previous</button>
                     </div>
                     <div class="col-12 col-md-6 mx-auto">
                         {{ form.submit(class="btn btn-primary w-100", **{"aria-label": t('general_submit', default='Submit business details') | escape}) | safe }}
@@ -227,9 +238,9 @@
                 document.querySelectorAll('.form-step').forEach(s => s.style.display = 'none');
                 document.getElementById(`step-${step}`).style.display = 'block';
                 const progress = document.getElementById('progress-bar');
-                progress.style.width = `${step * 33}%`;
-                progress.setAttribute('aria-valuenow', step * 33);
-                progress.textContent = `Step ${step} of 3`;
+                progress.style.width = `${step * 25}%`;
+                progress.setAttribute('aria-valuenow', step * 25);
+                progress.textContent = `Step ${step} of 4`;
             }
         };
 
@@ -237,9 +248,9 @@
             document.querySelectorAll('.form-step').forEach(s => s.style.display = 'none');
             document.getElementById(`step-${step}`).style.display = 'block';
             const progress = document.getElementById('progress-bar');
-            progress.style.width = `${step * 33}%`;
-            progress.setAttribute('aria-valuenow', step * 33);
-            progress.textContent = `Step ${step} of 3`;
+            progress.style.width = `${step * 25}%`;
+            progress.setAttribute('aria-valuenow', step * 25);
+            progress.textContent = `Step ${step} of 4`;
             const goalsGroup = document.getElementById('goals-group');
             const goalsFeedback = document.getElementById('goalsFeedback');
             if (goalsGroup && goalsFeedback) {
@@ -280,11 +291,16 @@
     }
     .form-group {
         width: 100%;
-        margin-bottom: 1.5rem;
+        margin-bottom: 2rem;
     }
     .form-control, .form-select {
         width: 100%;
         box-sizing: border-box;
+        font-size: 1rem;
+    }
+    .form-label {
+        font-size: 1.1rem;
+        font-weight: 500;
     }
     .invalid-feedback {
         font-size: 0.875rem;
@@ -293,10 +309,10 @@
     .form-check-group {
         display: flex;
         flex-direction: column;
-        gap: 0.5rem;
-        max-height: 150px;
+        gap: 0.75rem;
+        max-height: 200px;
         overflow-y: auto;
-        padding: 0.5rem;
+        padding: 0.75rem;
         border-radius: 0.25rem;
     }
     .form-check-group .form-check {
@@ -320,19 +336,22 @@
         display: block;
     }
     .btn {
-        padding: 0.5rem 1rem;
-        font-size: 1rem;
+        padding: 0.75rem 1.5rem;
+        font-size: 1.1rem;
     }
     @media (max-width: 576px) {
         .form-container {
-            padding: 1rem;
+            padding: 1.5rem;
         }
         .form-group {
-            margin-bottom: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .form-label {
+            font-size: 1rem;
         }
         .btn {
-            font-size: 0.875rem;
-            padding: 0.4rem 0.8rem;
+            font-size: 1rem;
+            padding: 0.5rem 1rem;
         }
     }
 </style>
