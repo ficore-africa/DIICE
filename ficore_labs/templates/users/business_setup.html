@@ -201,28 +201,21 @@
         // Multi-step navigation
         window.nextStep = function(step) {
             const currentStep = document.querySelector('.form-step[style*="block"]');
-            // Select all required fields in the current step
             const inputs = currentStep.querySelectorAll('input[required], select[required], textarea[required]');
             let valid = true;
             
-            // Special handling for the goals field if it's the current step
             if (currentStep.id === 'step-2') {
                 const goalsCheckboxes = document.querySelectorAll('#goals-group input[type="checkbox"]');
                 const goalsLabel = document.querySelector('#goals-group');
                 const checkedGoals = Array.from(goalsCheckboxes).some(cb => cb.checked);
 
                 if (!checkedGoals) {
-                    // This assumes the required validator on the Python field handles the error state on submit
-                    // For client-side validation, you might need to manually set a class if no item is checked
                     if (goalsLabel) {
-                         // Add logic to show a visual error if necessary, though Flask-WTF should handle this on final submit
+                         // A visual error could be added here if needed, but relying on Flask-WTF for final submit is common.
                     }
-                    // Since the current form structure relies on Flask-WTF validation on final submit, 
-                    // we'll rely on the default HTML validation for other fields for step navigation.
                 }
             }
 
-            // Standard HTML validation for inputs
             inputs.forEach(input => {
                 if (!input.checkValidity()) {
                     input.reportValidity();
@@ -249,8 +242,6 @@
             progress.textContent = `Step ${step} of 3`;
         };
 
-        // REMOVED: Trial countdown JavaScript. This is now handled server-side.
-
         // Goals hint for "Improve savings"
         const goalsGroup = document.getElementById('goals-group');
         goalsGroup.addEventListener('change', function () {
@@ -263,10 +254,33 @@
     })();
 </script>
 <style>
+    /* 🛠️ FIX 2 & 3: Ensure goals options stack vertically and are clickable, fixing the overlapping text issue. */
     .form-check-group .form-check {
-        display: block;
-        margin-bottom: 0.5rem;
+        /* Set to block to ensure it takes the full width and forces a line break */
+        display: block !important; 
+        /* Add sufficient vertical margin to separate items */
+        margin-bottom: 0.75rem !important; 
+        /* Set full width to prevent layout issues */
+        width: 100% !important; 
     }
+    
+    /* Ensure the actual checkbox input is correctly displayed and visible */
+    .form-check-group .form-check .form-check-input {
+        /* Reset any unexpected display issues */
+        display: inline-block !important; 
+        /* Standard Bootstrap positioning for the checkbox */
+        float: left;
+        margin-left: -1.5em;
+        position: static; 
+    }
+
+    /* Ensure the label text is offset from the checkbox and not cramped */
+    .form-check-group .form-check-label {
+        display: inline;
+        /* Push the label content over to make space for the checkbox */
+        padding-left: 1.5em; 
+    }
+
     .form-check-group .form-check-input:checked {
         background-color: #0d6efd;
         border-color: #0d6efd;
