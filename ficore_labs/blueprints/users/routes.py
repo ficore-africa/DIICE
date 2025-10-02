@@ -689,10 +689,10 @@ def setup_wizard():
                             'address': form.address.data.strip(),
                             'industry': form.industry.data,
                             'products_services': form.products_services.data.strip(),
-                            'phone_number': form.phone_number.data.strip()
+                            'phone_number': form.phone_number.data.strip(),
+                            'language': form.language.data,  # Moved to business_details
+                            'goals': form.goals.data  # Moved to business_details
                         },
-                        'language': form.language.data,
-                        'goals': form.goals.data,
                         'setup_complete': True
                     }
                 }
@@ -720,7 +720,7 @@ def setup_wizard():
             current_user=current_user,
             trial_days_remaining=trial_days_remaining
         )
-    except errors.PyMongoError as e:  # Updated to use imported pymongo.errors
+    except pymongo.errors.PyMongoError as e:  # Fixed to use pymongo.errors
         logger.error(f"MongoDB error during business setup for {user_id}: {str(e)}")
         flash(trans('general_database_error', default='An error occurred while accessing the database. Please try again later.'), 'danger')
         return render_template('users/business_setup.html', form=form, title=trans('general_business_setup', lang=session.get('lang', 'en'))), 500
