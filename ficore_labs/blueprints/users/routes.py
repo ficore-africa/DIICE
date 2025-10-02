@@ -144,7 +144,8 @@ class BusinessSetupForm(FlaskForm):
         option_widget=CheckboxInput(),  # Explicitly set CheckboxInput
         coerce=str,
         validators=[DataRequired(message=trans('general_select_at_least_one_goal', default='Please select at least one goal.'))],
-        render_kw={'class': 'form-check-input goals-checkbox'}
+        render_kw={'class': 'form-check-input goals-checkbox'},
+        default=[]
     )
     terms = BooleanField(trans('general_terms', default='I accept the Terms and Conditions'),
                         validators=[DataRequired(message=trans('general_terms_required', default='You must accept the terms'))],
