@@ -377,7 +377,7 @@ def initialize_app_data(app):
                                             'bsonType': 'array',
                                             'items': {
                                                 'bsonType': 'string',
-                                                'enum': ['track_expenses', 'manage_customers', 'improve_savings', 'increase_sales', 'streamline_operations']
+                                                'enum': ['track_expenses', 'manage_customers', 'improve_savings', 'increase_sales', 'streamline_operations', 'monitor_income_debt']
                                             }
                                         }
                                     },
