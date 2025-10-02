@@ -4,7 +4,7 @@
 {% endblock %}
 {% block content %}
 <div class="container my-5">
-    <div class="form-container card p-5 shadow-sm" style="max-width: 800px; margin: 0 auto; min-height: 500px; max-height: 80vh; overflow-y: auto;">
+    <div class="form-container card p-5 shadow-sm" style="max-width: 800px; margin: 0 auto; min-height: 600px; max-height: 80vh; overflow-y: auto;">
         <h2 class="card-title text-center mb-4" id="setup-form-title">
             {{ t('general_complete_business_setup_' + current_user.role, default='Complete ' + (current_user.role | capitalize) + ' Business Setup') | escape }}
         </h2>
@@ -168,19 +168,18 @@
                         {% if form.terms.errors %}
                             <div id="termsFeedback" class="invalid-feedback" role="alert">
                                 {% for error in form.terms.errors %}
-                                    {{ error | escape }}<br>
-                                {% endfor %}
-                            </div>
-                        {% endif %}
-                    </div>
+                                {{ error | escape }}<br>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
                 </div>
-                <div class="row g-2">
-                    <div class="col-12 col-md-6 mx-auto">
-                        <button type="button" class="btn btn-secondary w-100" onclick="prevStep(3)" aria-label="Go to previous step">Previous</button>
-                    </div>
-                    <div class="col-12 col-md-6 mx-auto">
-                        {{ form.submit(class="btn btn-primary w-100", **{"aria-label": t('general_submit', default='Submit business details') | escape}) | safe }}
-                    </div>
+            </div>
+            <div class="row g-2">
+                <div class="col-12 col-md-6 mx-auto">
+                    <button type="button" class="btn btn-secondary w-100" onclick="prevStep(3)" aria-label="Go to previous step">Previous</button>
+                </div>
+                <div class="col-12 col-md-6 mx-auto">
+                    {{ form.submit(class="btn btn-primary w-100", **{"aria-label": t('general_submit', default='Submit business details') | escape}) | safe }}
                 </div>
             </div>
         </form>
@@ -291,7 +290,7 @@
     }
     .form-group {
         width: 100%;
-        margin-bottom: 2rem;
+        margin-bottom: 2.5rem;
     }
     .form-control, .form-select {
         width: 100%;
@@ -309,9 +308,7 @@
     .form-check-group {
         display: flex;
         flex-direction: column;
-        gap: 0.75rem;
-        max-height: 200px;
-        overflow-y: auto;
+        gap: 1rem;
         padding: 0.75rem;
         border-radius: 0.25rem;
     }
