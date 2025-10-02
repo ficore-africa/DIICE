@@ -98,28 +98,26 @@
                 <div class="form-group mb-3">
                     <label class="form-label" for="goals">{{ t('general_main_goal', default="What's your main goal?") | escape }}</label>
                     <p class="form-text text-muted mb-2">{{ t('general_goals', default='Select your primary business goals (choose one or more).') | escape }}</p>
-                    <div class="form-check-group" id="goals-group">
+                    <div class="form-check-group" id="goals-group" role="group" aria-required="true" aria-describedby="goalsFeedback">
                         {% for subfield in form.goals %}
-                        <div class="form-check">
-                            {{ subfield(class="form-check-input" + (" is-invalid" if form.goals.errors else ""), id=subfield.id) | safe }}
-                            <label class="form-check-label" for="{{ subfield.id }}">
-                                {{ subfield.label.text | escape }}
-                            </label>
-                        </div>
+                            <div class="form-check mb-2">
+                                {{ subfield(class="form-check-input goals-checkbox" + (" is-invalid" if form.goals.errors else ""), id=subfield.id) | safe }}
+                                <label class="form-check-label" for="{{ subfield.id }}">{{ subfield.label.text | escape }}</label>
+                            </div>
                         {% endfor %}
+                        {% if form.goals.errors %}
+                            <div id="goalsFeedback" class="invalid-feedback d-block" role="alert">
+                                {% for error in form.goals.errors %}
+                                    {{ error | escape }}<br>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
                     </div>
                     <div id="savingsHint" style="display: none; margin-top: 1rem; color: #22488D; font-weight: 500;" role="alert" aria-live="polite">
-                        💡 {{ t('general_savings_hint', default='You may also check out our') | escape }} 
-                        <a href="https://personal.ficoreafrica.com/" target="_blank" aria-label="{{ t('general_personal_finance_app', default='Personal finance app') | escape }}">{{ t('general_personal_finance_app', default='personal finance app') | escape }}</a> 
+                        💡 {{ t('general_savings_hint', default='You may also check out our') | escape }}
+                        <a href="https://personal.ficoreafrica.com/" target="_blank" aria-label="{{ t('general_personal_finance_app', default='Personal finance app') | escape }}">{{ t('general_personal_finance_app', default='personal finance app') | escape }}</a>
                         {{ t('general_to_support_savings', default='to support this goal.') | escape }}
                     </div>
-                    {% if form.goals.errors %}
-                        <div id="goalsFeedback" class="invalid-feedback" role="alert">
-                            {% for error in form.goals.errors %}
-                                {{ error | escape }}<br>
-                            {% endfor %}
-                        </div>
-                    {% endif %}
                 </div>
                 <div class="row g-2">
                     <div class="col-12 col-md-6 mx-auto">
@@ -158,7 +156,7 @@
                     <div class="form-check">
                         {{ form.terms(class="form-check-input" + (" is-invalid" if form.terms.errors else ""), required=True, id="terms", **{"aria-describedby": "termsFeedback" if form.terms.errors else "", "aria-required": "true"}) | safe }}
                         <label class="form-check-label" for="terms">
-                            {{ t('general_agree_to_terms', default='By signing up, you agree to our') | escape }} 
+                            {{ t('general_agree_to_terms', default='By signing up, you agree to our') | escape }}
                             <a href="{{ url_for('general_bp.terms') | escape }}" aria-label="{{ t('general_terms', default='Terms of Service') | escape }}" target="_blank">{{ t('general_terms', default='Terms of Service') | escape }}</a>
                         </label>
                         {% if form.terms.errors %}
@@ -198,20 +196,27 @@
             }, false);
         });
 
-        // Multi-step navigation
         window.nextStep = function(step) {
             const currentStep = document.querySelector('.form-step[style*="block"]');
             const inputs = currentStep.querySelectorAll('input[required], select[required], textarea[required]');
             let valid = true;
-            
+
             if (currentStep.id === 'step-2') {
                 const goalsCheckboxes = document.querySelectorAll('#goals-group input[type="checkbox"]');
-                const goalsLabel = document.querySelector('#goals-group');
+                const goalsGroup = document.getElementById('goals-group');
+                const goalsFeedback = document.getElementById('goalsFeedback');
                 const checkedGoals = Array.from(goalsCheckboxes).some(cb => cb.checked);
 
                 if (!checkedGoals) {
-                    if (goalsLabel) {
-                         // A visual error could be added here if needed, but relying on Flask-WTF for final submit is common.
+                    valid = false;
+                    goalsGroup.classList.add('is-invalid');
+                    if (goalsFeedback) {
+                        goalsFeedback.style.display = 'block';
+                    }
+                } else {
+                    goalsGroup.classList.remove('is-invalid');
+                    if (goalsFeedback) {
+                        goalsFeedback.style.display = 'none';
                     }
                 }
             }
@@ -222,7 +227,7 @@
                     valid = false;
                 }
             });
-            
+
             if (valid) {
                 document.querySelectorAll('.form-step').forEach(s => s.style.display = 'none');
                 document.getElementById(`step-${step}`).style.display = 'block';
@@ -240,9 +245,14 @@
             progress.style.width = `${step * 33}%`;
             progress.setAttribute('aria-valuenow', step * 33);
             progress.textContent = `Step ${step} of 3`;
+            const goalsGroup = document.getElementById('goals-group');
+            const goalsFeedback = document.getElementById('goalsFeedback');
+            if (goalsGroup && goalsFeedback) {
+                goalsGroup.classList.remove('is-invalid');
+                goalsFeedback.style.display = 'none';
+            }
         };
 
-        // Goals hint for "Improve savings"
         const goalsGroup = document.getElementById('goals-group');
         goalsGroup.addEventListener('change', function () {
             const checkboxes = this.querySelectorAll('input[type="checkbox"]');
@@ -254,36 +264,39 @@
     })();
 </script>
 <style>
-    /* 🛠️ FIX 2 & 3: Ensure goals options stack vertically and are clickable, fixing the overlapping text issue. */
     .form-check-group .form-check {
-        /* Set to block to ensure it takes the full width and forces a line break */
-        display: block !important; 
-        /* Add sufficient vertical margin to separate items */
-        margin-bottom: 0.75rem !important; 
-        /* Set full width to prevent layout issues */
-        width: 100% !important; 
-    }
-    
-    /* Ensure the actual checkbox input is correctly displayed and visible */
-    .form-check-group .form-check .form-check-input {
-        /* Reset any unexpected display issues */
-        display: inline-block !important; 
-        /* Standard Bootstrap positioning for the checkbox */
-        float: left;
-        margin-left: -1.5em;
-        position: static; 
+        display: flex;
+        align-items: center;
+        margin-bottom: 1rem;
+        padding-left: 0;
+        min-height: 2rem;
     }
 
-    /* Ensure the label text is offset from the checkbox and not cramped */
+    .form-check-group .form-check-input {
+        width: 1.25rem;
+        height: 1.25rem;
+        margin-right: 0.75rem;
+        vertical-align: middle;
+    }
+
     .form-check-group .form-check-label {
-        display: inline;
-        /* Push the label content over to make space for the checkbox */
-        padding-left: 1.5em; 
+        flex-grow: 1;
+        vertical-align: middle;
+        line-height: 1.5;
     }
 
     .form-check-group .form-check-input:checked {
         background-color: #0d6efd;
         border-color: #0d6efd;
+    }
+
+    .form-check-group.is-invalid .invalid-feedback {
+        display: block;
+    }
+
+    .form-check-group .form-check-input:focus {
+        outline: 0;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
     }
 </style>
 {% endblock %}
