@@ -114,12 +114,12 @@
                         </div>
 
                         <div class="profile-form-group">
-                            <label for="goals" class="profile-form-label">{{ t('general_main_goal', default="What's your main goal?") }}</label>
-                            <div class="profile-form-check-group">
-                                {% for choice in form.goals %}
+                            <label class="profile-form-label">{{ t('general_main_goal', default="What's your main goal?") }}</label>
+                            <div class="profile-form-check-group" id="goals-container">
+                                {% for value, label in form.goals.choices %}
                                     <div class="profile-form-check">
-                                        {{ choice(class='profile-form-check-input', required=True) }}
-                                        {{ choice.label(class='profile-form-check-label') }}
+                                        <input type="checkbox" class="profile-form-check-input goals-checkbox" name="goals" value="{{ value }}" id="goals_{{ loop.index0 }}" {% if value in form.goals.data %}checked{% endif %}>
+                                        <label class="profile-form-check-label" for="goals_{{ loop.index0 }}">{{ label }}</label>
                                     </div>
                                 {% endfor %}
                                 {% if form.goals.errors %}
@@ -212,9 +212,10 @@
         // Special validation for goals in Step 2
         if (currentStep.id === 'step-2') {
             const goals = document.querySelectorAll('input[name="goals"]:checked');
+            console.log('Goals selected:', goals.length, Array.from(goals).map(g => g.value)); // Debugging
             if (goals.length === 0) {
                 isValid = false;
-                const goalsError = document.querySelector('.profile-form-check-group');
+                const goalsError = document.querySelector('#goals-container');
                 if (goalsError) {
                     goalsError.insertAdjacentHTML('beforeend', '<p class="profile-text-danger">{{ t('general_select_at_least_one_goal', default='Please select at least one goal.') }}</p>');
                     document.querySelectorAll('input[name="goals"]').forEach(input => input.classList.add('is-invalid'));
@@ -225,6 +226,7 @@
         // Special validation for terms in Step 3
         if (currentStep.id === 'step-3') {
             const terms = document.querySelector('input[name="terms"]');
+            console.log('Terms checked:', terms.checked); // Debugging
             if (!terms.checked) {
                 isValid = false;
                 terms.classList.add('is-invalid');
@@ -271,8 +273,13 @@
                 checkbox.classList.remove('is-invalid');
                 const error = checkbox.parentElement.querySelector('.profile-text-danger:not([data-server-error])');
                 if (error) error.remove();
+                console.log(`Checkbox ${checkbox.name} changed, value: ${checkbox.value}, checked: ${checkbox.checked}`); // Debugging
             });
         });
+
+        // Debug goals rendering
+        const goalsCheckboxes = document.querySelectorAll('input[name="goals"]');
+        console.log('Goals checkboxes rendered:', goalsCheckboxes.length, Array.from(goalsCheckboxes).map(c => c.value));
     });
 </script>
 {% endblock %}
