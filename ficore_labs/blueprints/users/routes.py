@@ -1,6 +1,7 @@
 import os
 import logging
 import uuid
+import math
 from datetime import datetime, timedelta, timezone
 from wtforms.validators import ValidationError
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, jsonify, session, make_response
@@ -641,6 +642,7 @@ def reset_password(token):
 @utils.limiter.limit("50/hour")
 def setup_wizard():
     try:
+        
         db = utils.get_mongo_db()
         user_id = request.args.get('user_id', current_user.id) if utils.is_admin() and request.args.get('user_id') else current_user.id
         user = db.users.find_one({'_id': user_id})
@@ -658,6 +660,16 @@ def setup_wizard():
             flash(trans('general_invalid_role', default='Invalid user role'), 'danger')
             logger.error(f"Invalid role '{user.get('role')}' for user {user_id} in setup wizard")
             return redirect(url_for('users.logout'))
+
+        # --- FIX 1: Calculate trial days remaining based on server time ---
+        trial_days_remaining = 30 # Default for a newly created user 
+        trial_end = user.get('trial_end')
+
+        if trial_end:
+            # Calculate difference in days. Use ceil to round up to the next full day.
+            time_left = trial_end - datetime.utcnow()
+            days_left = time_left.total_seconds() / (60 * 60 * 24)
+            trial_days_remaining = max(0, int(math.ceil(days_left))) 
 
         form = BusinessSetupForm()
         if form.validate_on_submit():
@@ -694,10 +706,19 @@ def setup_wizard():
                 return redirect(url_for('subscribe_bp.subscription_required'))
             return redirect(url_for('settings.profile', user_id=user_id) if utils.is_admin() else get_post_login_redirect(user.get('role', 'trader')))
         else:
+            # Flashing form errors to aid client-side validation logic
             for field, errors in form.errors.items():
                 for error in errors:
                     flash(f"{field}: {error}", 'danger')
-        return render_template('users/business_setup.html', form=form, title=trans('general_business_setup', lang=session.get('lang', 'en')), current_user=current_user)
+        
+        # --- PASS trial_days_remaining to the template ---
+        return render_template(
+            'users/business_setup.html', 
+            form=form, 
+            title=trans('general_business_setup', lang=session.get('lang', 'en')), 
+            current_user=current_user,
+            trial_days_remaining=trial_days_remaining
+        )
     except pymongo.errors.PyMongoError as e:
         logger.error(f"MongoDB error during business setup for {user_id}: {str(e)}")
         flash(trans('general_database_error', default='An error occurred while accessing the database. Please try again later.'), 'danger')
