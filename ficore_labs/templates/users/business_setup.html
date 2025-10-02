@@ -27,7 +27,7 @@
 
                     <!-- Progress Indicator -->
                     <div class="profile-progress">
-                        <div class="profile-progress-step active" data-step="1">
+                        <div class="profile-progress-step active" data-step="1" aria-current="step">
                             <span class="profile-step-number">1</span>
                             <span>{{ t('general_business_information', default='Business Information') }}</span>
                         </div>
@@ -46,40 +46,40 @@
                         <h2 class="profile-section-heading">{{ t('general_business_information', default='Business Information') }}</h2>
                         <div class="profile-form-group">
                             <label for="business_name" class="profile-form-label">{{ t('general_business_name', default='Business Name') }}</label>
-                            {{ form.business_name(placeholder=t('settings_business_name_placeholder', default='Your Business Name'), class='profile-form-control') }}
+                            {{ form.business_name(placeholder=t('settings_business_name_placeholder', default='Your Business Name'), class='profile-form-control', required=True) }}
                             {% if form.business_name.errors %}
                                 {% for error in form.business_name.errors %}
-                                    <p class="profile-text-danger">{{ error }}</p>
+                                    <p class="profile-text-danger" data-server-error="true">{{ error }}</p>
                                 {% endfor %}
                             {% endif %}
                         </div>
 
                         <div class="profile-form-group">
                             <label for="address" class="profile-form-label">{{ t('general_address', default='Address') }}</label>
-                            {{ form.address(placeholder=t('settings_business_address_placeholder', default='Your Business Address'), class='profile-form-control') }}
+                            {{ form.address(placeholder=t('settings_business_address_placeholder', default='Your Business Address'), class='profile-form-control', required=True) }}
                             {% if form.address.errors %}
                                 {% for error in form.address.errors %}
-                                    <p class="profile-text-danger">{{ error }}</p>
+                                    <p class="profile-text-danger" data-server-error="true">{{ error }}</p>
                                 {% endfor %}
                             {% endif %}
                         </div>
 
                         <div class="profile-form-group">
                             <label for="industry" class="profile-form-label">{{ t('general_industry', default='Industry') }}</label>
-                            {{ form.industry(class='profile-form-control') }}
+                            {{ form.industry(class='profile-form-control', required=True) }}
                             {% if form.industry.errors %}
                                 {% for error in form.industry.errors %}
-                                    <p class="profile-text-danger">{{ error }}</p>
+                                    <p class="profile-text-danger" data-server-error="true">{{ error }}</p>
                                 {% endfor %}
                             {% endif %}
                         </div>
 
                         <div class="profile-form-group">
                             <label for="products_services" class="profile-form-label">{{ t('general_products_services', default='Products/Services') }}</label>
-                            {{ form.products_services(placeholder=t('settings_products_services_placeholder', default='e.g., Clothing, Consulting'), class='profile-form-control') }}
+                            {{ form.products_services(placeholder=t('settings_products_services_placeholder', default='e.g., Clothing, Consulting'), class='profile-form-control', required=True) }}
                             {% if form.products_services.errors %}
                                 {% for error in form.products_services.errors %}
-                                    <p class="profile-text-danger">{{ error }}</p>
+                                    <p class="profile-text-danger" data-server-error="true">{{ error }}</p>
                                 {% endfor %}
                             {% endif %}
                         </div>
@@ -95,20 +95,20 @@
                         <h2 class="profile-section-heading">{{ t('general_contact_preferences', default='Contact & Preferences') }}</h2>
                         <div class="profile-form-group">
                             <label for="phone_number" class="profile-form-label">{{ t('general_phone_number', default='Phone Number') }}</label>
-                            {{ form.phone_number(placeholder=t('settings_phone_placeholder', default='+234xxxxxxxxx'), class='profile-form-control') }}
+                            {{ form.phone_number(placeholder=t('settings_phone_placeholder', default='+234xxxxxxxxx'), class='profile-form-control', required=True) }}
                             {% if form.phone_number.errors %}
                                 {% for error in form.phone_number.errors %}
-                                    <p class="profile-text-danger">{{ error }}</p>
+                                    <p class="profile-text-danger" data-server-error="true">{{ error }}</p>
                                 {% endfor %}
                             {% endif %}
                         </div>
 
                         <div class="profile-form-group">
                             <label for="language" class="profile-form-label">{{ t('general_language', default='Language') }}</label>
-                            {{ form.language(class='profile-form-control') }}
+                            {{ form.language(class='profile-form-control', required=True) }}
                             {% if form.language.errors %}
                                 {% for error in form.language.errors %}
-                                    <p class="profile-text-danger">{{ error }}</p>
+                                    <p class="profile-text-danger" data-server-error="true">{{ error }}</p>
                                 {% endfor %}
                             {% endif %}
                         </div>
@@ -118,13 +118,13 @@
                             <div class="profile-form-check-group">
                                 {% for choice in form.goals %}
                                     <div class="profile-form-check">
-                                        {{ choice(class='profile-form-check-input') }}
+                                        {{ choice(class='profile-form-check-input', required=True) }}
                                         {{ choice.label(class='profile-form-check-label') }}
                                     </div>
                                 {% endfor %}
                                 {% if form.goals.errors %}
                                     {% for error in form.goals.errors %}
-                                        <p class="profile-text-danger">{{ error }}</p>
+                                        <p class="profile-text-danger" data-server-error="true">{{ error }}</p>
                                     {% endfor %}
                                 {% endif %}
                             </div>
@@ -141,14 +141,14 @@
                         <h2 class="profile-section-heading">{{ t('general_terms', default='Terms') }}</h2>
                         <div class="profile-form-group">
                             <div class="profile-form-check">
-                                {{ form.terms(class='profile-form-check-input') }}
+                                {{ form.terms(class='profile-form-check-input', required=True) }}
                                 <label for="terms" class="profile-form-check-label">
                                     {{ t('general_terms', default='I accept the Terms and Conditions') }}
                                     <a href="{{ url_for('general_bp.terms') }}" target="_blank">{{ t('general_terms_link', default='View Terms') }}</a>
                                 </label>
                                 {% if form.terms.errors %}
                                     {% for error in form.terms.errors %}
-                                        <p class="profile-text-danger">{{ error }}</p>
+                                        <p class="profile-text-danger" data-server-error="true">{{ error }}</p>
                                     {% endfor %}
                                 {% endif %}
                             </div>
@@ -180,33 +180,55 @@
 
         document.querySelectorAll('.profile-progress-step').forEach(step => {
             step.classList.remove('active');
+            step.removeAttribute('aria-current');
         });
-        document.querySelector(`.profile-progress-step[data-step="${stepNumber}"]`).classList.add('active');
+        const activeStep = document.querySelector(`.profile-progress-step[data-step="${stepNumber}"]`);
+        activeStep.classList.add('active');
+        activeStep.setAttribute('aria-current', 'step');
     }
 
     function nextStep(stepNumber) {
-        // Basic client-side validation for the current step
+        // Clear previous client-side error messages
+        document.querySelectorAll('.profile-text-danger:not([data-server-error])').forEach(error => error.remove());
+        document.querySelectorAll('.profile-form-control, .profile-form-check-input').forEach(input => {
+            input.classList.remove('is-invalid');
+        });
+
+        // Get current step
         const currentStep = document.querySelector('.profile-step-content:not([style*="display: none"])');
-        const inputs = currentStep.querySelectorAll('input, select, textarea');
         let isValid = true;
 
+        // Validate fields in the current step
+        const inputs = currentStep.querySelectorAll('input:not([type="checkbox"]), select, textarea');
         inputs.forEach(input => {
             if (input.required && !input.value.trim()) {
                 isValid = false;
                 input.classList.add('is-invalid');
-            } else {
-                input.classList.remove('is-invalid');
+                const errorMessage = '{{ t('general_field_required', default='This field is required.') }}';
+                input.parentElement.insertAdjacentHTML('beforeend', `<p class="profile-text-danger">${errorMessage}</p>`);
             }
         });
 
-        if (stepNumber === 2) {
+        // Special validation for goals in Step 2
+        if (currentStep.id === 'step-2') {
             const goals = document.querySelectorAll('input[name="goals"]:checked');
             if (goals.length === 0) {
                 isValid = false;
                 const goalsError = document.querySelector('.profile-form-check-group');
                 if (goalsError) {
                     goalsError.insertAdjacentHTML('beforeend', '<p class="profile-text-danger">{{ t('general_select_at_least_one_goal', default='Please select at least one goal.') }}</p>');
+                    document.querySelectorAll('input[name="goals"]').forEach(input => input.classList.add('is-invalid'));
                 }
+            }
+        }
+
+        // Special validation for terms in Step 3
+        if (currentStep.id === 'step-3') {
+            const terms = document.querySelector('input[name="terms"]');
+            if (!terms.checked) {
+                isValid = false;
+                terms.classList.add('is-invalid');
+                terms.parentElement.insertAdjacentHTML('beforeend', '<p class="profile-text-danger">{{ t('general_terms_required', default='You must accept the terms.') }}</p>');
             }
         }
 
@@ -218,15 +240,18 @@
     }
 
     function prevStep(stepNumber) {
-        // Remove any client-side added error messages
+        // Clear client-side error messages
         document.querySelectorAll('.profile-text-danger:not([data-server-error])').forEach(error => error.remove());
+        document.querySelectorAll('.profile-form-control, .profile-form-check-input').forEach(input => {
+            input.classList.remove('is-invalid');
+        });
         showStep(stepNumber);
     }
 
     document.addEventListener('DOMContentLoaded', () => {
         showStep(1); // Initialize with first step
 
-        // Mark server-side errors to distinguish from client-side
+        // Mark server-side errors
         document.querySelectorAll('.profile-text-danger').forEach(error => {
             error.setAttribute('data-server-error', 'true');
         });
@@ -235,6 +260,17 @@
         document.querySelectorAll('input, select, textarea').forEach(input => {
             input.addEventListener('input', () => {
                 input.classList.remove('is-invalid');
+                const error = input.parentElement.querySelector('.profile-text-danger:not([data-server-error])');
+                if (error) error.remove();
+            });
+        });
+
+        // Handle checkbox changes for goals and terms
+        document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+            checkbox.addEventListener('change', () => {
+                checkbox.classList.remove('is-invalid');
+                const error = checkbox.parentElement.querySelector('.profile-text-danger:not([data-server-error])');
+                if (error) error.remove();
             });
         });
     });
