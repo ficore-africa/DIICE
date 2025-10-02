@@ -141,6 +141,7 @@ class BusinessSetupForm(FlaskForm):
             ('monitor_income_debt', trans('goals_monitor_income_debt', default='Monitor income/debt'))
         ],
         widget=ListWidget(prefix_label=False),
+        option_widget=CheckboxInput(),  # Explicitly set CheckboxInput
         coerce=str,
         validators=[DataRequired(message=trans('general_select_at_least_one_goal', default='Please select at least one goal.'))],
         render_kw={'class': 'form-check-input goals-checkbox'}
