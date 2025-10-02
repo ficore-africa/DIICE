@@ -8,97 +8,7 @@
 <!-- External CSS for dashboard-specific components -->
 <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-notifications.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-realtime.css') }}">
-<style>
-    /* Ensure tables are scrollable on smaller screens */
-    .table-responsive-scroll {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-    }
-    .table-responsive-scroll table {
-        min-width: 650px; /* Increased min-width for better display of all columns */
-    }
-
-    /* Style improvements for the stat cards */
-    .dashboard-stat-card {
-        transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
-    }
-    .dashboard-stat-card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
-    }
-
-    /* Profit Summary Card specific styling */
-    .profit-summary-card {
-        background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); /* Deep Blue gradient */
-        color: white; /* Base color for the card */
-    }
-    .profit-summary-card.negative {
-        background: linear-gradient(135deg, #7f1d1d 0%, #dc2626 100%); /* Deep Red gradient for negative profit */
-    }
-    
-    /* Target all text within the profit summary card and force it to white */
-    .profit-summary-card *,
-    .profit-summary-card .card-title,
-    .profit-summary-card .card-text,
-    .profit-summary-card .text-white-50 {
-        color: white !important;
-    }
-    /* Ensure the icon is also explicitly white */
-    .profit-summary-card i {
-        color: white !important;
-    }
-    /* Ensure the profit value retains its bold/large styling, but is white */
-    .profit-summary-card .profit-summary-value {
-        font-weight: 700;
-        letter-spacing: -0.5px;
-        color: white !important;
-    }
-
-    .profit-summary-card .btn-outline-light {
-        border-color: rgba(255, 255, 255, 0.5);
-        color: white !important;
-    }
-    .profit-summary-card .btn-outline-light:hover {
-        background-color: rgba(255, 255, 255, 0.1);
-        color: #fff;
-    }
-    .profit-summary-value {
-        font-weight: 700;
-        letter-spacing: -0.5px;
-    }
-
-    /* Spinner animation */
-    @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-    }
-    .spin {
-        animation: spin 1.5s linear infinite;
-    }
-
-    /* Enforce platinum background for all cards except profit-summary-card */
-    .dashboard-stat-card:not(.profit-summary-card) {
-        background-color: #D9D9D9 !important; /* Platinum background */
-        color: #000 !important; /* Ensure base text color is black */
-    }
-
-    /* Ensure all text elements within non-profit-summary cards are black */
-    .dashboard-stat-card:not(.profit-summary-card) * {
-        color: #000 !important;
-    }
-
-    /* Ensure buttons and links within non-profit-summary cards use appropriate styling */
-    .dashboard-stat-card:not(.profit-summary-card) .btn,
-    .dashboard-stat-card:not(.profit-summary-card) a {
-        color: #000 !important;
-        border-color: rgba(0, 0, 0, 0.5) !important;
-    }
-    .dashboard-stat-card:not(.profit-summary-card) .btn:hover,
-    .dashboard-stat-card:not(.profit-summary-card) a:hover {
-        background-color: rgba(0, 0, 0, 0.1) !important;
-        color: #000 !important;
-    }
-</style>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
 
 <!-- External JavaScript for dynamic features -->
 <script src="{{ url_for('static', filename='js/dashboard-notifications.js') }}" defer></script>
@@ -106,7 +16,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="container py-4" data-user-id="{{ current_user.id if current_user.is_authenticated else '' | escape }}">
+<div class="dashboard-container" data-user-id="{{ current_user.id if current_user.is_authenticated else '' | escape }}">
     {% if current_user.is_authenticated %}
     
     <!-- 1. DISMISSABLE NOTIFICATIONS & TAX PREP ALERT -->
@@ -115,54 +25,56 @@
     </div>
 
     {% if tax_prep_mode and stats.profit_only is defined %}
-    <div class="alert alert-success d-flex align-items-center mb-4 border-0 shadow-sm" role="alert">
+    <div class="dashboard-card dashboard-text-success d-flex align-items-center mb-4">
         <i class="bi bi-cash-coin me-3 h4"></i>
         <div>
             <strong class="me-2">{{ trans('profit_only', default='True Profit (Tax Prep Mode):') | escape }}</strong>
             <span class="h4">{{ stats.profit_only | format_currency }}</span>
-            <small class="d-block">{{ trans('profit_note', default='This is your actual profit after all expenses and inventory costs.') | escape }}</small>
+            <small class="d-block dashboard-text-muted">{{ trans('profit_note', default='This is your actual profit after all expenses and inventory costs.') | escape }}</small>
         </div>
     </div>
     {% endif %}
 
     <!-- 2. REAL-TIME REFRESH CONTROLS -->
-    <div class="d-flex align-items-center mb-4 p-3 bg-light rounded-3 shadow-sm">
-        <button id="dashboard-refresh-btn" class="btn btn-primary btn-sm me-3">
-            <i class="bi bi-arrow-clockwise"></i> {{ trans('general_refresh', default='Refresh Now') | escape }}
-        </button>
-        
-        <div class="form-check form-switch me-3">
-            <input class="form-check-input" type="checkbox" id="auto-refresh-toggle" checked>
-            <label class="form-check-label" for="auto-refresh-toggle">
-                {{ trans('auto_refresh', default='Auto-refresh') | escape }}
-            </label>
+    <div class="dashboard-card mb-4">
+        <div class="dashboard-card-body d-flex align-items-center flex-wrap gap-3">
+            <button id="dashboard-refresh-btn" class="dashboard-btn dashboard-btn-primary">
+                <i class="bi bi-arrow-clockwise"></i> {{ trans('general_refresh', default='Refresh Now') | escape }}
+            </button>
+            
+            <div class="dashboard-form-group">
+                <input class="dashboard-form-check-input" type="checkbox" id="auto-refresh-toggle" checked>
+                <label class="dashboard-form-label" for="auto-refresh-toggle">
+                    {{ trans('auto_refresh', default='Auto-refresh') | escape }}
+                </label>
+            </div>
+            
+            <select id="refresh-rate-select" class="dashboard-form-control" style="width: auto;">
+                <option value="30" selected>{{ trans('refresh_30s', default='30 seconds') | escape }}</option>
+                <option value="60">{{ trans('refresh_1m', default='1 minute') | escape }}</option>
+                <option value="300">{{ trans('refresh_5m', default='5 minutes') | escape }}</option>
+            </select>
+            
+            <span id="refresh-indicator" class="me-3 d-none">
+                <i class="bi bi-arrow-clockwise dashboard-spinner"></i> {{ trans('refreshing', default='Refreshing...') | escape }}
+            </span>
+            
+            <small id="last-refresh-time" class="dashboard-text-muted"></small>
         </div>
-        
-        <select id="refresh-rate-select" class="form-select form-select-sm me-3" style="width: auto;">
-            <option value="30" selected>{{ trans('refresh_30s', default='30 seconds') | escape }}</option>
-            <option value="60">{{ trans('refresh_1m', default='1 minute') | escape }}</option>
-            <option value="300">{{ trans('refresh_5m', default='5 minutes') | escape }}</option>
-        </select>
-        
-        <span id="refresh-indicator" class="me-3 d-none">
-            <i class="bi bi-arrow-clockwise spin"></i> {{ trans('refreshing', default='Refreshing...') | escape }}
-        </span>
-        
-        <small id="last-refresh-time" class="last-refresh-time"></small>
     </div>
 
     <!-- 3. TAX PREP TOGGLE AND PDF DOWNLOAD -->
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
-        <div class="form-check form-switch p-0 m-0">
-            <input class="form-check-input ms-0" type="checkbox" id="taxPrepToggle" {% if tax_prep_mode %}checked{% endif %}>
-            <label class="form-check-label ms-3" for="taxPrepToggle">
+        <div class="dashboard-form-group">
+            <input class="dashboard-form-check-input" type="checkbox" id="taxPrepToggle" {% if tax_prep_mode %}checked{% endif %}>
+            <label class="dashboard-form-label" for="taxPrepToggle">
                 <i class="bi bi-calculator me-1"></i>
                 <strong>{{ trans('profit_mode', default='Tax Prep Mode: Show Profit Only') | escape }}</strong>
             </label>
-            <small class="d-block ms-3">{{ trans('true_profit_help', default='Toggle to view pure profit after costs.') | escape }}</small>
+            <small class="d-block dashboard-text-muted">{{ trans('true_profit_help', default='Toggle to view pure profit after costs.') | escape }}</small>
         </div>
         
-        <a href="{{ url_for('reports.profit_loss') }}?format=pdf" class="btn btn-success shadow-sm">
+        <a href="{{ url_for('reports.profit_loss') }}?format=pdf" class="dashboard-btn dashboard-btn-success">
             <i class="bi bi-file-earmark-arrow-down me-1"></i>
             {{ trans('download_profit_summary', default='Download P&L Report (PDF)') | escape }}
         </a>
@@ -173,22 +85,22 @@
         <!-- Profit Summary Card -->
         {% set profit = (stats.total_receipts_amount - stats.total_payments_amount) %}
         <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-lg h-100 dashboard-stat-card profit-summary-card {% if profit < 0 %}negative{% endif %}">
-                <div class="card-body text-center">
-                    <div class="text-white mb-2">
+            <div class="dashboard-card dashboard-profit-summary-card {% if profit < 0 %}negative{% endif %}">
+                <div class="dashboard-card-body text-center">
+                    <div class="mb-2">
                         <i class="bi bi-graph-up-arrow fa-2x"></i>
                     </div>
-                    <h6 class="card-title text-white">{{ trans('profit_summary', default='Profit Summary') | escape }}</h6>
+                    <h6 class="card-title">{{ trans('profit_summary', default='Profit Summary') | escape }}</h6>
                     <p class="card-text">
                         {% if tax_prep_mode and stats.profit_only is defined %}
-                            <span id="true-profit" class="h3 text-white profit-summary-value">{{ stats.profit_only | format_currency }}</span><br>
-                            <small class="text-white-50">{{ trans('true_profit', default='True Profit') | escape }}</small>
+                            <span id="true-profit" class="h3">{{ stats.profit_only | format_currency }}</span><br>
+                            <small class="dashboard-text-muted">{{ trans('true_profit', default='True Profit') | escape }}</small>
                         {% else %}
-                            <span id="gross-profit" class="h3 text-white profit-summary-value">{{ profit | format_currency }}</span><br>
-                            <small class="text-white-50">{{ trans('gross_profit', default='Gross Profit') | escape }}</small>
+                            <span id="gross-profit" class="h3">{{ profit | format_currency }}</span><br>
+                            <small class="dashboard-text-muted">{{ trans('gross_profit', default='Gross Profit') | escape }}</small>
                         {% endif %}
                     </p>
-                    <button class="btn btn-outline-light btn-sm mt-2" onclick="toggleTaxPrepMode()">
+                    <button class="dashboard-btn dashboard-btn-outline btn-sm mt-2" onclick="toggleTaxPrepMode()">
                         {{ trans('toggle_view', default='Toggle Profit View') | escape }}
                     </button>
                 </div>
@@ -197,106 +109,106 @@
         
         <!-- Inventory Card -->
         <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm h-100 dashboard-stat-card">
-                <div class="card-body text-center">
+            <div class="dashboard-card">
+                <div class="dashboard-card-body text-center">
                     <div class="mb-2">
                         <i class="bi bi-box-seam fa-2x"></i>
                     </div>
                     <h6 class="card-title">{{ trans('inventory_nav_label', default='Inventory') | escape }}</h6>
                     <p class="card-text">
                         <span id="inventory-count" class="h3">{{ stats.total_inventory | default('0') }}</span><br>
-                        <small>Total Items</small>
+                        <small class="dashboard-text-muted">Total Items</small>
                         <span id="inventory-cost" class="d-block">{{ stats.total_inventory_cost | format_currency }}</span>
                     </p>
-                    <a href="{{ url_for('inventory.index') }}" class="btn btn-outline-dark btn-sm">{{ trans('general_view', default='View Details') | escape }}</a>
+                    <a href="{{ url_for('inventory.index') }}" class="dashboard-btn dashboard-btn-outline btn-sm">{{ trans('general_view', default='View Details') | escape }}</a>
                 </div>
             </div>
         </div>
         
         <!-- Income/Receipts Card -->
         <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm h-100 dashboard-stat-card">
-                <div class="card-body text-center">
+            <div class="dashboard-card">
+                <div class="dashboard-card-body text-center">
                     <div class="mb-2">
                         <i class="bi bi-cash-stack fa-2x"></i>
                     </div>
                     <h6 class="card-title">{{ trans('receipts_money_in', default='Total Income') | escape }}</h6>
                     <p class="card-text">
                         <span id="receipts-amount" class="h3">{{ stats.total_receipts_amount | format_currency }}</span><br>
-                        <small>{{ trans('receipts_count', default='Total Receipts') | escape }}: <span id="receipts-count">{{ stats.total_receipts | default('0') }}</span></small>
+                        <small class="dashboard-text-muted">{{ trans('receipts_count', default='Total Receipts') | escape }}: <span id="receipts-count">{{ stats.total_receipts | default('0') }}</span></small>
                     </p>
-                    <a href="{{ url_for('receipts.index') }}" class="btn btn-outline-dark btn-sm">{{ trans('general_view', default='View Details') | escape }}</a>
+                    <a href="{{ url_for('receipts.index') }}" class="dashboard-btn dashboard-btn-outline btn-sm">{{ trans('general_view', default='View Details') | escape }}</a>
                 </div>
             </div>
         </div>
         
         <!-- Expenses/Payments Card -->
         <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm h-100 dashboard-stat-card">
-                <div class="card-body text-center">
+            <div class="dashboard-card">
+                <div class="dashboard-card-body text-center">
                     <div class="mb-2">
                         <i class="bi bi-wallet2 fa-2x"></i>
                     </div>
                     <h6 class="card-title">{{ trans('payments_money_out', default='Total Expenses') | escape }}</h6>
                     <p class="card-text">
                         <span id="payments-amount" class="h3">{{ stats.total_payments_amount | format_currency }}</span><br>
-                        <small>{{ trans('payments_count', default='Total Payments') | escape }}: <span id="payments-count">{{ stats.total_payments | default('0') }}</span></small>
+                        <small class="dashboard-text-muted">{{ trans('payments_count', default='Total Payments') | escape }}: <span id="payments-count">{{ stats.total_payments | default('0') }}</span></small>
                     </p>
-                    <a href="{{ url_for('payments.index') }}" class="btn btn-outline-dark btn-sm">{{ trans('general_view', default='View Details') | escape }}</a>
+                    <a href="{{ url_for('payments.index') }}" class="dashboard-btn dashboard-btn-outline btn-sm">{{ trans('general_view', default='View Details') | escape }}</a>
                 </div>
             </div>
         </div>
         
         <!-- Debtors Card -->
         <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm h-100 dashboard-stat-card">
-                <div class="card-body text-center">
+            <div class="dashboard-card">
+                <div class="dashboard-card-body text-center">
                     <div class="mb-2">
                         <i class="bi bi-person-plus-fill fa-2x"></i>
                     </div>
                     <h6 class="card-title">{{ trans('general_debtors', default='Money Owed to You') | escape }}</h6>
                     <p class="card-text">
                         <span id="debtors-amount" class="h3">{{ stats.total_debtors_amount | format_currency }}</span><br>
-                        <small>{{ trans('debtors_count', default='Total Debtors') | escape }}: <span id="debtors-count">{{ stats.total_debtors | default('0') }}</span></small>
+                        <small class="dashboard-text-muted">{{ trans('debtors_count', default='Total Debtors') | escape }}: <span id="debtors-count">{{ stats.total_debtors | default('0') }}</span></small>
                     </p>
-                    <a href="{{ url_for('debtors.index') }}" class="btn btn-outline-dark btn-sm">{{ trans('general_view', default='View Details') | escape }}</a>
+                    <a href="{{ url_for('debtors.index') }}" class="dashboard-btn dashboard-btn-outline btn-sm">{{ trans('general_view', default='View Details') | escape }}</a>
                 </div>
             </div>
         </div>
         
         <!-- Creditors Card -->
         <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm h-100 dashboard-stat-card">
-                <div class="card-body text-center">
+            <div class="dashboard-card">
+                <div class="dashboard-card-body text-center">
                     <div class="mb-2">
                         <i class="bi bi-person-dash-fill fa-2x"></i>
                     </div>
                     <h6 class="card-title">{{ trans('general_creditors', default='Money You Owe') | escape }}</h6>
                     <p class="card-text">
                         <span id="creditors-amount" class="h3">{{ stats.total_creditors_amount | format_currency }}</span><br>
-                        <small>{{ trans('creditors_count', default='Total Creditors') | escape }}: <span id="creditors-count">{{ stats.total_creditors | default('0') }}</span></small>
+                        <small class="dashboard-text-muted">{{ trans('creditors_count', default='Total Creditors') | escape }}: <span id="creditors-count">{{ stats.total_creditors | default('0') }}</span></small>
                     </p>
-                    <a href="{{ url_for('creditors.index') }}" class="btn btn-outline-dark btn-sm">{{ trans('general_view', default='View Details') | escape }}</a>
+                    <a href="{{ url_for('creditors.index') }}" class="dashboard-btn dashboard-btn-outline btn-sm">{{ trans('general_view', default='View Details') | escape }}</a>
                 </div>
             </div>
         </div>
         
         <!-- Streak Card -->
         <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm h-100 dashboard-stat-card">
-                <div class="card-body text-center">
+            <div class="dashboard-card">
+                <div class="dashboard-card-body text-center">
                     <div class="mb-2">
                         <i class="bi bi-fire fa-2x"></i>
                     </div>
                     <h6 class="card-title">{{ trans('streak_title', default='Record Keeping Streak') | escape }}</h6>
                     <p class="card-text">
                         <span class="h3">{{ streak | default(0) }}</span><br>
-                        <small>{{ trans('streak_days', default='days in a row!') | escape }}</small>
+                        <small class="dashboard-text-muted">{{ trans('streak_days', default='days in a row!') | escape }}</small>
                         {% if streak is defined and streak >= 3 %}
                         <span class="badge bg-success">{{ trans('streak_reward', default='Excellent!') | escape }}</span>
                         {% endif %}
                     </p>
-                    <a href="{{ url_for('rewards.index') }}" class="btn btn-outline-dark btn-sm">{{ trans('general_view', default='View Rewards') | escape }}</a>
+                    <a href="{{ url_for('rewards.index') }}" class="dashboard-btn dashboard-btn-outline btn-sm">{{ trans('general_view', default='View Rewards') | escape }}</a>
                 </div>
             </div>
         </div>
@@ -304,16 +216,16 @@
         <!-- Daily Log Reminder Card -->
         {% if show_daily_log_reminder %}
         <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm h-100 dashboard-stat-card">
-                <div class="card-body text-center">
+            <div class="dashboard-card">
+                <div class="dashboard-card-body text-center">
                     <div class="mb-2">
                         <i class="bi bi-calendar-check fa-2x"></i>
                     </div>
                     <h6 class="card-title">{{ trans('log_reminder_title', default='Daily Check-In') | escape }}</h6>
                     <p class="card-text">
-                        <small>{{ trans('reminder_log_today', default="Have you recorded today’s activity?") | escape }}</small>
+                        <small class="dashboard-text-muted">{{ trans('reminder_log_today', default="Have you recorded today’s activity?") | escape }}</small>
                     </p>
-                    <a href="{{ url_for('business.home') }}" class="btn btn-primary btn-sm mt-2">{{ trans('log_now', default='Log Now') | escape }}</a>
+                    <a href="{{ url_for('business.home') }}" class="dashboard-btn dashboard-btn-primary btn-sm mt-2">{{ trans('log_now', default='Log Now') | escape }}</a>
                 </div>
             </div>
         </div>
@@ -322,18 +234,18 @@
 
     <!-- 5. RECENT ACTIVITY SECTIONS -->
     <div class="mb-5">
-        <h3 class="mb-3">{{ trans('recent_activity', default='Recent Activity') | escape }}</h3>
+        <h3 class="dashboard-section-heading">{{ trans('recent_activity', default='Recent Activity') | escape }}</h3>
         <div class="row g-4">
             <!-- Recent Debtors -->
             <div class="col-md-6">
-                <div class="card border-0 shadow-sm h-100">
-                    <div class="card-body d-flex flex-column">
+                <div class="dashboard-card">
+                    <div class="dashboard-card-body d-flex flex-column">
                         <h5 class="card-title mb-3">
                             <i class="bi bi-person-plus-fill me-2"></i> {{ trans('general_debtors', default='Recent Debtors') | escape }}
                         </h5>
                         {% if recent_debtors %}
-                        <div class="table-responsive-scroll flex-grow-1">
-                            <table class="table table-sm table-hover mb-0">
+                        <div class="dashboard-table-responsive flex-grow-1">
+                            <table class="table table-sm table-hover mb-0 dashboard-table">
                                 <thead class="table-light">
                                     <tr>
                                         <th>{{ trans('general_date', default='Date') | escape }}</th>
@@ -353,25 +265,25 @@
                             </table>
                         </div>
                         {% else %}
-                        <p class="flex-grow-1 d-flex align-items-center justify-content-center">
+                        <p class="flex-grow-1 d-flex align-items-center justify-content-center dashboard-text-muted">
                             {{ trans('no_recent_debtors', default='No recent debtors found.') | escape }}
                         </p>
                         {% endif %}
-                        <a href="{{ url_for('debtors.index') }}" class="btn btn-outline-dark btn-sm mt-3 align-self-start">{{ trans('general_view_all', default='View All Debtors') | escape }}</a>
+                        <a href="{{ url_for('debtors.index') }}" class="dashboard-btn dashboard-btn-outline btn-sm mt-3 align-self-start">{{ trans('general_view_all', default='View All Debtors') | escape }}</a>
                     </div>
                 </div>
             </div>
             
             <!-- Recent Creditors -->
             <div class="col-md-6">
-                <div class="card border-0 shadow-sm h-100">
-                    <div class="card-body d-flex flex-column">
+                <div class="dashboard-card">
+                    <div class="dashboard-card-body d-flex flex-column">
                         <h5 class="card-title mb-3">
                             <i class="bi bi-person-dash-fill me-2"></i> {{ trans('general_creditors', default='Recent Creditors') | escape }}
                         </h5>
                         {% if recent_creditors %}
-                        <div class="table-responsive-scroll flex-grow-1">
-                            <table class="table table-sm table-hover mb-0">
+                        <div class="dashboard-table-responsive flex-grow-1">
+                            <table class="table table-sm table-hover mb-0 dashboard-table">
                                 <thead class="table-light">
                                     <tr>
                                         <th>{{ trans('general_date', default='Date') | escape }}</th>
@@ -391,25 +303,25 @@
                             </table>
                         </div>
                         {% else %}
-                        <p class="flex-grow-1 d-flex align-items-center justify-content-center">
+                        <p class="flex-grow-1 d-flex align-items-center justify-content-center dashboard-text-muted">
                             {{ trans('no_recent_creditors', default='No recent creditors found.') | escape }}
                         </p>
                         {% endif %}
-                        <a href="{{ url_for('creditors.index') }}" class="btn btn-outline-dark btn-sm mt-3 align-self-start">{{ trans('general_view_all', default='View All Creditors') | escape }}</a>
+                        <a href="{{ url_for('creditors.index') }}" class="dashboard-btn dashboard-btn-outline btn-sm mt-3 align-self-start">{{ trans('general_view_all', default='View All Creditors') | escape }}</a>
                     </div>
                 </div>
             </div>
             
             <!-- Recent Receipts -->
             <div class="col-md-6">
-                <div class="card border-0 shadow-sm h-100">
-                    <div class="card-body d-flex flex-column">
+                <div class="dashboard-card">
+                    <div class="dashboard-card-body d-flex flex-column">
                         <h5 class="card-title mb-3">
                             <i class="bi bi-arrow-down-left me-2"></i> {{ trans('receipts_money_in', default='Recent Income') | escape }}
                         </h5>
                         {% if recent_receipts %}
-                        <div class="table-responsive-scroll flex-grow-1">
-                            <table class="table table-sm table-hover mb-0">
+                        <div class="dashboard-table-responsive flex-grow-1">
+                            <table class="table table-sm table-hover mb-0 dashboard-table">
                                 <thead class="table-light">
                                     <tr>
                                         <th>{{ trans('general_date', default='Date') | escape }}</th>
@@ -429,25 +341,25 @@
                             </table>
                         </div>
                         {% else %}
-                        <p class="flex-grow-1 d-flex align-items-center justify-content-center">
+                        <p class="flex-grow-1 d-flex align-items-center justify-content-center dashboard-text-muted">
                             {{ trans('no_recent_receipts', default='No recent income recorded.') | escape }}
                         </p>
                         {% endif %}
-                        <a href="{{ url_for('receipts.index') }}" class="btn btn-outline-dark btn-sm mt-3 align-self-start">{{ trans('general_view_all', default='View All Income') | escape }}</a>
+                        <a href="{{ url_for('receipts.index') }}" class="dashboard-btn dashboard-btn-outline btn-sm mt-3 align-self-start">{{ trans('general_view_all', default='View All Income') | escape }}</a>
                     </div>
                 </div>
             </div>
             
             <!-- Recent Payments -->
             <div class="col-md-6">
-                <div class="card border-0 shadow-sm h-100">
-                    <div class="card-body d-flex flex-column">
+                <div class="dashboard-card">
+                    <div class="dashboard-card-body d-flex flex-column">
                         <h5 class="card-title mb-3">
                             <i class="bi bi-arrow-up-right me-2"></i> {{ trans('payments_money_out', default='Recent Expenses') | escape }}
                         </h5>
                         {% if recent_payments %}
-                        <div class="table-responsive-scroll flex-grow-1">
-                            <table class="table table-sm table-hover mb-0">
+                        <div class="dashboard-table-responsive flex-grow-1">
+                            <table class="table table-sm table-hover mb-0 dashboard-table">
                                 <thead class="table-light">
                                     <tr>
                                         <th>{{ trans('general_date', default='Date') | escape }}</th>
@@ -467,11 +379,11 @@
                             </table>
                         </div>
                         {% else %}
-                        <p class="flex-grow-1 d-flex align-items-center justify-content-center">
+                        <p class="flex-grow-1 d-flex align-items-center justify-content-center dashboard-text-muted">
                             {{ trans('no_recent_payments', default='No recent expenses recorded.') | escape }}
                         </p>
                         {% endif %}
-                        <a href="{{ url_for('payments.index') }}" class="btn btn-outline-dark btn-sm mt-3 align-self-start">{{ trans('general_view_all', default='View All Expenses') | escape }}</a>
+                        <a href="{{ url_for('payments.index') }}" class="dashboard-btn dashboard-btn-outline btn-sm mt-3 align-self-start">{{ trans('general_view_all', default='View All Expenses') | escape }}</a>
                     </div>
                 </div>
             </div>
@@ -481,22 +393,22 @@
     <!-- 6. QUICK ACTIONS -->
     {% if can_interact %}
     <div class="mb-5">
-        <h3 class="mb-3">{{ trans('general_quick_actions', default='Quick Actions') | escape }}</h3>
+        <h3 class="dashboard-section-heading">{{ trans('general_quick_actions', default='Quick Actions') | escape }}</h3>
         <div class="d-flex flex-wrap gap-3">
-            <a href="{{ url_for('receipts.add') }}" class="btn btn-lg btn-success shadow-sm">
+            <a href="{{ url_for('receipts.add') }}" class="dashboard-btn dashboard-btn-success">
                 <i class="bi bi-plus-circle me-2"></i> {{ trans('receipts_add_money_in', default='Add Income') | escape }}
             </a>
-            <a href="{{ url_for('payments.add') }}" class="btn btn-lg btn-danger shadow-sm">
+            <a href="{{ url_for('payments.add') }}" class="dashboard-btn dashboard-btn-danger">
                 <i class="bi bi-dash-circle me-2"></i> {{ trans('payments_add_money_out', default='Add Expense') | escape }}
             </a>
-            <a href="{{ url_for('inventory.add') }}" class="btn btn-lg btn-primary shadow-sm">
+            <a href="{{ url_for('inventory.add') }}" class="dashboard-btn dashboard-btn-primary">
                 <i class="bi bi-box-seam me-2"></i> {{ trans('inventory_add', default='New Stock') | escape }}
             </a>
-            <a href="{{ url_for('debtors.add') }}" class="btn btn-lg btn-info shadow-sm">
+            <a href="{{ url_for('debtors.add') }}" class="dashboard-btn dashboard-btn-info">
                 <i class="bi bi-person-plus me-2"></i> {{ trans('debtors_create_what_they_owe_you', default='New Debtor') | escape }}
             </a>
             {% if current_user.role == 'admin' %}
-            <a href="{{ url_for('admin.dashboard') }}" class="btn btn-lg btn-warning shadow-sm">
+            <a href="{{ url_for('admin.dashboard') }}" class="dashboard-btn dashboard-btn-warning">
                 <i class="bi bi-shield-lock me-2"></i> {{ trans('admin_dashboard', default='Admin Dashboard') | escape }}
             </a>
             {% endif %}
@@ -506,11 +418,11 @@
 
     {% else %}
     <!-- 7. LOGGED OUT FALLBACK -->
-    <div class="text-center py-5 my-5 bg-light rounded-3 shadow-sm">
-        <div class="p-lg-5">
-            <h1 class="display-5 fw-bold">{{ trans('dashboard_welcome_to_ficore', default='Welcome to Business Finance Dashboard') | escape }}</h1>
-            <p class="fs-4">{{ trans('dashboard_please_login', default='Log in to access your business statistics, recent activity, and quick action links.') | escape }}</p>
-            <a href="{{ url_for('users.login') }}" class="btn btn-primary btn-lg mt-3">{{ trans('general_login', default='Log In Now') | escape }}</a>
+    <div class="dashboard-card text-center py-5 my-5">
+        <div class="dashboard-card-body">
+            <h1 class="dashboard-section-heading">{{ trans('dashboard_welcome_to_ficore', default='Welcome to Business Finance Dashboard') | escape }}</h1>
+            <p class="fs-4 dashboard-text-muted">{{ trans('dashboard_please_login', default='Log in to access your business statistics, recent activity, and quick action links.') | escape }}</p>
+            <a href="{{ url_for('users.login') }}" class="dashboard-btn dashboard-btn-primary btn-lg mt-3">{{ trans('general_login', default='Log In Now') | escape }}</a>
         </div>
     </div>
     {% endif %}
@@ -548,11 +460,19 @@
         window.dashboardData = {
             inventoryLoss: {{ 'true' if inventory_loss else 'false' }},
             debts: {
-                // Ensure data is passed even if variables are not defined to avoid JS errors
                 unpaidDebtors: {{ unpaid_debtors | tojson | safe if unpaid_debtors else '[]' }},
                 unpaidCreditors: {{ unpaid_creditors | tojson | safe if unpaid_creditors else '[]' }}
             }
         };
+
+        // 4. Form input validation
+        document.querySelectorAll('.dashboard-form-control, .dashboard-form-check-input').forEach(input => {
+            input.addEventListener('input', () => {
+                input.classList.remove('is-invalid');
+                const error = input.parentElement.querySelector('.dashboard-text-danger');
+                if (error) error.remove();
+            });
+        });
     });
 </script>
 {% endblock %}
