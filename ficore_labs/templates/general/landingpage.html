@@ -71,12 +71,12 @@
                             </h2>
                             <div id="collapseTools{{ category }}" class="accordion-collapse collapse" aria-labelledby="headingTools{{ category }}">
                                 <div class="accordion-body">
-                                    <ul class="list-unstyled fs-5 mt-4">
-                                        <li><i class="bi bi-check-circle-fill me-2 text-primary"></i>Track your DIICE - debtors, income, inventory, creditors and expenses</li>
-                                        <li><i class="bi bi-file-earmark-text-fill me-2 text-primary"></i>Auto-generation of your financial reports</li>
-                                        <li><i class="bi bi-currency-exchange me-2 text-primary"></i>Manage cash flow & forecast with ease</li>
-                                        <li><i class="bi bi-graph-up me-2 text-primary"></i>Use tools for investor-ready reporting</li>
-                                        <li><i class="bi bi-shield-check me-2 text-primary"></i>Enjoy built-in compliance for clarity</li>
+                                    <ul class="list-unstyled tool-list">
+                                        <li><i class="bi bi-check-circle-fill me-2 text-primary"></i>Track your <strong>DIICE</strong> - <strong>debtors</strong>, <strong>income</strong>, inventory, <strong>creditors</strong> and <strong>expenses</strong></li>
+                                        <li><i class="bi bi-file-earmark-text-fill me-2 text-primary"></i>Auto-generation of your <strong>financial reports</strong></li>
+                                        <li><i class="bi bi-currency-exchange me-2 text-primary"></i>Manage <strong>cash flow</strong> & <strong>forecast</strong> with ease</li>
+                                        <li><i class="bi bi-graph-up me-2 text-primary"></i>Use tools for <strong>investor-ready reporting</strong></li>
+                                        <li><i class="bi bi-shield-check me-2 text-primary"></i>Enjoy built-in <strong>compliance</strong> for clarity</li>
                                     </ul>
                                 </div>
                             </div>
@@ -314,6 +314,22 @@
 .why-item {
     padding: 1rem;
 }
+.tool-list {
+    background-color: #f8f9fa; /* Light pastel background */
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    margin-top: 1rem;
+}
+.tool-list li {
+    line-height: 1.5;
+    margin-bottom: 1rem;
+    word-wrap: break-word;
+}
+.tool-list i {
+    font-size: 1.125rem; /* 18px */
+    margin-right: 0.5rem; /* 8px */
+}
 
 /* Enhanced Button Hierarchy */
 .hero-actions {
@@ -323,40 +339,44 @@
     align-items: center;
     margin: 2rem 0;
 }
-
 .auth-buttons {
     display: flex;
     gap: 1rem;
     flex-wrap: wrap;
     justify-content: center;
 }
-
 .auth-buttons .btn {
     min-width: 140px;
     font-weight: 600;
 }
 
-/* Responsive adjustments */
-@media (min-width: 768px) {
-    .hero-actions {
-        flex-direction: row;
-        justify-content: center;
-        flex-wrap: wrap;
-        gap: 2rem;
-    }
+/* Accordion Enhancements */
+.accordion-button {
+    min-height: 48px; /* Larger tap area */
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+.accordion-collapse {
+    transition: height 0.3s ease; /* Smooth animation */
 }
 
+/* Mobile-specific styles */
 @media (max-width: 576px) {
+    .tool-list {
+        padding: 1rem; /* Horizontal padding for mobile */
+    }
+    .tool-list li {
+        font-size: 1rem; /* 16px */
+    }
     .auth-buttons {
         flex-direction: column;
         width: 100%;
     }
-    
     .auth-buttons .btn {
         width: 100%;
         min-width: auto;
     }
 }
+
 /* Button Style Overrides */
 .btn-primary {
     background-color: var(--button-primary-bg);
@@ -375,7 +395,7 @@
     background-color: transparent;
     transition: var(--transition-base), transform 0.2s;
 }
-.btn-outline-primary:hover,
+.btn-outline-primary:hover {
     background-color: rgba(34, 72, 141, 0.1); /* Light primary fill on hover */
     color: var(--button-secondary-bg);
     border-color: var(--button-secondary-border);
@@ -392,7 +412,6 @@
     border-width: 0.2px !important;
   }
 }
-/* Default (desktop/tablet) */
 .btn-outline-primary {
     border: 0.2px solid var(--button-secondary-border);
 }
