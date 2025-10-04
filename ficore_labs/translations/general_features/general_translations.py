@@ -11,6 +11,11 @@ GENERAL_TRANSLATIONS = {
         'general_database_connection_failed': 'MongoDB connection failed after max retries',
         'general_database_initialization_failed': 'Failed to initialize database',
         'category_staff_wages': 'Staff Wages',
+        'general_tool_diice': 'Track your DIICE - debtors, income, inventory, creditors and expenses',
+        'general_tool_reports': 'Auto-generation of your financial reports',
+        'general_tool_cashflow': 'Manage cash flow & forecast with ease',
+        'general_tool_investor': 'Use tools for investor-ready reporting',
+        'general_tool_compliance': 'Enjoy built-in compliance for clarity',
             'category_business_travel': 'Business Travel',
             'category_rent_utilities': 'Rent and Utilities',
             'category_marketing_sales': 'Marketing and Sales',
@@ -2568,6 +2573,11 @@ GENERAL_TRANSLATIONS = {
             'subscribe_paystack_option': 'Biya da Paystack',
             'subscribe_pay_online': 'Biya ta Kan Layi',
         'profile_settings_desc': 'Sabunta bayanan ka na sirri, zaɓuka, da bayanan asusun anan.',
+        'general_tool_diice': 'Bibiya da lura da DIICE – masu bin bashi, kudaden shiga, kaya, masu karbar bashi da kuma kashe-kashe',
+        'general_tool_reports': 'Samar da rahotannin kuɗi ta atomatik',
+        'general_tool_cashflow': 'Sarrafa shigowa da fitowar kuɗi tare da saukin hasashen kuɗin gaba',
+        'general_tool_investor': 'Yi amfani da kayan aiki don samar da rahotanni da masu zuba jari ke bukata',
+        'general_tool_compliance': 'Amfana da tsarin da ke tabbatar da bin doka don fahimta da sauƙi',
         
         # Search and Navigation (Hausa)
         'search_results_for': 'Sakamakon bincike don',
