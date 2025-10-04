@@ -71,19 +71,13 @@
                             </h2>
                             <div id="collapseTools{{ category }}" class="accordion-collapse collapse" aria-labelledby="headingTools{{ category }}">
                                 <div class="accordion-body">
-                                    <div class="row">
-                                        {% for tool in category_tools %}
-                                            <div class="col-md-4 mb-3">
-                                                <a href="{{ tool.get('url', url_for('users.login')) }}" class="tool-card-link">
-                                                    <div class="card">
-                                                        <div class="card-body">
-                                                            <h5>{{ t(tool.get('label_key', ''), default=tool.get('label', 'Tool')) | e }}</h5>
-                                                        </div>
-                                                    </div>
-                                                </a>
-                                            </div>
-                                        {% endfor %}
-                                    </div>
+                                    <ul class="list-unstyled fs-5 mt-4">
+                                        <li><i class="bi bi-check-circle-fill me-2 text-primary"></i>Track your DIICE - debtors, income, inventory, creditors and expenses</li>
+                                        <li><i class="bi bi-file-earmark-text-fill me-2 text-primary"></i>Auto-generation of your financial reports</li>
+                                        <li><i class="bi bi-currency-exchange me-2 text-primary"></i>Manage cash flow & forecast with ease</li>
+                                        <li><i class="bi bi-graph-up me-2 text-primary"></i>Use tools for investor-ready reporting</li>
+                                        <li><i class="bi bi-shield-check me-2 text-primary"></i>Enjoy built-in compliance for clarity</li>
+                                    </ul>
                                 </div>
                             </div>
                         </div>
