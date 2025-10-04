@@ -278,9 +278,9 @@ def manage_subscription():
         lang = session.get('lang', 'en')
         from_subscription_required = request.args.get('from_subscription_required') == 'true'
         payment_info = {
-            'bank': os.getenv('PAYMENT_BANK', 'OPAY'),
-            'account_name': os.getenv('PAYMENT_ACCOUNT_NAME', 'Ficore Labs'),
-            'account_number': os.getenv('PAYMENT_ACCOUNT_NUMBER', '1234567890')
+            'bank': os.getenv('PAYMENT_BANK', 'KUDA'),
+            'account_name': os.getenv('PAYMENT_ACCOUNT_NAME', 'Ficore Labs Ltd'),
+            'account_number': os.getenv('PAYMENT_ACCOUNT_NUMBER', '3002896099')
         }
         db = get_mongo_db()
         receipts = list(db.payment_receipts.find({'user_id': current_user.id}).sort('uploaded_at', -1))
