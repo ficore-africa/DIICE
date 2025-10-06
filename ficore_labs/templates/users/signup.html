@@ -21,7 +21,6 @@
             <p class="mb-3 text-muted">{{ t('general_form_reset_note', default='Form fields retain your input for convenience. Clear them if needed.') | escape }}</p>
             <p class="mb-3 text-muted">
                 {{ t('general_trial_info', default='Your 30-day free trial starts now. ') | escape }}
-                <span id="trial-countdown" aria-live="polite">30 days remaining</span>.
             </p>
             <form class="validate-form needs-validation" method="POST" action="{{ url_for('users.signup') }}" novalidate aria-labelledby="signup-form-title">
                 {{ form.hidden_tag() }}
@@ -184,23 +183,5 @@ document.getElementById('password').addEventListener('input', function () {
             }
         });
     });
-
-    // Trial countdown (starts today: September 30, 2025)
-    function updateTrialCountdown() {
-        const trialStart = new Date('2025-09-30');
-        const trialEnd = new Date(trialStart.getTime() + 30 * 24 * 60 * 60 * 1000);
-        const now = new Date();
-        const daysLeft = Math.ceil((trialEnd - now) / (1000 * 60 * 60 * 24));
-        const countdownEl = document.getElementById('trial-countdown');
-        if (daysLeft > 0) {
-            countdownEl.textContent = `${daysLeft} days remaining`;
-        } else {
-            countdownEl.textContent = 'Trial expired';
-            countdownEl.classList.add('text-danger');
-        }
-    }
-    updateTrialCountdown();
-    setInterval(updateTrialCountdown, 24 * 60 * 60 * 1000); // Update daily
-})();
 </script>
 {% endblock %}
